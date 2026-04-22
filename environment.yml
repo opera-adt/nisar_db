@@ -1,0 +1,15 @@
+name: nisar-db-env
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.10
+  - click
+  - geopandas-base
+  - numpy
+  - pandas
+  - pip
+  - requests
+  - shapely
+  - tqdm
+  - pip:
+    - unzip-http

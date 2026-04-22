@@ -1,0 +1,33 @@
+[project]
+name = "nisar-db"
+version = "0.1.0"
+description = "NISAR Frame database generation for OPERA DISP-NISAR"
+authors = ["Marijan Govorcin <marijan.govorcin@jpl.nasa.gov>"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+
+[tasks]
+lint = "pre-commit run --all-files"
+tests = "pytest -xvs tests"
+check = "mypy src/"
+build = "pip install -e ."
+create-frame-to-bound = "python create_frame_to_bound.py"
+create-catalog = "python create_gslc_catalog.py"
+create-consistent = "python create_consistent_gslc_catalog.py"
+
+[dependencies]
+python = ">=3.9,<3.12"
+click = "*"
+geopandas = "*"
+numpy = "*"
+pandas = "*"
+requests = "*"
+shapely = "*"
+tqdm = "*"
+
+[feature.dev.dependencies]
+pytest = "*"
+pre-commit = "*"
+mypy = "*"
+black = "*"
+ruff = "*"
