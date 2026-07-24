@@ -25,13 +25,13 @@ Usage
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import csv
+from pathlib import Path
 
 import click
 import pandas as pd
+
+from nisar_db.filenames import GSLCFilename
 
 # Columns that contain zero-padded numeric strings (e.g. "0005", "003").
 # Written with explicit quoting so pandas doesn't drop leading zeros on re-read.
@@ -39,10 +39,6 @@ _STR_COLS = ["cycle", "mode", "mode_family", "common_mode", "crid", "version"]
 
 # Mode families considered "standard" for common_mode voting.
 _STANDARD_FAMILIES = {"40", "20"}
-
-# Allow running from the repo root without installing
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-from nisar_db.filenames import GSLCFilename
 
 
 def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str]]]:

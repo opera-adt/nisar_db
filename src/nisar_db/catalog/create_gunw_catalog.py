@@ -23,9 +23,6 @@ from typing import Dict, List, Optional, Union
 import duckdb
 import pandas as pd
 
-# Add the src directory to sys.path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from nisar_db.filenames import GUNWFilename, NISARCollection
 from nisar_db.search_nisar import search_nisar_granules
 
