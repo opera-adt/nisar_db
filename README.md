@@ -62,11 +62,13 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  create-catalog          Generate a structured catalog from a list of NISAR GSLC files
-  create-consistent       Create a consistent GSLC catalog for NISAR processing
-  create-frame-to-bound   Create a frame-to-bound JSON file for NISAR frames
-  create-nisar-catalog    Create comprehensive JSON catalogs of NISAR products for web applications
-  create-blackout-dates   Create blackout dates for NISAR frames
+  create-blackout-dates  Create the NISAR blackout-dates JSON.
+  create-catalog         Parse a NISAR GSLC file list into a structured CSV.
+  create-consistent      Create the consistent-GSLC JSON for NISAR frames.
+  create-frame-to-bound  Create a frame_to_bound JSON file for NISAR.
+  create-nisar-catalog   Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
+  download               Download NISAR granules/URLs from CMR.
+  search                 Search for NISAR products.
 ```
 
 ## Creating GSLC Catalogs
@@ -95,25 +97,28 @@ This generates both an uncompressed JSON file and a compressed .json.zip file fo
 
 ## Creating Consistent GSLC Catalogs
 
-For operational processing, a consistent catalog of GSLC files is needed. The `nisar-db create-consistent` command builds this:
+For operational processing, a consistent catalog of GSLC files is needed. The `nisar-db create-consistent` command builds this from the GSLC catalog CSV (`create-catalog`) and the filtered frames GeoPackage (`create-frame-to-bound` writes `opera-nisar-disp-frames.gpkg`):
 
 ```bash
-nisar-db create-consistent --input gslc_catalog.csv --output consistent_gslc_catalog.json
+nisar-db create-consistent \
+  --catalog gslc_catalog.csv \
+  --nisar-gpkg opera-nisar-disp-frames.gpkg \
+  --output consistent_gslc_catalog.json
 ```
 
 ## Creating NISAR Product JSON Catalogs
 
-The new `create-nisar-catalog.py` script generates comprehensive JSON catalogs of NISAR products for use in web applications. These catalogs are similar to the ones produced by burst_db.
+The `nisar-db create-nisar-catalog` command generates comprehensive JSON catalogs of NISAR products (queried from CMR) for use in web applications. These catalogs are similar to the ones produced by burst_db.
 
 ```bash
-# Create catalogs for all product types
-python create_nisar_catalog.py --output-dir catalog
+# Create catalogs for all product types (default)
+nisar-db create-nisar-catalog --output-dir catalog
 
 # Create only GSLC catalog
-python create_nisar_catalog.py --gslc --output-dir catalog
+nisar-db create-nisar-catalog --gslc --output-dir catalog
 
 # Create only GUNW catalog
-python create_nisar_catalog.py --gunw --output-dir catalog
+nisar-db create-nisar-catalog --gunw --output-dir catalog
 ```
 
 The script generates the following JSON files:
@@ -134,37 +139,37 @@ The script also creates DuckDB databases (`gslc_catalog.duckdb` and `gunw_catalo
 
 ## Creating Blackout Dates for NISAR Frames
 
-The `create_blackout_dates_cli.py` script generates blackout date information for NISAR frames. Blackout dates indicate periods when data should not be processed, typically due to environmental conditions like snow cover or extreme weather that affect SAR data quality.
+The `nisar-db create-blackout-dates` command generates blackout date information for NISAR frames. Blackout dates indicate periods when data should not be processed, typically due to environmental conditions like snow cover or extreme weather that affect SAR data quality.
 
 ```bash
-# Create blackout dates from snow analysis data
-python create_blackout_dates_cli.py --snow-analysis snow_analysis.geojson --output-file nisar-blackout-dates.json
+# Create blackout dates from snow analysis data (default input format)
+nisar-db create-blackout-dates --input-file snow_analysis.geojson --output-file nisar-blackout-dates.json
 
 # Create blackout dates from monthly data
-python create_blackout_dates_cli.py --monthly-data monthly_data.geojson --output-file nisar-blackout-dates.json
+nisar-db create-blackout-dates --input-file monthly_data.geojson --monthly --output-file nisar-blackout-dates.json
 
 # Create manual blackout dates for predefined frames
-python create_blackout_dates_cli.py --manual --output-file nisar-manual-blackout-dates.json
+nisar-db create-blackout-dates --manual --output-file nisar-manual-blackout-dates.json
 ```
 
-The script supports three methods for creating blackout dates:
+The command supports three methods for creating blackout dates:
 
-1. **Snow Analysis Data**: Uses a GeoJSON or Parquet file with snow cover analysis data, containing aggressive, median, and conservative blackout periods for each frame.
+1. **Snow Analysis Data** (default): Uses a GeoJSON or Parquet file with snow cover analysis data, containing aggressive, median, and conservative blackout periods for each frame.
    
    ```bash
-   python create_blackout_dates_cli.py --snow-analysis snow_analysis.geojson --max-default-duration 180
+   nisar-db create-blackout-dates --input-file snow_analysis.geojson --max-default-duration 180
    ```
 
-2. **Monthly Data**: Uses a GeoJSON file with year, month, frame_id, and to_process fields, where to_process=0 indicates a blackout month.
+2. **Monthly Data** (`--monthly`): Uses a GeoJSON file with year, month, frame_id, and to_process fields, where to_process=0 indicates a blackout month.
    
    ```bash
-   python create_blackout_dates_cli.py --monthly-data monthly_data.geojson
+   nisar-db create-blackout-dates --input-file monthly_data.geojson --monthly
    ```
 
-3. **Manual Definition**: Creates blackout dates from predefined periods without requiring an input file.
+3. **Manual Definition** (`--manual`): Creates blackout dates from predefined periods without requiring an input file.
    
    ```bash
-   python create_blackout_dates_cli.py --manual --start-year 2025 --end-year 2030
+   nisar-db create-blackout-dates --manual --start-year 2025 --end-year 2030
    ```
 
 The output is a JSON file with the following structure:

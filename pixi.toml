@@ -11,9 +11,9 @@ lint = "pre-commit run --all-files"
 tests = "pytest -xvs tests"
 check = "mypy src/"
 build = "pip install -e ."
-create-frame-to-bound = "python create_frame_to_bound.py"
-create-catalog = "python create_gslc_catalog.py"
-create-consistent = "python create_consistent_gslc_catalog.py"
+create-frame-to-bound = "nisar-db create-frame-to-bound"
+create-catalog = "nisar-db create-catalog"
+create-consistent = "nisar-db create-consistent"
 
 [dependencies]
 python = ">=3.9,<3.12"
