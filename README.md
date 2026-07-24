@@ -65,6 +65,8 @@ Commands:
   create-catalog          Generate a structured catalog from a list of NISAR GSLC files
   create-consistent       Create a consistent GSLC catalog for NISAR processing
   create-frame-to-bound   Create a frame-to-bound JSON file for NISAR frames
+  create-nisar-catalog    Create comprehensive JSON catalogs of NISAR products for web applications
+  create-blackout-dates   Create blackout dates for NISAR frames
 ```
 
 ## Creating GSLC Catalogs
@@ -98,6 +100,119 @@ For operational processing, a consistent catalog of GSLC files is needed. The `n
 ```bash
 nisar-db create-consistent --input gslc_catalog.csv --output consistent_gslc_catalog.json
 ```
+
+## Creating NISAR Product JSON Catalogs
+
+The new `create-nisar-catalog.py` script generates comprehensive JSON catalogs of NISAR products for use in web applications. These catalogs are similar to the ones produced by burst_db.
+
+```bash
+# Create catalogs for all product types
+python create_nisar_catalog.py --output-dir catalog
+
+# Create only GSLC catalog
+python create_nisar_catalog.py --gslc --output-dir catalog
+
+# Create only GUNW catalog
+python create_nisar_catalog.py --gunw --output-dir catalog
+```
+
+The script generates the following JSON files:
+
+- **GSLC products**:
+  - `gslc_tracks.json`: List of all tracks and their pass directions
+  - `gslc_frames.json`: List of all frames for each track
+  - `gslc_dates.json`: List of all acquisition dates for each frame
+  - `gslc_scenes.json`: Detailed information about each GSLC scene
+
+- **GUNW products**:
+  - `gunw_tracks.json`: List of all tracks and their pass directions
+  - `gunw_frames.json`: List of all frames for each track
+  - `gunw_pairs.json`: List of all interferogram pairs for each frame
+  - `gunw_interferograms.json`: Detailed information about each interferogram
+
+The script also creates DuckDB databases (`gslc_catalog.duckdb` and `gunw_catalog.duckdb`) that can be used for efficient querying of the catalog.
+
+## Creating Blackout Dates for NISAR Frames
+
+The `create_blackout_dates_cli.py` script generates blackout date information for NISAR frames. Blackout dates indicate periods when data should not be processed, typically due to environmental conditions like snow cover or extreme weather that affect SAR data quality.
+
+```bash
+# Create blackout dates from snow analysis data
+python create_blackout_dates_cli.py --snow-analysis snow_analysis.geojson --output-file nisar-blackout-dates.json
+
+# Create blackout dates from monthly data
+python create_blackout_dates_cli.py --monthly-data monthly_data.geojson --output-file nisar-blackout-dates.json
+
+# Create manual blackout dates for predefined frames
+python create_blackout_dates_cli.py --manual --output-file nisar-manual-blackout-dates.json
+```
+
+The script supports three methods for creating blackout dates:
+
+1. **Snow Analysis Data**: Uses a GeoJSON or Parquet file with snow cover analysis data, containing aggressive, median, and conservative blackout periods for each frame.
+   
+   ```bash
+   python create_blackout_dates_cli.py --snow-analysis snow_analysis.geojson --max-default-duration 180
+   ```
+
+2. **Monthly Data**: Uses a GeoJSON file with year, month, frame_id, and to_process fields, where to_process=0 indicates a blackout month.
+   
+   ```bash
+   python create_blackout_dates_cli.py --monthly-data monthly_data.geojson
+   ```
+
+3. **Manual Definition**: Creates blackout dates from predefined periods without requiring an input file.
+   
+   ```bash
+   python create_blackout_dates_cli.py --manual --start-year 2025 --end-year 2030
+   ```
+
+The output is a JSON file with the following structure:
+
+```json
+{
+  "metadata": {
+    "generation_time": "2026-04-22T14:30:25.123456",
+    "input_file": "snow_analysis.geojson",
+    "output_file": "nisar-blackout-dates-2026-04-22.json"
+  },
+  "blackout_dates": {
+    "1001": [
+      [
+        "2025-11-01T00:00:00",
+        "2026-05-31T23:59:59"
+      ],
+      [
+        "2026-11-01T00:00:00",
+        "2027-05-31T23:59:59"
+      ]
+    ],
+    "1002": [
+      [
+        "2025-11-15T00:00:00",
+        "2026-04-30T23:59:59"
+      ]
+    ]
+  }
+}
+```
+
+### Automated Catalog Updates with GitHub Actions
+
+A GitHub Actions workflow is included to automatically update the catalogs daily:
+
+```yaml
+name: Update NISAR Catalog
+
+on:
+  schedule:
+    # Run every day at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+```
+
+The workflow searches for new NISAR products, updates the catalogs, and commits the changes to the repository.
 
 ## Frame database information
 
@@ -170,15 +285,23 @@ You can use the Python API directly:
 ```python
 from nisar_db.filenames import GSLCFilename, GUNWFilename
 from nisar_db.geodb import convert_to_gdf, get_opera_na_shape
-from nisar_db.download import download_earthdata_granule
+from nisar_db.download_extended import download_earthdata_granule, download_from_url
+from nisar_db.catalog.create_gslc_catalog import search_gslc_products
+from nisar_db.catalog.create_blackout_dates import manual_blackout_dates
 
 # Parse a GSLC filename
-gslc = GSLCFilename.from_path("path/to/NISAR_L2_PR_GSLC_123_456_D_789_4000_HH_20250101T120000_20250101T120100.h5")
+gslc = GSLCFilename.from_path("path/to/NISAR_L2_GSLC_BETA_V1_123_456_D_789_4000_HH_20250101T120000_20250101T120100.h5")
 print(gslc.date)       # Access date
 print(gslc.scene_id)   # Get scene identifier (track/frame/direction)
 
 # Download data from EarthData (requires .netrc credentials)
 files = download_earthdata_granule("granule_id", output_dir="downloads")
+
+# Search for GSLC products
+gslc_products = search_gslc_products(max_results=1000)
+
+# Create manual blackout dates
+blackout_data = manual_blackout_dates(output_file="blackout_dates.json")
 
 # Work with geographic data
 na_shape = get_opera_na_shape()  # Get the OPERA North America shape

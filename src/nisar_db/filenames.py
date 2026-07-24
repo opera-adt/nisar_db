@@ -1,8 +1,27 @@
 from dataclasses import dataclass, asdict
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 import pandas as pd
 from .utils import parts_str, _DT_FMT, _DATE_FMT
+
+# NISAR TRACK_FRAME_DB
+NISAR_DB_GRANULE_ID = "G3817504902-ASF"
+
+# NISAR CMR Collection IDs and short names
+class NISARCollection:
+    """Collection names and IDs for NISAR products in CMR."""
+
+    # GSLC Collections
+    GSLC_BETA_V1_SHORT_NAME = "NISAR_L2_GSLC_BETA_V1"  # Current GSLC short name
+    GSLC_PR_SHORT_NAME = "NISAR_L2_PR_GSLC"  # Original/alternative GSLC short name
+
+    # GUNW Collections
+    GUNW_BETA_V1_SHORT_NAME = "NISAR_L2_GUNW_BETA_V1"  # Current GUNW short name (if available)
+    GUNW_PR_SHORT_NAME = "NISAR_L2_PR_GUNW"  # Original/alternative GUNW short name
+
+    # Provider
+    DEFAULT_PROVIDER = "ASF"  # Alaska Satellite Facility is the primary NISAR data provider
 
 @dataclass(frozen=True)
 class GSLCFilename:

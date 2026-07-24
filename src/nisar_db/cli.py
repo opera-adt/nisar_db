@@ -3,6 +3,7 @@
 import click
 import sys
 from pathlib import Path
+import datetime
 
 # Add the parent directory to sys.path so we can import from scripts
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from create_frame_to_bound import main as create_frame_to_bound_main
 from create_gslc_catalog import main as create_gslc_catalog_main
 from create_consistent_gslc_catalog import main as create_consistent_gslc_catalog_main
+from nisar_db.search_nisar import main as search_nisar_main
 
 
 @click.group()
@@ -108,6 +110,47 @@ def create_consistent_cmd(input_file, output, blackout_file, min_dates):
     across all frames and dates.
     """
     create_consistent_gslc_catalog_main(input_file, output, blackout_file, min_dates)
+
+
+@cli_app.command(name="search")
+@click.option("--bbox", type=str, help="Bounding box as 'west,south,east,north'")
+@click.option("--track", type=int, help="Track number")
+@click.option("--frame", type=int, help="Frame number")
+@click.option("--direction", type=str, help="Orbit direction (A/D)")
+@click.option("--cycle", type=int, help="Cycle number")
+@click.option(
+    "--product-type",
+    type=click.Choice(["GSLC", "GUNW"]),
+    default="GSLC",
+    help="Product type (default: GSLC)"
+)
+@click.option("--polarization", type=str, help="Polarization (e.g., HH)")
+@click.option("--start-date", type=str, help="Start date (YYYY-MM-DD)")
+@click.option("--end-date", type=str, help="End date (YYYY-MM-DD)")
+@click.option("--provider", type=str, default="ASF", help="Data provider (default: ASF)")
+@click.option("--max-results", type=int, default=100, help="Maximum results (default: 100)")
+@click.option("--download", type=str, help="Download to this directory")
+@click.option("--output-csv", type=str, help="Save results to CSV")
+@click.option(
+    "--url-type",
+    type=click.Choice(["https", "s3"]),
+    default="https",
+    help="URL type (default: https)"
+)
+def search_cmd(**kwargs):
+    """Search for NISAR products.
+
+    Search for NISAR GSLC and GUNW products in the CMR catalog.
+    Results can be saved to CSV and/or downloaded.
+    """
+    import sys
+    sys.argv = [sys.argv[0]]
+    for key, value in kwargs.items():
+        if value is not None:
+            sys.argv.append(f"--{key.replace('_', '-')}")
+            if not isinstance(value, bool):
+                sys.argv.append(str(value))
+    search_nisar_main()
 
 
 if __name__ == "__main__":
