@@ -18,9 +18,6 @@ import logging
 import sys
 from pathlib import Path
 
-# Add the src directory to sys.path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
 from nisar_db.catalog.create_gslc_catalog import main as create_gslc_catalog
 from nisar_db.catalog.create_gunw_catalog import main as create_gunw_catalog
 

@@ -12,9 +12,6 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# Add the src directory to sys.path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-
 from nisar_db.download_extended import (
     download_earthdata_granule,
     download_from_url,

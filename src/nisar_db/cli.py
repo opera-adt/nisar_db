@@ -21,6 +21,59 @@ cli_app.add_command(create_catalog_cmd, name="create-catalog")
 cli_app.add_command(create_consistent_cmd, name="create-consistent")
 
 
+def _run_argparse_main(module_name: str, prog: str, args: tuple[str, ...]) -> None:
+    """Drive an argparse-based ``main()`` from a click passthrough command.
+
+    The target module is imported lazily so heavy optional deps (duckdb,
+    geopandas) are only required when the command actually runs, never for
+    ``nisar-db --help``.
+    """
+    import importlib
+    import sys
+
+    module = importlib.import_module(module_name)
+    sys.argv = [prog, *args]
+    module.main()
+
+
+_PASSTHROUGH = {"context_settings": dict(ignore_unknown_options=True, help_option_names=[])}
+
+
+@cli_app.command(name="create-nisar-catalog", **_PASSTHROUGH)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def create_nisar_catalog_cmd(args):
+    """Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
+
+    Passes all options through to nisar_db.nisar_catalog; run with --help
+    for its full argument list.
+    """
+    _run_argparse_main("nisar_db.nisar_catalog", "create-nisar-catalog", args)
+
+
+@cli_app.command(name="create-blackout-dates", **_PASSTHROUGH)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def create_blackout_dates_cmd(args):
+    """Create the NISAR blackout-dates JSON.
+
+    Passes all options through to nisar_db.catalog.create_blackout_dates;
+    run with --help for its full argument list.
+    """
+    _run_argparse_main(
+        "nisar_db.catalog.create_blackout_dates", "create-blackout-dates", args
+    )
+
+
+@cli_app.command(name="download", **_PASSTHROUGH)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def download_cmd(args):
+    """Download NISAR granules/URLs from CMR.
+
+    Passes all options through to nisar_db.download_cli; run with --help
+    for its full argument list.
+    """
+    _run_argparse_main("nisar_db.download_cli", "download", args)
+
+
 @cli_app.command(name="search")
 @click.option("--bbox", type=str, help="Bounding box as 'west,south,east,north'")
 @click.option("--track", type=int, help="Track number")
