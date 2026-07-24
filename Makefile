@@ -25,6 +25,9 @@ endif
 # Define output filenames with dates
 FRAME_TO_BOUND := opera-nisar-disp-frame-to-bounds-$(DATE).json
 CONSISTENT_GSLC := opera-nisar-disp-consistent-gslc-$(DATE).json
+# Side output of create-frame-to-bound: filtered NISAR frame polygons,
+# consumed by create-consistent.
+FRAMES_GPKG := opera-nisar-disp-frames.gpkg
 
 # Main target
 all: $(FRAME_TO_BOUND) $(CONSISTENT_GSLC)
@@ -32,17 +35,20 @@ all: $(FRAME_TO_BOUND) $(CONSISTENT_GSLC)
 	@echo "Build complete for version $(VERSION)"
 	@echo "================================================"
 
-# Create Frame-to-Bound JSON
+# Create Frame-to-Bound JSON (also writes $(FRAMES_GPKG))
 $(FRAME_TO_BOUND): $(NISAR_GPKG)
-	python create_frame_to_bound.py --nisar-gpkg $(NISAR_GPKG) --output $@
+	nisar-db create-frame-to-bound --nisar-gpkg $(NISAR_GPKG) --output $@
 
-# Create Consistent GSLC catalog
-$(CONSISTENT_GSLC): $(GSLC_CATALOG)
-	python create_consistent_gslc_catalog.py --input $(GSLC_CATALOG) --output $@
+# The filtered frames GPKG is produced as a side effect of frame-to-bound
+$(FRAMES_GPKG): $(FRAME_TO_BOUND)
+
+# Create Consistent GSLC catalog (needs the catalog CSV and the frames GPKG)
+$(CONSISTENT_GSLC): $(GSLC_CATALOG) $(FRAMES_GPKG)
+	nisar-db create-consistent --catalog $(GSLC_CATALOG) --nisar-gpkg $(FRAMES_GPKG) --output $@
 
 # Create GSLC catalog from file list
 gslc_catalog.csv: gslc_files.txt $(NISAR_GPKG)
-	python create_gslc_catalog.py --input gslc_files.txt --output $@ --nisar-gpkg $(NISAR_GPKG) --na-only
+	nisar-db create-catalog --input gslc_files.txt --output $@ --nisar-gpkg $(NISAR_GPKG) --na-only
 
 # Clean up intermediate files
 clean:
