@@ -103,7 +103,7 @@ To bring `nisar_db` to `burst_db`-level "assets produced by a GitHub Action/rele
 - [ ] `catalog/create_gslc_catalog.py`, `catalog/create_gunw_catalog.py` — keep, remove `sys.path.insert`, fix `DuckDBPy.Connection` typo
 - [ ] `catalog/create_blackout_dates.py` — single blackout module; delete `src/scripts` + `nisar_workflow.py` duplicates
 - [ ] Reference-date equivalent (`reference_dates.py`) — **decide if DISP-NISAR needs reference-date resets** (parity with burst_db `make-reference-dates`)
-- [ ] Keep supporting: `filenames.py`, `geodb.py`, `search_nisar.py`, `download_extended.py`, `parser.py`, `utils.py`
+- [ ] Keep supporting: `filenames.py`, `geodb.py`, `search_nisar.py`, `download.py`, `parser.py`, `utils.py`
 
 ### CLI (`src/nisar_db/cli.py`)
 

@@ -68,7 +68,7 @@ jobs:
       - name: Download NISAR TrackFrame database (public granule)
         run: |
           python - <<'PY'
-          from nisar_db.download_extended import download_earthdata_granule
+          from nisar_db.download import download_earthdata_granule
           import os, shutil, glob
           paths = download_earthdata_granule(os.environ["NISAR_DB_GRANULE_ID"])
           if not paths:

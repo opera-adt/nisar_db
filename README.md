@@ -290,7 +290,7 @@ You can use the Python API directly:
 ```python
 from nisar_db.filenames import GSLCFilename, GUNWFilename
 from nisar_db.geodb import convert_to_gdf, get_opera_na_shape
-from nisar_db.download_extended import download_earthdata_granule, download_from_url
+from nisar_db.download import download_earthdata_granule, download_from_url
 from nisar_db.catalog.create_gslc_catalog import search_gslc_products
 from nisar_db.catalog.create_blackout_dates import manual_blackout_dates
 
