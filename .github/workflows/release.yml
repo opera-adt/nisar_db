@@ -1,0 +1,125 @@
+name: Release NISAR DISP assets
+
+# Build the Path-A release assets (frame-to-bounds, GSLC catalog, consistent-GSLC)
+# and attach them to a GitHub Release when a v* tag is pushed.
+#
+# Required repository secrets (Earthdata Login, used to download the public
+# NISAR TrackFrame database granule and to query CMR):
+#   EARTHDATA_USERNAME
+#   EARTHDATA_PASSWORD
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      max_results:
+        description: 'Max GSLC granules to pull from CMR for the catalog'
+        required: false
+        default: '25000'
+
+permissions:
+  contents: write
+
+env:
+  # CMR concept-id of the public NISAR TrackFrame database granule.
+  NISAR_DB_GRANULE_ID: G3817504902-ASF
+  MAX_RESULTS: ${{ github.event.inputs.max_results || '25000' }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Configure Earthdata credentials
+        env:
+          EARTHDATA_USERNAME: ${{ secrets.EARTHDATA_USERNAME }}
+          EARTHDATA_PASSWORD: ${{ secrets.EARTHDATA_PASSWORD }}
+        run: |
+          if [ -z "$EARTHDATA_USERNAME" ] || [ -z "$EARTHDATA_PASSWORD" ]; then
+            echo "::error::EARTHDATA_USERNAME / EARTHDATA_PASSWORD secrets are required."
+            exit 1
+          fi
+          umask 177
+          cat > "$HOME/.netrc" <<EOF
+          machine urs.earthdata.nasa.gov login $EARTHDATA_USERNAME password $EARTHDATA_PASSWORD
+          EOF
+
+      - name: Resolve version/date
+        id: meta
+        run: |
+          echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download NISAR TrackFrame database (public granule)
+        run: |
+          python - <<'PY'
+          from nisar_db.download_extended import download_earthdata_granule
+          import os, shutil, glob
+          paths = download_earthdata_granule(os.environ["NISAR_DB_GRANULE_ID"])
+          if not paths:
+              raise SystemExit("Failed to download the NISAR TrackFrame granule")
+          gpkg = next((p for p in paths if p.endswith(".gpkg")), paths[0])
+          shutil.copy(gpkg, "NISAR_TrackFrame_L.gpkg")
+          print("gpkg:", gpkg)
+          PY
+
+      - name: Build frame-to-bounds asset
+        run: |
+          nisar-db create-frame-to-bound \
+            --nisar-gpkg NISAR_TrackFrame_L.gpkg \
+            --output opera-nisar-disp-frame-to-bounds-${{ steps.meta.outputs.date }}.json
+
+      - name: Build GSLC file list from CMR
+        run: |
+          nisar-db search --product-type GSLC --url-type s3 \
+            --max-results "${MAX_RESULTS}" --output-csv gslc_search.csv
+          python - <<'PY'
+          import pandas as pd
+          df = pd.read_csv("gslc_search.csv")
+          urls = df["url"].dropna().astype(str)
+          urls = urls[urls.str.startswith("s3://")]
+          urls.to_csv("gslc_files.txt", index=False, header=False)
+          print(f"Wrote {len(urls)} GSLC S3 paths to gslc_files.txt")
+          PY
+
+      - name: Build GSLC catalog (North America only)
+        run: |
+          nisar-db create-catalog \
+            --input gslc_files.txt \
+            --output gslc_catalog.csv \
+            --na-only --nisar-gpkg NISAR_TrackFrame_L.gpkg
+
+      - name: Build consistent-GSLC asset
+        run: |
+          nisar-db create-consistent \
+            --catalog gslc_catalog.csv \
+            --nisar-gpkg opera-nisar-disp-frames.gpkg \
+            --output opera-nisar-disp-consistent-gslc-${{ steps.meta.outputs.date }}.json
+
+      - name: Create GitHub Release with assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "nisar_db ${{ steps.meta.outputs.version }}" \
+            --generate-notes \
+            opera-nisar-disp-frame-to-bounds-${{ steps.meta.outputs.date }}.json \
+            opera-nisar-disp-frame-to-bounds-${{ steps.meta.outputs.date }}.json.zip \
+            opera-nisar-disp-consistent-gslc-${{ steps.meta.outputs.date }}.json \
+            opera-nisar-disp-consistent-gslc-${{ steps.meta.outputs.date }}.json.zip \
+            gslc_catalog.csv
