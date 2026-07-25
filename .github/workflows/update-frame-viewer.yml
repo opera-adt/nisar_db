@@ -1,0 +1,150 @@
+name: Update frame viewer
+
+# Weekly refresh of the frame viewer published at
+# https://opera-adt.github.io/nisar_db/frame-viewer/
+#
+# Queries CMR for the current GSLC archive, rebuilds the consistent-mode
+# database from it, renders the viewer HTML, and republishes the docs site.
+# Everything is sourced from CMR, so no AWS credentials are needed -- only
+# Earthdata Login, to download the public NISAR TrackFrame database granule.
+#
+# Required repository secrets:
+#   EARTHDATA_USERNAME
+#   EARTHDATA_PASSWORD
+
+on:
+  schedule:
+    # Mondays at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      max_results:
+        description: 'Cap on GSLC granules pulled from CMR (0 = whole archive)'
+        required: false
+        default: '0'
+
+# Needs write access to push the built site to the gh-pages branch.
+permissions:
+  contents: write
+
+# Same group as the Docs workflow: both push to gh-pages, so they must never
+# run at the same time.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 0 = no cap. CMR is paged eagerly, so a cap saves no time; it only
+  # drops granules (73k GSLC granules exist as of 2026-07).
+  MAX_RESULTS: ${{ github.event.inputs.max_results || '0' }}
+  VIEWER_HTML: docs/assets/opera_nisar_db_viewer.html
+
+jobs:
+  refresh:
+    name: Rebuild the consistent-mode catalog and viewer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # gh-deploy needs full history for the gh-pages branch
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install package and docs dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[docs]'
+
+      - uses: extractions/netrc@v3
+        with:
+          machine: urs.earthdata.nasa.gov
+          username: ${{ secrets.EARTHDATA_USERNAME }}
+          password: ${{ secrets.EARTHDATA_PASSWORD }}
+
+      # Stamped once so a job spanning midnight UTC does not write one file and
+      # then look for another.
+      - name: Resolve date stamp
+        run: echo "DATE=$(date +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      - name: Filter NISAR frames to North America
+        run: |
+          nisar-db download-frame-db
+          nisar-db create-frame-to-bound \
+            --nisar-gpkg NISAR_TrackFrame_L_*.gpkg \
+            --output opera-nisar-disp-frame-to-bounds.json
+
+      - name: Query CMR for GSLC granules
+        run: |
+          nisar-db search --product-type GSLC --url-type s3 \
+            --max-results "${MAX_RESULTS}" --output-csv gslc_search.csv
+          python - <<'PY'
+          import pandas as pd
+          df = pd.read_csv("gslc_search.csv")
+          urls = df["url"].dropna().astype(str)
+          urls = urls[urls.str.startswith("s3://")]
+          urls.to_csv("gslc_files.txt", index=False, header=False)
+          print(f"Wrote {len(urls)} GSLC S3 paths to gslc_files.txt")
+          PY
+
+      - name: Build the consistent-mode database
+        run: |
+          nisar-db create-catalog \
+            --input gslc_files.txt \
+            --output gslc_catalog.csv \
+            --na-only --nisar-gpkg NISAR_TrackFrame_L_*.gpkg
+          nisar-db create-consistent \
+            --catalog gslc_catalog.csv \
+            --nisar-gpkg opera-nisar-disp-frames.gpkg \
+            --output opera-nisar-disp-consistent-gslc-${DATE}.json
+
+      # Blackout windows are climatological and reference dates follow them, so
+      # neither is rebuilt here: the latest release's copies drive the viewer's
+      # blackout coloring and reference-reset details when they exist.
+      - name: Fetch blackout / reference dates from the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXTRA=""
+          if gh release download --pattern 'opera-nisar-disp-blackout-dates-*.json' \
+               --dir release-assets 2>/dev/null; then
+            BLACKOUT=$(ls release-assets/opera-nisar-disp-blackout-dates-*.json | head -n1)
+            EXTRA="$EXTRA --blackout-json $BLACKOUT"
+          fi
+          if gh release download --pattern 'opera-nisar-disp-reference-dates-*.json' \
+               --dir release-assets 2>/dev/null; then
+            REFERENCE=$(ls release-assets/opera-nisar-disp-reference-dates-*.json | head -n1)
+            EXTRA="$EXTRA --reference-json $REFERENCE"
+          fi
+          echo "VIEWER_EXTRA=$EXTRA" >> "$GITHUB_ENV"
+          echo "Extra viewer inputs:${EXTRA:- none}"
+
+      - name: Render the viewer HTML
+        run: |
+          python scripts/generate_scope_viewer.py \
+            --frames-gpkg opera-nisar-disp-frames.gpkg \
+            --gslc-catalog gslc_catalog.csv \
+            --consistent-json opera-nisar-disp-consistent-gslc-${DATE}.json \
+            ${VIEWER_EXTRA} \
+            --output "${VIEWER_HTML}"
+
+      # The rendered page is ~3 MB, so it is published rather than committed:
+      # gh-deploy picks up the working-tree copy written above, and main keeps
+      # the last hand-generated version for local `mkdocs serve`.
+      - name: Publish the docs site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdocs gh-deploy --strict --force
+
+      # The data behind the page, retrievable without re-running the query.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: consistent-mode-catalog
+          path: |
+            opera-nisar-disp-consistent-gslc-*.json
+            opera-nisar-disp-frame-to-bounds.json
+            gslc_catalog.csv
+          retention-days: 90
