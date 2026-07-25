@@ -299,6 +299,54 @@ The output is a JSON file with the following structure:
 }
 ```
 
+## Creating Reference Dates
+
+The `nisar-db create-reference-dates` command decides when each frame's InSAR
+reference epoch resets. Two strategies are available:
+
+```bash
+# Month-based: anchor each frame on a snow-free month picked from its blackouts
+nisar-db create-reference-dates \
+  --consistent-json opera-nisar-disp-consistent-gslc-2026-07-25.json \
+  --blackout-file opera-nisar-disp-blackout-dates-2026-07-25.json \
+  --output opera-nisar-disp-reference-dates-2026-07-25.json
+
+# Interval-based: open a new epoch roughly yearly, once enough data has piled up
+nisar-db create-reference-dates \
+  --consistent-json opera-nisar-disp-consistent-gslc-2026-07-25.json \
+  --interval 1.0 --min-acquisitions 15
+```
+
+With `--blackout-file`, a frame with no recorded snow anchors on November, one
+with a moderate snow season on September, and a heavily snow-bound frame on
+July. Without it, epochs follow each frame's actual acquisition history: a new
+one opens after `--interval` years, but only once `--min-acquisitions`
+acquisitions have accumulated, so sparse frames keep a single reference.
+
+## Labeling Processing Modes
+
+The `nisar-db label-processing-mode` command annotates a consistent-GSLC JSON
+with which acquisitions form complete processing batches:
+
+```bash
+nisar-db label-processing-mode \
+  --consistent-json opera-nisar-disp-consistent-gslc-2026-07-25.json \
+  --previous-json opera-nisar-disp-consistent-gslc-2026-04-25.json \
+  --output opera-nisar-disp-consistent-gslc-with-processing-mode-2026-07-25.json
+```
+
+Each `sensing_time_list` turns from a list into a `{sensing_time: label}` map:
+
+- `historical_NN` -- part of a full `--batch-size` batch, processable now.
+- `forward_NN` -- the trailing partial batch, reprocessed as new data arrives.
+- `no_run` -- the frame has never accumulated a full batch.
+
+`NN` increments after any gap longer than `--gap-threshold-years`, since a
+stack cannot span it. Passing `--previous-json` also records, under
+`metadata.frames_with_changed_mode`, the frames whose winning
+`(common_mode, common_coverage)` flipped since the last release -- those cannot
+reuse their existing stack.
+
 ### Automated Catalog Updates with GitHub Actions
 
 A GitHub Actions workflow is included to automatically update the catalogs daily:

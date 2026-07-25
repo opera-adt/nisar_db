@@ -43,6 +43,7 @@ nav:
       - Consistent mode: background/consistent-mode.md
       - Blackout dates: background/blackout-dates.md
       - Reference (reset) dates: background/reference-dates.md
+      - Processing modes: background/processing-modes.md
   - Tutorials:
       - Build a consistent-mode database: tutorials/consistent-mode-database.md
       - Derive blackout dates from snow cover: tutorials/snow-analysis.md

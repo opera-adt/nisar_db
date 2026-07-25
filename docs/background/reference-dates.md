@@ -33,6 +33,7 @@ Two operational triggers, both inherited from the Sentinel-1 workflow:
 
 | Piece | Location |
 |---|---|
+| Derivation + CLI | [`reference_dates.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/reference_dates.py) |
 | JSON writer | `create_reference_dates_json` in [`blackout.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/blackout.py) |
 | Re-exported for back-compat | [`consistent_gslc.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/consistent_gslc.py) |
 | Sentinel-1 reference (for parity) | `burst_db`'s [`reference_dates.py`](https://github.com/opera-adt/burst_db/blob/main/src/burst_db/reference_dates.py) |
@@ -56,9 +57,41 @@ Per-frame, keyed by `frame_idx`; each value lists the reset dates in order:
 
 ## Producing it
 
-`create_reference_dates_json` takes a `{frame_idx: [dates]}` mapping and writes
-the JSON (plus a `.json.zip`). It is currently a Python-API entry point, matching
-`burst_db`'s module-first approach:
+`nisar-db create-reference-dates` derives the dates and writes the JSON plus its
+`.json.zip`. Which of the two rules applies depends on whether a blackout file
+is supplied:
+
+```bash
+# Month-based: anchor each frame on a snow-free month
+nisar-db create-reference-dates \
+  --consistent-json opera-nisar-disp-consistent-gslc-2026-07-25.json \
+  --blackout-file opera-nisar-disp-blackout-dates-2026-07-25.json \
+  --output opera-nisar-disp-reference-dates-2026-07-25.json
+
+# Interval-based: follow each frame's own acquisition history
+nisar-db create-reference-dates \
+  --consistent-json opera-nisar-disp-consistent-gslc-2026-07-25.json \
+  --interval 1.0 --min-acquisitions 15
+```
+
+The month-based rule maps a frame's blackout count onto a reference month --
+none to November, up to five windows to September, more than that to July --
+because a frame that spends half the year under snow cannot carry a winter
+reference. The interval-based rule opens a new epoch once `--interval` years
+have passed *and* `--min-acquisitions` acquisitions have accumulated, so sparse
+frames keep a single reference rather than a string of unusably short batches.
+Frames listed in `EVENT_DATES_BY_FRAME` reset on their event date regardless.
+
+```mermaid
+flowchart LR
+    A["Consistent-mode stack<br/>(per frame, sorted dates)"] --> B["reset rule<br/>batch length / event dates"]
+    F["Blackout dates"] -.->|month-based| B
+    B --> C["{frame_idx: [reset dates]}"]
+    C --> D["create_reference_dates_json"]
+    D --> E["opera-nisar-disp-reference-dates-*.json"]
+```
+
+The writer is also usable directly when the dates come from elsewhere:
 
 ```python
 from nisar_db.blackout import create_reference_dates_json
@@ -68,14 +101,6 @@ refs = {
     "5830": ["2025-12-01", "2026-06-01"],
 }
 create_reference_dates_json(refs, output="nisar-reference-dates.json")
-```
-
-```mermaid
-flowchart LR
-    A["Consistent-mode stack<br/>(per frame, sorted dates)"] --> B["reset rule<br/>batch length / event dates"]
-    B --> C["{frame_idx: [reset dates]}"]
-    C --> D["create_reference_dates_json"]
-    D --> E["nisar-reference-dates-*.json"]
 ```
 
 ## How the processor uses it
