@@ -47,12 +47,12 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # setuptools_scm derives the version from the tag history
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -75,7 +75,7 @@ jobs:
             *+*) echo "::warning::Version ${version} has a local segment; PyPI upload will be rejected. Tag the commit first." ;;
           esac
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: python-dist
           path: dist/*
@@ -89,7 +89,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: python-dist
           path: dist
@@ -111,7 +111,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: python-dist
           path: dist
@@ -129,7 +129,7 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -149,7 +149,7 @@ jobs:
           conda build conda --no-anaconda-upload --output-folder build-conda -c conda-forge
           find build-conda -name '*.conda' -o -name '*.tar.bz2'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: conda-package
           path: |
