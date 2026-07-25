@@ -10,29 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://opera-adt.github.io/nisar_db/index.html">
+        <link rel="canonical" href="https://opera-adt.github.io/nisar_db/background/processing-modes.html">
       
       
+        <link rel="prev" href="reference-dates.html">
       
-        <link rel="next" href="background/consistent-mode.html">
+      
+        <link rel="next" href="../tutorials/consistent-mode-database.html">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>NISAR_DB</title>
+        <title>Processing modes - NISAR_DB</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,7 +53,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#nisar_db" class="md-skip">
+        <a href="#background-processing-modes-historical-forward" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +94,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="index.html" title="NISAR_DB" class="md-header__button md-logo" aria-label="NISAR_DB" data-md-component="logo">
+    <a href="../index.html" title="NISAR_DB" class="md-header__button md-logo" aria-label="NISAR_DB" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Processing modes
             
           </span>
         </div>
@@ -228,7 +230,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="index.html" title="NISAR_DB" class="md-nav__button md-logo" aria-label="NISAR_DB" data-md-component="logo">
+    <a href="../index.html" title="NISAR_DB" class="md-nav__button md-logo" aria-label="NISAR_DB" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -255,37 +257,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="index.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -301,59 +276,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-lives-here" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What lives here
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#serve-these-docs-locally" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Serve these docs locally
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -362,8 +284,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -374,11 +298,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -399,7 +323,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -417,7 +341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="background/consistent-mode.html" class="md-nav__link">
+      <a href="consistent-mode.html" class="md-nav__link">
         
   
   
@@ -445,7 +369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="background/blackout-dates.html" class="md-nav__link">
+      <a href="blackout-dates.html" class="md-nav__link">
         
   
   
@@ -473,7 +397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="background/reference-dates.html" class="md-nav__link">
+      <a href="reference-dates.html" class="md-nav__link">
         
   
   
@@ -498,10 +422,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="background/processing-modes.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing modes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="processing-modes.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -517,6 +468,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three labels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-nisar-reconciliation-question" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The NISAR reconciliation question
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-this-lives-in-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where this lives in the code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#producing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Producing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-json-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The JSON shape
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -588,7 +614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/consistent-mode-database.html" class="md-nav__link">
+      <a href="../tutorials/consistent-mode-database.html" class="md-nav__link">
         
   
   
@@ -616,7 +642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/snow-analysis.html" class="md-nav__link">
+      <a href="../tutorials/snow-analysis.html" class="md-nav__link">
         
   
   
@@ -651,7 +677,7 @@
   
   
     <li class="md-nav__item">
-      <a href="frame-viewer.html" class="md-nav__link">
+      <a href="../frame-viewer.html" class="md-nav__link">
         
   
   
@@ -698,10 +724,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-lives-here" class="md-nav__link">
+  <a href="#the-three-labels" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What lives here
+        The three labels
       
     </span>
   </a>
@@ -709,10 +735,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
+  <a href="#the-nisar-reconciliation-question" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install
+        The NISAR reconciliation question
       
     </span>
   </a>
@@ -720,10 +746,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#serve-these-docs-locally" class="md-nav__link">
+  <a href="#where-this-lives-in-the-code" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Serve these docs locally
+        Where this lives in the code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#producing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Producing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-json-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The JSON shape
       
     </span>
   </a>
@@ -750,128 +798,112 @@
   
 
 
-<h1 id="nisar_db">NISAR_DB<a class="headerlink" href="#nisar_db" title="Permanent link">&para;</a></h1>
-<p>Frame-database and product-catalog generation for <strong>OPERA DISP-NISAR</strong>.</p>
-<p><code>nisar_db</code> builds the auxiliary databases that the DISP-NISAR processing system
-needs to decide <em>which</em> NISAR GSLC acquisitions stack into a consistent displacement time
-series, <em>where</em> on to process, and <em>when</em> to exclude or reset. It is the
-NISAR counterpart of <a href="https://github.com/opera-adt/burst_db"><code>burst_db</code></a>, which
-does the same job for Sentinel-1 (DISP-S1).</p>
-<p>The two projects deliberately mirror each other. Wherever a concept already
-exists for Sentinel-1, <code>nisar_db</code> reproduces it with the same JSON shapes and the
-same operational meaning, adapted to the fact that <strong>NISAR is frame-based</strong> (there
-are no sub-frame burst IDs).</p>
+<h1 id="background-processing-modes-historical-forward">Background: processing modes (historical / forward)<a class="headerlink" href="#background-processing-modes-historical-forward" title="Permanent link">&para;</a></h1>
+<p>The <a href="consistent-mode.html">consistent-mode</a> database says <em>which</em> acquisitions
+belong to a frame's stack. It does not say which of them the processor can run
+<strong>now</strong>, as a complete batch, versus which are still accumulating. That is what
+the processing-mode labels add.</p>
+<p>This mirrors <code>burst_db</code>'s
+<code>opera-disp-s1-consistent-burst-ids-with-processing-mode-*.json</code> and its
+<code>reconcile_and_label_db.py</code> step.</p>
+<h2 id="the-three-labels">The three labels<a class="headerlink" href="#the-three-labels" title="Permanent link">&para;</a></h2>
+<p>DISP processing runs in batches of a fixed size (15 acquisitions, matching
+DISP-S1). Walking a frame's sorted sensing times from the beginning:</p>
 <table>
 <thead>
 <tr>
-<th>Concept</th>
-<th>Sentinel-1 (<code>burst_db</code>)</th>
-<th>NISAR (<code>nisar_db</code>)</th>
+<th>Label</th>
+<th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Smallest spatial unit</td>
-<td>burst ID</td>
-<td>frame</td>
+<td><code>historical_NN</code></td>
+<td>Part of a full batch. Processable now, and the result is final.</td>
 </tr>
 <tr>
-<td>"Which acquisitions are safe to stack"</td>
-<td>consistent <strong>burst</strong> database</td>
-<td>consistent <strong>mode</strong> (GSLC) database</td>
+<td><code>forward_NN</code></td>
+<td>The trailing partial batch. Reprocessed as new acquisitions arrive.</td>
 </tr>
 <tr>
-<td>Seasonal exclusions</td>
-<td>blackout dates JSON</td>
-<td>blackout dates JSON</td>
-</tr>
-<tr>
-<td>Reference-epoch resets</td>
-<td>reference dates JSON</td>
-<td>reference (reset) dates JSON</td>
-</tr>
-<tr>
-<td>Geographic footprint</td>
-<td>frame-to-burst / bounds</td>
-<td>frame-to-bound</td>
+<td><code>no_run</code></td>
+<td>The frame has never accumulated a full batch. Nothing to run yet.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="what-lives-here">What lives here<a class="headerlink" href="#what-lives-here" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong><a href="background/consistent-mode.html">Background → Consistent mode</a></strong> — the core
-  selection logic. How, for every frame over North America, <code>nisar_db</code> picks a
-  single dominant acquisition mode + coverage so the resulting stack is
-  spatially and temporally consistent.</li>
-<li><strong><a href="background/blackout-dates.html">Background → Blackout dates</a></strong> — per-frame
-  date ranges (e.g. seasonal snow) whose acquisitions are excluded from the
-  consistent stack.</li>
-<li><strong><a href="background/reference-dates.html">Background → Reference (reset) dates</a></strong> —
-  per-frame epochs at which the InSAR reference is reset, to avoid forming
-  very long temporal-baseline interferograms.</li>
-<li><strong><a href="tutorials/consistent-mode-database.html">Tutorials → Build a consistent-mode database</a></strong>
-  — a step-by-step recipe anyone can follow to produce the consistent-GSLC
-  database from scratch.</li>
-<li><strong><a href="tutorials/snow-analysis.html">Tutorials → Derive blackout dates from snow cover</a></strong>
-  — the upstream analysis: NOAA GEFS snow and temperature into per-frame
-  blackout windows, and what those windows cost the stack.</li>
-</ul>
-<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">pip</label><label for="__tabbed_1_2">conda</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>nisar-db
+<p><code>NN</code> is a group number. It increments after any gap longer than
+<code>--gap-threshold-years</code> (default 2.0), because a stack cannot span such a gap --
+the acquisitions on either side belong to separate time series, and batch
+counting restarts.</p>
+<p>For a young mission this distribution is lopsided by construction: most NISAR
+frames carry one partial batch, so <code>forward_01</code> and <code>no_run</code> dominate and the
+<code>historical</code> fraction grows with every release.</p>
+<h2 id="the-nisar-reconciliation-question">The NISAR reconciliation question<a class="headerlink" href="#the-nisar-reconciliation-question" title="Permanent link">&para;</a></h2>
+<p><code>burst_db</code> also diffs each release against the previous one, looking for frames
+whose <code>burst_id_list</code> changed -- a changed burst set invalidates the existing
+stack.</p>
+<p>NISAR frames have no burst list: the footprint is fixed by the mission. The
+equivalent invalidation is the winning <strong><code>(common_mode, common_coverage)</code></strong>
+flipping between releases, since that changes which acquisitions were selected
+as consistent. Passing <code>--previous-json</code> records those frames under
+<code>metadata.frames_with_changed_mode</code>.</p>
+<h2 id="where-this-lives-in-the-code">Where this lives in the code<a class="headerlink" href="#where-this-lives-in-the-code" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Labeling + reconciliation</td>
+<td><a href="https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/processing_mode.py"><code>processing_mode.py</code></a></td>
+</tr>
+<tr>
+<td>Sentinel-1 reference (for parity)</td>
+<td><code>burst_db</code>'s <a href="https://github.com/opera-adt/burst_db/blob/main/src/burst_db/reconcile_and_label_db.py"><code>reconcile_and_label_db.py</code></a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="producing-it">Producing it<a class="headerlink" href="#producing-it" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nisar-db<span class="w"> </span>label-processing-mode<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--previous-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-04-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc-with-processing-mode-2026-07-25.json
 </code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>-c<span class="w"> </span>opera-adt<span class="w"> </span>nisar_db
+<pre class="mermaid"><code>flowchart LR
+    A["Consistent-GSLC JSON"] --&gt; B["split on gaps &gt;&lt;br/&gt;gap_threshold_years"]
+    B --&gt; C["batch in groups of&lt;br/&gt;batch_size"]
+    C --&gt; D["historical / forward / no_run"]
+    E["Previous release"] -.-&gt; F["frames_with_changed_mode"]
+    D --&gt; G["…-with-processing-mode-*.json"]
+    F -.-&gt; G</code></pre>
+<h2 id="the-json-shape">The JSON shape<a class="headerlink" href="#the-json-shape" title="Permanent link">&para;</a></h2>
+<p>Identical to the consistent-GSLC document, except that <code>sensing_time_list</code>
+becomes a mapping from sensing time to label. Every other per-frame field is
+carried through unchanged:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">&quot;processing_mode_params&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">&quot;batch_size&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="nt">&quot;gap_threshold_years&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">&quot;labeling_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-25T12:00:00&quot;</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;frames_with_changed_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;5830&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">&quot;5827&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">&quot;common_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;4005&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">&quot;common_coverage&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;F&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">&quot;sensing_time_list&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">&quot;2025-01-05T01:23:45&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;historical_01&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">&quot;2026-01-12T01:23:45&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;forward_01&quot;</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="p">}</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="p">}</span>
 </code></pre></div>
-</div>
-</div>
-</div>
-<p>Or from a checkout, for development:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">pixi</label><label for="__tabbed_2_2">conda env</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/opera-adt/nisar_db
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">cd</span><span class="w"> </span>nisar_db
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>pixi<span class="w"> </span>install
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>pixi<span class="w"> </span>shell
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>pixi<span class="w"> </span>run<span class="w"> </span>build
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/opera-adt/nisar_db
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nb">cd</span><span class="w"> </span>nisar_db
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>conda<span class="w"> </span>env<span class="w"> </span>create<span class="w">          </span><span class="c1"># runtime dependencies only</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>conda<span class="w"> </span>activate<span class="w"> </span>nisar-db-env
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># contributors: add the tooling extras</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
-</code></pre></div>
-</div>
-</div>
-</div>
-<p>Installing the package creates the <code>nisar-db</code> command line tool:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="gp">$ </span>nisar-db<span class="w"> </span>--help
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="go">Usage: nisar-db [OPTIONS] COMMAND [ARGS]...</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="go">  Create/interact with OPERA&#39;s NISAR frame database.</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="go">Commands:</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="go">  create-blackout-dates  Create the NISAR blackout-dates JSON.</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="go">  create-catalog         Parse a NISAR GSLC file list into a structured CSV.</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="go">  create-consistent      Create the consistent-GSLC JSON for NISAR frames.</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="go">  create-frame-to-bound  Create a frame_to_bound JSON file for NISAR.</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="go">  create-nisar-catalog   Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="go">  download               Download NISAR granules/URLs from CMR.</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="go">  search                 Search for NISAR products.</span>
-</code></pre></div>
-<h2 id="serve-these-docs-locally">Serve these docs locally<a class="headerlink" href="#serve-these-docs-locally" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[docs]&quot;</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>mkdocs<span class="w"> </span>serve
-</code></pre></div>
-<p>Then open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>.</p>
 
 
 
@@ -927,10 +959,10 @@ are no sub-frame burst IDs).</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
