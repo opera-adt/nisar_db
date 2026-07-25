@@ -647,11 +647,22 @@ databases. Pan and zoom to inspect track/frame footprints and their attributes.<
 <a href="https://github.com/opera-adt/nisar_db/blob/main/scripts/generate_scope_viewer.py"><code>scripts/generate_scope_viewer.py</code></a>;
 the embedded copy below is served as a static asset with these docs.</p>
 <p>It opens on the globe projection (the control at the bottom right switches to
-Mercator). Hovering a frame shows a summary that stays until you move on or
-close it with its <code>x</code>; clicking a frame opens the frame panel, where
-<strong>Show granules</strong> expands the granule list, <strong>Export CSV</strong> downloads that
-frame's granules, and <strong>Show plot</strong> charts observation mode against acquisition
-date.</p>
+Mercator), with frames coloured by GSLC count in CMR. Clicking a frame opens the
+frame panel, where <strong>Show granules</strong> expands the granule list, <strong>Export CSV</strong>
+downloads that frame's granules, and <strong>Show plot</strong> charts observation mode
+against acquisition date. Turn on <strong>Map Tools → Hover info</strong> to also get a
+summary popup while pointing at frames; it stays until you move on or close it
+with its <code>x</code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Keeping the CalVal frames current</p>
+<p>The <code>isCalVal</code>, <code>isSNWG</code>, and <code>isDNC</code> flags behind the <strong>Product / Site
+Flags</strong> filters are carried straight from the TrackFrame GeoPackage, so the
+viewer is only as current as the GeoPackage it was built from. When the
+CalVal site list changes, refresh the database and rebuild the viewer:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nisar-db<span class="w"> </span>download-frame-db<span class="w"> </span>--force
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
+</code></pre></div>
+</div>
 <p><iframe
   src="assets/opera_nisar_db_viewer.html"
   title="NISAR OPERA frame viewer"
