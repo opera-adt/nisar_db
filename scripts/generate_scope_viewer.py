@@ -311,6 +311,8 @@ def build_frame_data(
             "track": int(row["track"]),
             "frame": int(row["frame"]),
             "passDirection": row["passDirection"],
+            # Site flags come from the TrackFrame GeoPackage; a stale GeoPackage
+            # means stale CalVal frames, so refresh it when the site list changes.
             "isCalVal": bool(row["isCalVal"]),
             "isSNWG": bool(row["isSNWG"]),
             "isDNC": bool(row["isDNC"]),
@@ -512,6 +514,14 @@ BODY_HTML = r"""<body>
     <div id="sidebar-scroll">
 
       <div class="section">
+        <div class="section-head" data-target="sec-tools"><span>Map Tools</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-tools">
+          <div class="check-row"><input type="checkbox" id="f-hover"><label for="f-hover" style="margin:0;color:var(--text)">Hover info</label></div>
+          <div class="stat-line">Off by default: with it on, pointing at a frame pops up its summary. Clicking a frame always opens the full panel.</div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-loc">
           <label>Track (e.g. "12" or "10-20" or "12,34,56")</label>
@@ -539,8 +549,8 @@ BODY_HTML = r"""<body>
         <div class="section-body" id="sec-style">
           <label>Color frames by</label>
           <select id="color-by">
-            <option value="passDirection" selected>Pass Direction (default)</option>
-            <option value="gslc_count">GSLC count in CMR</option>
+            <option value="passDirection">Pass Direction</option>
+            <option value="gslc_count" selected>GSLC count in CMR (default)</option>
             <option value="cons_mode">Consistent mode</option>
             <option value="cons_cov">Consistent coverage (full/partial)</option>
             <option value="n_modes">Distinct modes per frame</option>
@@ -617,7 +627,7 @@ BODY_HTML = r"""<body>
     </div>
   </div>
   <div id="map">
-    <div id="top-hint">Hover a frame for a summary &middot; click to list granules &amp; select</div>
+    <div id="top-hint">Click a frame to list granules &amp; select &middot; enable "Hover info" for a quick summary</div>
     <div id="basemap-ctrl">
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
@@ -1319,11 +1329,11 @@ APP_JS = r"""
     map.addSource("frames", { type:"geojson", data: FRAME_DATA });
     map.addLayer({
       id:"frames-fill", type:"fill", source:"frames",
-      paint:{ "fill-color": colorExpression("passDirection"), "fill-opacity": 0.32 }
+      paint:{ "fill-color": colorExpression("gslc_count"), "fill-opacity": 0.32 }
     });
     map.addLayer({
       id:"frames-outline", type:"line", source:"frames",
-      paint:{ "line-color": colorExpression("passDirection"), "line-width": 1, "line-opacity":0.7 }
+      paint:{ "line-color": colorExpression("gslc_count"), "line-width": 1, "line-opacity":0.7 }
     });
 
     map.addSource("selected", { type:"geojson", data:{type:"FeatureCollection", features:[]} });
@@ -1352,7 +1362,7 @@ APP_JS = r"""
       applyColorBy();
     });
     document.getElementById("btn-reset-style").addEventListener("click", ()=>{
-      document.getElementById("color-by").value = "passDirection";
+      document.getElementById("color-by").value = "gslc_count";
       document.getElementById("fill-opacity").value = 32;
       document.getElementById("opacity-val").textContent = 32;
       applyColorBy();
@@ -1365,8 +1375,11 @@ APP_JS = r"""
     let hoverCloseTimer = null;
     const cancelHoverClose = ()=>{ clearTimeout(hoverCloseTimer); hoverCloseTimer = null; };
     const scheduleHoverClose = ()=>{ cancelHoverClose(); hoverCloseTimer = setTimeout(()=>popup.remove(), 350); };
+    const hoverToggle = document.getElementById("f-hover");
+    hoverToggle.addEventListener("change", ()=>{ if (!hoverToggle.checked) popup.remove(); });
     map.on("mousemove", "frames-fill", (e)=>{
       map.getCanvas().style.cursor = "pointer";
+      if (!hoverToggle.checked) return;
       cancelHoverClose();
       const p = e.features[0].properties;
       popup.setLngLat(e.lngLat).setHTML(`
