@@ -21,13 +21,23 @@ the embedded copy below is served as a static asset with these docs.
     page was built from, so a scheduled run and a manual `workflow_dispatch`
     both show up there.
 
+    Each run queries the **entire** GSLC archive (`--max-results 0`), not a
+    capped slice.
+
 It opens on the globe projection (the control at the bottom right switches to
-Mercator), with frames coloured by GSLC count in CMR. Clicking a frame opens the
-frame panel, where **Show granules** expands the granule list, **Export CSV**
-downloads that frame's granules, and **Show plot** charts observation mode
-against acquisition date. Turn on **Map Tools → Hover info** to also get a
-summary popup while pointing at frames; it stays until you move on or close it
-with its `x`.
+Mercator), with frames coloured by GSLC count in CMR and the science modes
+(`2005`, `4005`) and polarizations (`DHDH`, `QPDH`) preselected under
+**GSLC Mode / Polarization**. The count colouring follows those chips, so the
+ramp always answers "how many granules of the kind I selected". Clicking a frame
+opens the frame panel, where **Show granules** expands the granule list,
+**Export CSV** downloads that frame's granules, and **Show plot** charts
+observation mode against acquisition date.
+
+The **(i)** button above the globe toggle turns on hover summaries: with it on,
+pointing at a frame pops up its summary, which stays until you move on or close
+it with its `x`. **GSLC Acquisitions Over Time** in the sidebar counts granules
+by acquisition date across the frames currently shown, binning to weeks or
+months as the time span grows.
 
 !!! note "Keeping the CalVal frames current"
     The `isCalVal`, `isSNWG`, and `isDNC` flags behind the **Product / Site

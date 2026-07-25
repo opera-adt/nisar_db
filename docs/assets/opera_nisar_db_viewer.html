@@ -69,6 +69,8 @@
   #basemap-ctrl{position:absolute;top:10px;right:10px;background:rgba(15,20,24,.9);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
   #basemap-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
+  .maplibregl-ctrl-group button.hover-info-btn{display:flex;align-items:center;justify-content:center;color:#33383d;}
+  .maplibregl-ctrl-group button.hover-info-btn.active{background:#dfeeff;color:#1668c8;}
   .maplibregl-popup-content{background:#161c22;color:var(--text);font-size:12px;border-radius:6px;padding:8px 22px 8px 10px;}
   .maplibregl-popup-close-button{color:var(--text-dim);font-size:15px;line-height:1;padding:2px 6px;background:none;border:none;}
   .maplibregl-popup-close-button:hover{background:none;color:#ff5d5d;}
@@ -83,6 +85,10 @@
   .granule-row{font-size:10.5px;color:var(--text-dim);padding:2px 0;border-bottom:1px solid rgba(42,51,59,.5);font-family:ui-monospace,Menlo,Consolas,monospace;}
   .granule-row .gdate{color:var(--text);}
   .granule-row .gmode{color:var(--accent2);}
+  .day-bar{fill:var(--accent);}
+  .day-bar:hover{fill:#9ecbff;}
+  .day-base{stroke:var(--border);stroke-width:1;}
+  .day-axis{fill:var(--text-dim);font-size:9.5px;}
   #chart-modal{position:fixed;inset:0;z-index:20;background:rgba(4,8,11,.62);display:flex;align-items:center;justify-content:center;}
   #chart-modal[hidden]{display:none;}
   .chart-card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:8px;
@@ -120,14 +126,6 @@
       <small id="hdr-queried">CMR queried: unknown</small>
     </h1>
     <div id="sidebar-scroll">
-
-      <div class="section">
-        <div class="section-head" data-target="sec-tools"><span>Map Tools</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-tools">
-          <div class="check-row"><input type="checkbox" id="f-hover"><label for="f-hover" style="margin:0;color:var(--text)">Hover info</label></div>
-          <div class="stat-line">Off by default: with it on, pointing at a frame pops up its summary. Clicking a frame always opens the full panel.</div>
-        </div>
-      </div>
 
       <div class="section">
         <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
@@ -200,6 +198,17 @@
       </div>
 
       <div class="section">
+        <div class="section-head" data-target="sec-daily"><span>GSLC Acquisitions Over Time</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-daily">
+          <div class="stat-line">GSLC granules in CMR over North America, counted by acquisition date across the frames currently shown. Hover a bar for its count.</div>
+          <div id="daily-wrap" style="position:relative;margin-top:6px;">
+            <div id="daily-chart"></div>
+            <div class="chart-tip" id="daily-tip" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-head" data-target="sec-cons"><span>Consistent Mode Summary</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-cons">
           <div class="stat-line">Consistent (mode, coverage) chosen per frame for DISP time series, aggregated over the frames currently shown.</div>
@@ -235,7 +244,7 @@
     </div>
   </div>
   <div id="map">
-    <div id="top-hint">Click a frame to list granules &amp; select &middot; enable "Hover info" for a quick summary</div>
+    <div id="top-hint">Click a frame to list granules &amp; select &middot; the (i) button toggles hover summaries</div>
     <div id="basemap-ctrl">
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
@@ -348,7 +357,7 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
 
   const COLOR_BY_FIELDS = {
     passDirection: { label:"Pass Direction",      key:"passDirection", kind:"cat" },
-    gslc_count:    { label:"GSLC count in CMR",    key:"gslc_count",    kind:"num" },
+    gslc_count:    { label:"GSLC count in CMR",    key:"gslc_count_sel", kind:"num" },
     cons_mode:     { label:"Consistent mode",      key:"cons_mode",     kind:"cat" },
     cons_cov:      { label:"Consistent coverage",  key:"cons_cov",      kind:"cat" },
     n_modes:       { label:"Distinct modes",       key:"n_modes",       kind:"num" },
@@ -422,12 +431,18 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
   }
 
   // ---------- filter chips ----------
-  function buildChips(containerId, values, chipSet){
+  // Science modes / polarizations the DISP time series is built from: preselected
+  // so the map opens on the acquisitions that matter, not the whole archive.
+  const DEFAULT_GSLC_MODES = ["2005", "4005"];
+  const DEFAULT_GSLC_POLS = ["DHDH", "QPDH"];
+
+  function buildChips(containerId, values, chipSet, defaults){
     const el = document.getElementById(containerId);
     el.innerHTML = "";
     values.forEach(v=>{
       const c = document.createElement("div");
       c.className = "chip"; c.textContent = v;
+      if (defaults && defaults.includes(v)) { chipSet.add(v); c.classList.add("active"); }
       c.onclick = ()=>{
         if (chipSet.has(v)) { chipSet.delete(v); c.classList.remove("active"); }
         else { chipSet.add(v); c.classList.add("active"); }
@@ -436,8 +451,13 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
       el.appendChild(c);
     });
   }
-  buildChips("chips-gslc-mode", allModesGslc, activeChips.gslcMode);
-  buildChips("chips-gslc-pol", allPolsGslc, activeChips.gslcPol);
+  function buildGslcChips(){
+    activeChips.gslcMode.clear();
+    activeChips.gslcPol.clear();
+    buildChips("chips-gslc-mode", allModesGslc, activeChips.gslcMode, DEFAULT_GSLC_MODES);
+    buildChips("chips-gslc-pol", allPolsGslc, activeChips.gslcPol, DEFAULT_GSLC_POLS);
+  }
+  buildGslcChips();
 
   // When CMR (or the bucket scan) was last queried for the catalog behind this
   // page. The refresh workflow builds the catalog in the same run, so this
@@ -567,14 +587,135 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
   }
 
   function applyFilters(){
+    updateSelectedGslcCounts();
     const filtered = currentFiltered();
     if (map.getSource("frames")) {
       map.getSource("frames").setData({type:"FeatureCollection", features: filtered});
     }
     document.getElementById("hdr-count").textContent = filtered.length;
+    applyColorBy();          // the GSLC-count ramp follows the mode/pol chips
     refreshSummary(filtered);
     refreshBlackoutSummary(filtered);
+    refreshDailyChart(filtered);
   }
+
+  // ---------- GSLC count under the current mode / polarization chips ----------
+  const MODE_POL_BY_FRAME = new Map(
+    FRAME_DATA.features.map(f=>{
+      const granules = Array.isArray(f.properties.granules) ? f.properties.granules : [];
+      return [f.properties.id, granules.map(g=>[g.mode, g.pol])];
+    })
+  );
+
+  function selectedGslcCount(id){
+    const rows = MODE_POL_BY_FRAME.get(id) || [];
+    const modes = activeChips.gslcMode, pols = activeChips.gslcPol;
+    if (!modes.size && !pols.size) return rows.length;
+    let n = 0;
+    for (const [mode, pol] of rows) {
+      if (modes.size && !modes.has(mode)) continue;
+      if (pols.size && !pols.has(pol)) continue;
+      n++;
+    }
+    return n;
+  }
+
+  // Colouring by "GSLC count in CMR" reads this, so the ramp answers "how many
+  // granules of the kind I selected", not "how many of any kind".
+  function updateSelectedGslcCounts(){
+    FRAME_DATA.features.forEach(f=>{
+      f.properties.gslc_count_sel = selectedGslcCount(f.properties.id);
+    });
+  }
+  updateSelectedGslcCounts();
+
+  // ---------- GSLC acquisitions over time ----------
+  // Per-frame date histograms are built once: the chart is redrawn on every
+  // filter keystroke, and re-walking 60k+ granules each time is not free.
+  const DAY_COUNTS_BY_FRAME = new Map(
+    FRAME_DATA.features.map(f=>{
+      const per = new Map();
+      const granules = Array.isArray(f.properties.granules) ? f.properties.granules : [];
+      granules.forEach(g=>{ if (g.date) per.set(g.date, (per.get(g.date)||0)+1); });
+      return [f.properties.id, Array.from(per.entries())];
+    })
+  );
+
+  const BIN_LABEL = {1:"per day", 7:"per week", 30:"per month"};
+  let dailyBins = [];
+
+  function refreshDailyChart(features){
+    const el = document.getElementById("daily-chart");
+    const tip = document.getElementById("daily-tip");
+    tip.hidden = true;
+
+    const counts = new Map();
+    features.forEach(f=> (DAY_COUNTS_BY_FRAME.get(f.properties.id)||[]).forEach(([d,n])=>
+      counts.set(d, (counts.get(d)||0) + n)));
+    const days = Array.from(counts.keys()).sort();
+    dailyBins = [];
+    if (!days.length) {
+      el.innerHTML = `<div class="stat-line">No GSLC acquisitions in the frames shown.</div>`;
+      return;
+    }
+
+    const t0 = Date.parse(`${days[0]}T00:00:00Z`);
+    const t1 = Date.parse(`${days[days.length-1]}T00:00:00Z`);
+    const spanDays = Math.round((t1 - t0) / DAY_MS) + 1;
+    // Keep bars wide enough to hit: a daily bar over a multi-year archive is
+    // narrower than a pixel in a 300px sidebar.
+    const binDays = spanDays > 900 ? 30 : spanDays > 220 ? 7 : 1;
+    const nBins = Math.ceil(spanDays / binDays);
+    dailyBins = Array.from({length:nBins}, (_,i)=>({t: t0 + i*binDays*DAY_MS, n: 0, binDays}));
+    let total = 0;
+    counts.forEach((n, d)=>{
+      const i = Math.floor((Date.parse(`${d}T00:00:00Z`) - t0) / (binDays * DAY_MS));
+      dailyBins[i].n += n;
+      total += n;
+    });
+
+    const W = Math.max(el.clientWidth || 300, 200);
+    const H = 86, padT = 12, padB = 16;
+    const maxN = Math.max(...dailyBins.map(b=>b.n));
+    const slot = W / nBins;
+    const bw = Math.max(1, slot - (slot > 4 ? 1 : 0));
+    const bars = dailyBins.map((b,i)=>{
+      if (!b.n) return "";
+      const h = Math.max(1.5, (b.n / maxN) * (H - padT - padB));
+      return `<rect class="day-bar" data-i="${i}" x="${(i*slot).toFixed(2)}" y="${(H-padB-h).toFixed(2)}" `+
+             `width="${bw.toFixed(2)}" height="${h.toFixed(2)}" rx="${bw > 3 ? 1.5 : 0}"/>`;
+    }).join("");
+    const fmt = t => new Date(t).toISOString().slice(0,10);
+
+    el.innerHTML =
+      `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"`+
+      ` aria-label="GSLC granules ${BIN_LABEL[binDays]}">`+
+      `<text class="day-axis" x="0" y="9">peak ${maxN}</text>`+
+      `${bars}`+
+      `<line class="day-base" x1="0" x2="${W}" y1="${H-padB}" y2="${H-padB}"/>`+
+      `<text class="day-axis" x="0" y="${H-4}">${fmt(t0)}</text>`+
+      `<text class="day-axis" x="${W}" y="${H-4}" text-anchor="end">${fmt(t1)}</text>`+
+      `</svg>`+
+      `<div class="stat-line">${total.toLocaleString()} granules &middot; counted ${BIN_LABEL[binDays]}</div>`;
+  }
+
+  document.getElementById("daily-chart").addEventListener("mousemove", (e)=>{
+    const tip = document.getElementById("daily-tip");
+    const bar = e.target.closest ? e.target.closest("rect[data-i]") : null;
+    if (!bar) { tip.hidden = true; return; }
+    const b = dailyBins[Number(bar.dataset.i)];
+    const start = new Date(b.t).toISOString().slice(0,10);
+    const end = new Date(b.t + (b.binDays-1)*DAY_MS).toISOString().slice(0,10);
+    tip.innerHTML = `<b>${b.n}</b> granule${b.n === 1 ? "" : "s"}<br>`+
+                    `<span class="tdim">${b.binDays === 1 ? start : `${start} to ${end}`}</span>`;
+    const wrap = tip.parentElement.getBoundingClientRect();
+    tip.hidden = false;
+    tip.style.left = `${Math.max(0, Math.min(e.clientX - wrap.left + 10, wrap.width - tip.offsetWidth))}px`;
+    tip.style.top = `${e.clientY - wrap.top - 34}px`;
+  });
+  document.getElementById("daily-chart").addEventListener("mouseleave", ()=>{
+    document.getElementById("daily-tip").hidden = true;
+  });
 
   ["f-track","f-frame","f-id"].forEach(id=>document.getElementById(id).addEventListener("input", applyFilters));
   document.querySelectorAll('input[name="pass"]').forEach(r=>r.addEventListener("change", applyFilters));
@@ -589,8 +730,7 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     document.getElementById("f-id").value = "";
     document.querySelector('input[name="pass"][value="all"]').checked = true;
     ["f-calval","f-blackout"].forEach(id=>{ const el=document.getElementById(id); if (el) el.checked=false; });
-    Object.values(activeChips).forEach(s=>s.clear());
-    document.querySelectorAll(".chip.active").forEach(c=>c.classList.remove("active"));
+    buildGslcChips();
     applyFilters();
   });
 
@@ -824,6 +964,33 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     attributionControl: true
   });
   map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+
+  // Frame summaries on hover are opt-in; the switch sits above the globe toggle.
+  let hoverEnabled = false;
+  let onHoverChange = ()=>{};
+  const hoverInfoControl = {
+    onAdd(){
+      this._wrap = document.createElement("div");
+      this._wrap.className = "maplibregl-ctrl maplibregl-ctrl-group";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "hover-info-btn";
+      btn.innerHTML = `<svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">`+
+        `<path fill="currentColor" d="M12 2.4A9.6 9.6 0 1 0 21.6 12 9.61 9.61 0 0 0 12 2.4zm0 1.8a7.8 7.8 0 1 1-7.8 7.8A7.81 7.81 0 0 1 12 4.2zm0 2.1a1.35 1.35 0 1 0 1.35 1.35A1.35 1.35 0 0 0 12 6.3zm-1.15 4.2h2.3v6.6h-2.3z"/></svg>`;
+      const sync = ()=>{
+        btn.classList.toggle("active", hoverEnabled);
+        btn.title = hoverEnabled ? "Hover info: on" : "Hover info: off";
+        btn.setAttribute("aria-label", btn.title);
+        btn.setAttribute("aria-pressed", String(hoverEnabled));
+      };
+      btn.addEventListener("click", ()=>{ hoverEnabled = !hoverEnabled; sync(); onHoverChange(); });
+      sync();
+      this._wrap.appendChild(btn);
+      return this._wrap;
+    },
+    onRemove(){ this._wrap.remove(); }
+  };
+  map.addControl(hoverInfoControl, "bottom-right");
   map.addControl(new maplibregl.GlobeControl(), "bottom-right");
 
   document.querySelectorAll('input[name="basemap"]').forEach(r=>{
@@ -1052,11 +1219,10 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     let hoverCloseTimer = null;
     const cancelHoverClose = ()=>{ clearTimeout(hoverCloseTimer); hoverCloseTimer = null; };
     const scheduleHoverClose = ()=>{ cancelHoverClose(); hoverCloseTimer = setTimeout(()=>popup.remove(), 350); };
-    const hoverToggle = document.getElementById("f-hover");
-    hoverToggle.addEventListener("change", ()=>{ if (!hoverToggle.checked) popup.remove(); });
+    onHoverChange = ()=>{ if (!hoverEnabled) popup.remove(); };
     map.on("mousemove", "frames-fill", (e)=>{
       map.getCanvas().style.cursor = "pointer";
-      if (!hoverToggle.checked) return;
+      if (!hoverEnabled) return;
       cancelHoverClose();
       const p = e.features[0].properties;
       popup.setLngLat(e.lngLat).setHTML(`
