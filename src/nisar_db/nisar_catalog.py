@@ -57,8 +57,8 @@ def main():
     parser.add_argument(
         "--max-results",
         type=int,
-        default=25000,
-        help="Maximum number of results to return from CMR search (default: 25000)",
+        default=0,
+        help="Cap on CMR results; 0 (the default) keeps the whole archive",
     )
 
     args = parser.parse_args()

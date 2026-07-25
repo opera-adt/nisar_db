@@ -140,7 +140,10 @@ def download_frame_db_cmd(output_dir: Path, force: bool, granule_id: str | None)
     "--provider", type=str, default="ASF", help="Data provider (default: ASF)"
 )
 @click.option(
-    "--max-results", type=int, default=100, help="Maximum results (default: 100)"
+    "--max-results",
+    type=int,
+    default=100,
+    help="Maximum results; 0 = the entire matching archive (default: 100)",
 )
 @click.option("--download", type=str, help="Download to this directory")
 @click.option("--output-csv", type=str, help="Save results to CSV")

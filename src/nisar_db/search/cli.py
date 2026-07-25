@@ -38,7 +38,10 @@ def main():
         "--provider", type=str, default="ASF", help="Data provider (default: ASF)"
     )
     parser.add_argument(
-        "--max-results", type=int, default=100, help="Maximum results (default: 100)"
+        "--max-results",
+        type=int,
+        default=100,
+        help="Maximum results; 0 = the entire matching archive (default: 100)",
     )
     parser.add_argument("--download", type=str, help="Download to this directory")
     parser.add_argument("--output-csv", type=str, help="Save results to CSV")

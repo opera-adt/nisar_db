@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       max_results:
-        description: 'Max GSLC granules to pull from CMR for the catalog'
+        description: 'Cap on GSLC granules pulled from CMR (0 = whole archive)'
         required: false
-        default: '25000'
+        default: '0'
       snow_geojson:
         description: >-
           Path (in the checkout) to a snow-analysis GeoJSON. When set, the
@@ -32,7 +32,7 @@ permissions:
 env:
   # CMR concept-id of the public NISAR TrackFrame database granule.
   NISAR_DB_GRANULE_ID: G3817504902-ASF
-  MAX_RESULTS: ${{ github.event.inputs.max_results || '25000' }}
+  MAX_RESULTS: ${{ github.event.inputs.max_results || '0' }}
 
 jobs:
   release:

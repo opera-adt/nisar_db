@@ -280,6 +280,25 @@ def _build_search_params(
     return params
 
 
+def _apply_max_results(items: List[Any], max_results: Optional[int]) -> List[Any]:
+    """Truncate ``items`` to ``max_results``, warning when anything is dropped.
+
+    ``None`` or a non-positive cap keeps everything. CMR is paged eagerly, so a
+    cap never saves query time -- silently returning a partial archive would
+    make a catalog look complete when it is not.
+    """
+    if max_results is None or max_results <= 0 or len(items) <= max_results:
+        return items
+    logger.warning(
+        "Truncating %d CMR results to max_results=%d; %d granules dropped. "
+        "Pass max_results=None (CLI: --max-results 0) for the whole archive.",
+        len(items),
+        max_results,
+        len(items) - max_results,
+    )
+    return items[:max_results]
+
+
 def search_nisar_products(
     bbox: Optional[Tuple[float, float, float, float]] = None,
     track: Optional[int] = None,
@@ -293,7 +312,7 @@ def search_nisar_products(
     url_type: UrlType = UrlType.HTTPS,
     provider: str = "ASF",
     short_name: Optional[Union[str, List[str]]] = None,
-    max_results: int = 10000,  # Increased default to 10000
+    max_results: Optional[int] = None,
     max_workers: int = 4,  # Increased workers to 4 by default
 ) -> List[NISARProduct]:
     """Search for NISAR products in CMR.
@@ -324,8 +343,12 @@ def search_nisar_products(
         Data provider (default: "ASF").
     short_name : Optional[str]
         CMR short name. If None, determined from product_type.
-    max_results : int
-        Maximum number of results to return.
+    max_results : Optional[int]
+        Cap on the number of returned products. ``None`` (the default) or a
+        value <= 0 returns the whole matching archive. The cap is applied
+        *after* every page is fetched, so it saves no query time -- it only
+        drops granules, in arbitrary CMR order. Truncation is logged as a
+        warning.
     max_workers : int
         Maximum number of concurrent workers for fetching pages.
         Default is 2 to avoid overwhelming the CMR API.
@@ -385,8 +408,6 @@ def search_nisar_products(
                 continue
 
             products.append(product)
-            if len(products) >= max_results:
-                break
         except (ValueError, KeyError) as e:
             logger.debug(f"Skipping item due to parsing error: {e}")
 
@@ -395,13 +416,13 @@ def search_nisar_products(
         key=lambda p: (p.track or 0, p.frame or 0, p.direction or "", p.start_datetime)
     )
 
-    return products
+    return _apply_max_results(products, max_results)
 
 
 def search_nisar_granules(
     short_name: Union[str, List[str]],
     provider: str = "ASF",
-    max_results: int = 25000,
+    max_results: Optional[int] = None,
     max_workers: int = 4,
     output_format: str = "json",  # noqa: ARG001  # kept for backward compatibility
 ) -> pd.DataFrame:
@@ -420,8 +441,10 @@ def search_nisar_granules(
         CMR collection short name(s) to search.
     provider : str
         Data provider (default: "ASF").
-    max_results : int
-        Cap on the number of returned rows.
+    max_results : Optional[int]
+        Cap on the number of returned rows; ``None`` (the default) or <= 0
+        keeps the whole archive. See :func:`search_nisar_products` for why a
+        cap costs the same query time as no cap.
     max_workers : int
         Concurrent CMR page workers.
     output_format : str
@@ -446,7 +469,7 @@ def search_nisar_granules(
     )
 
     rows = []
-    for entry in entries[:max_results]:
+    for entry in _apply_max_results(entries, max_results):
         rows.append(
             {
                 "granule_id": entry.get("id", ""),
