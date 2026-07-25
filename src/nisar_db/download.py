@@ -85,6 +85,7 @@ def download_earthdata_granule(
     skip_existing: bool = True,
     show_progress: bool = True,
     timeout: int = 60,
+    filename_suffix: str | None = None,
 ) -> list[str]:
     """Download a NASA EarthData granule using ``.netrc`` credentials.
 
@@ -100,6 +101,11 @@ def download_earthdata_granule(
         If True, display download progress information.
     timeout : int
         Timeout in seconds for the HTTP requests.
+    filename_suffix : str, optional
+        Keep only the data links whose file name ends with this suffix, e.g.
+        ``".gpkg"``. Some granules list a browse/search page alongside the
+        science file under the same CMR relation, which would otherwise be
+        saved as an HTML file.
 
     Returns
     -------
@@ -130,6 +136,12 @@ def download_earthdata_granule(
     download_urls = [
         link["href"] for link in entry.get("links", []) if link.get("rel") == _DATA_REL
     ]
+    if filename_suffix is not None:
+        download_urls = [
+            url
+            for url in download_urls
+            if _filename_from_url(url).endswith(filename_suffix)
+        ]
     if not download_urls:
         logger.warning(f"No download URLs found for granule: {granule_id}")
         return []

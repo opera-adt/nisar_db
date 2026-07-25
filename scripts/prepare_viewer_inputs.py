@@ -20,7 +20,11 @@ The S3 scan in step 2 enumerates the whole prefix and takes minutes; pass
 
 Examples
 --------
-Full run into ``notebooks/``::
+Full run into ``notebooks/``, fetching the TrackFrame database from CMR::
+
+    python scripts/prepare_viewer_inputs.py --profile saml-pub
+
+Same, reusing a TrackFrame GeoPackage already on disk::
 
     python scripts/prepare_viewer_inputs.py \\
         --nisar-gpkg notebooks/NISAR_TrackFrame_L_20250909.gpkg \\
@@ -48,6 +52,7 @@ from pathlib import Path
 
 from nisar_db.consistent_gslc import make_consistent_gslc_json
 from nisar_db.frame_to_bound import build_frame_to_bound
+from nisar_db.geodb import get_trackframe_db
 from nisar_db.gslc_catalog import parse_gslc_list, write_catalog_csv
 from nisar_db.io_json import write_zipped_json
 from nisar_db.logging_setup import configure_logging
@@ -152,8 +157,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--nisar-gpkg",
         type=Path,
-        required=True,
-        help="Global NISAR TrackFrame GeoPackage (NISAR_TrackFrame_L_YYYYMMDD.gpkg).",
+        default=None,
+        help=(
+            "Global NISAR TrackFrame GeoPackage (NISAR_TrackFrame_L_YYYYMMDD.gpkg). "
+            "Omit to download it from CMR into --outdir."
+        ),
     )
     parser.add_argument(
         "--outdir",
@@ -197,7 +205,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.skip_frames:
         logger.info(f"Reusing {frames_gpkg}")
     else:
-        frames_gpkg = prepare_frames(args.nisar_gpkg, args.outdir)
+        nisar_gpkg = args.nisar_gpkg or get_trackframe_db(output_dir=args.outdir)
+        frames_gpkg = prepare_frames(nisar_gpkg, args.outdir)
 
     db_path = args.outdir / GSLC_DUCKDB
     if args.skip_catalog:

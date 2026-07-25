@@ -1,5 +1,9 @@
 """Command-line interface for nisar_db tools."""
 
+from __future__ import annotations
+
+from pathlib import Path
+
 import click
 
 from nisar_db.blackout import main as append_blackout_dates_cmd
@@ -79,6 +83,42 @@ def download_cmd(args):
     for its full argument list.
     """
     _run_argparse_main("nisar_db.download_cli", "download", args)
+
+
+@cli_app.command(name="download-frame-db", context_settings={"show_default": True})
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path(),
+    help="Directory to download the GeoPackage into.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Re-download even if the GeoPackage is already present.",
+)
+@click.option(
+    "--granule-id",
+    default=None,
+    help="CMR concept id to fetch (default: the current TrackFrame database).",
+)
+def download_frame_db_cmd(output_dir: Path, force: bool, granule_id: str | None):
+    """Download the global NISAR TrackFrame database GeoPackage.
+
+    This is the --nisar-gpkg input to create-frame-to-bound, create-catalog and
+    create-consistent. It is a public CMR granule; downloading needs Earthdata
+    Login credentials in ~/.netrc.
+    """
+    from nisar_db.filenames import NISAR_DB_GRANULE_ID
+    from nisar_db.geodb import get_trackframe_db
+
+    path = get_trackframe_db(
+        output_dir=output_dir,
+        skip_existing=not force,
+        granule_id=granule_id or NISAR_DB_GRANULE_ID,
+    )
+    click.echo(f"NISAR TrackFrame database: {path}")
 
 
 @cli_app.command(name="search")

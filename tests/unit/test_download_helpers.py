@@ -48,6 +48,51 @@ class _FakeResponse:
         return self._chunks
 
 
+class _FakeCmrResponse:
+    """Stand-in for the CMR granule-metadata response."""
+
+    def __init__(self, hrefs: list[str]) -> None:
+        data_rel = "http://esipfed.org/ns/fedsearch/1.1/data#"
+        self._payload = {
+            "feed": {
+                "entry": [
+                    {
+                        "title": "NISAR_TrackFrame_L_20250909",
+                        "links": [{"rel": data_rel, "href": h} for h in hrefs],
+                    }
+                ]
+            }
+        }
+
+    def raise_for_status(self) -> None:
+        pass
+
+    def json(self) -> dict:
+        return self._payload
+
+
+def test_download_granule_filters_by_suffix(tmp_path: Path, monkeypatch) -> None:
+    hrefs = [
+        "https://example.com/NISAR_TrackFrame_L_20250909.gpkg",
+        "https://search.earthdata.nasa.gov/search/granules?p=C1-ASF",
+    ]
+    monkeypatch.setattr(
+        download.requests, "get", lambda *a, **kw: _FakeCmrResponse(hrefs)
+    )
+    # Pre-create the target so skip_existing returns without any transfer.
+    (tmp_path / "NISAR_TrackFrame_L_20250909.gpkg").write_bytes(b"gpkg")
+    (tmp_path / "granules").write_bytes(b"html")
+
+    kept = download.download_earthdata_granule(
+        "G1-ASF", output_dir=tmp_path, filename_suffix=".gpkg"
+    )
+    assert kept == [str(tmp_path / "NISAR_TrackFrame_L_20250909.gpkg")]
+
+    # Without the filter, the browse page is treated as a data file too.
+    both = download.download_earthdata_granule("G1-ASF", output_dir=tmp_path)
+    assert len(both) == 2
+
+
 def test_stream_to_file_writes_bytes_and_returns_mb(tmp_path: Path) -> None:
     dest = tmp_path / "out.bin"
     payload = [b"a" * 1024, b"b" * 1024]

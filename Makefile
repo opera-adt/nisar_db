@@ -10,11 +10,17 @@ DATE := $(shell date +%Y-%m-%d)
 # Verbosely echo commands
 SHELL = sh -xv
 
-# Find the latest NISAR TrackFrame GeoPackage
-NISAR_GPKG ?= $(shell ls -t NISAR_TrackFrame_L_*.gpkg | head -n1)
+# Find the latest NISAR TrackFrame GeoPackage. With none on disk, fall back to a
+# name the download rule below builds from the public CMR granule.
+NISAR_GPKG ?= $(shell ls -t NISAR_TrackFrame_L_*.gpkg 2>/dev/null | head -n1)
 ifeq ($(NISAR_GPKG),)
-    $(error No NISAR_TrackFrame_L_*.gpkg file found. Please provide one: make NISAR_GPKG=path/to/NISAR_TrackFrame_L_YYYYMMDD.gpkg)
+    NISAR_GPKG = NISAR_TrackFrame_L.gpkg
+    $(info No NISAR_TrackFrame_L_*.gpkg found; it will be downloaded from CMR.)
 endif
+
+NISAR_TrackFrame_L.gpkg:
+	nisar-db download-frame-db
+	cp NISAR_TrackFrame_L_2*.gpkg $@
 
 # Find the latest GSLC catalog file
 GSLC_CATALOG ?= $(shell ls -t gslc_catalog*.csv | head -n1)
@@ -156,7 +162,7 @@ help:
 	@echo ""
 	@echo "Parameters:"
 	@echo "  VERSION=x.y.z              Override version number"
-	@echo "  NISAR_GPKG=file.gpkg       Specify NISAR TrackFrame GeoPackage"
+	@echo "  NISAR_GPKG=file.gpkg       NISAR TrackFrame GeoPackage (downloaded if absent)"
 	@echo "  GSLC_CATALOG=file.csv      Specify GSLC catalog file"
 	@echo "  SNOW_GEOJSON=file.geojson  Snow-analysis windows for the blackout dates"
 	@echo "  PREVIOUS_CONSISTENT=f.json Previous release, to diff changed frames"

@@ -1,6 +1,96 @@
+from __future__ import annotations
+
+from pathlib import Path
+
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import MultiPolygon
+
+from .download import download_earthdata_granule
+from .filenames import NISAR_DB_GRANULE_ID
+
+
+def get_trackframe_db(
+    output_dir: str | Path = ".",
+    skip_existing: bool = True,
+    granule_id: str = NISAR_DB_GRANULE_ID,
+) -> Path:
+    """Download the global NISAR TrackFrame database GeoPackage.
+
+    The TrackFrame database is a public CMR granule, so no credentials beyond a
+    standard Earthdata Login ``.netrc`` entry are needed. It is the
+    ``--nisar-gpkg`` input to ``create-frame-to-bound``, ``create-catalog`` and
+    ``create-consistent``.
+
+    Parameters
+    ----------
+    output_dir : str or Path
+        Directory to download into.
+    skip_existing : bool
+        Reuse the file if it is already in ``output_dir`` (the default): the
+        granule is versioned by date, so a present file is the same file.
+    granule_id : str
+        CMR concept id to fetch. Defaults to the current TrackFrame database;
+        pass an older concept id to pin a previous version.
+
+    Returns
+    -------
+    Path
+        Path to the local ``NISAR_TrackFrame_L_<date>.gpkg``.
+
+    Raises
+    ------
+    RuntimeError
+        If the granule yielded no GeoPackage, e.g. a failed or unauthenticated
+        download.
+
+    Examples
+    --------
+    >>> gpkg = get_trackframe_db("data/")  # doctest: +SKIP
+    >>> gpkg.name  # doctest: +SKIP
+    'NISAR_TrackFrame_L_20250909.gpkg'
+
+    """
+    # The granule advertises a browse page under the same CMR relation as the
+    # GeoPackage; without the suffix filter it lands as a stray HTML file.
+    paths = download_earthdata_granule(
+        granule_id,
+        output_dir=output_dir,
+        skip_existing=skip_existing,
+        filename_suffix=".gpkg",
+    )
+    if not paths:
+        raise RuntimeError(
+            f"No GeoPackage downloaded for granule {granule_id}. Check network "
+            "access and that ~/.netrc holds valid Earthdata Login credentials."
+        )
+    return Path(paths[0])
+
+
+def load_trackframe_db(
+    output_dir: str | Path = ".",
+    skip_existing: bool = True,
+    granule_id: str = NISAR_DB_GRANULE_ID,
+) -> gpd.GeoDataFrame:
+    """Download (if needed) and read the NISAR TrackFrame database.
+
+    Thin wrapper over :func:`get_trackframe_db` for the common case of wanting
+    the frames in memory rather than the path.
+
+    Examples
+    --------
+    >>> frames = load_trackframe_db("data/")  # doctest: +SKIP
+    >>> sorted(frames.columns)[:3]  # doctest: +SKIP
+    ['crossesDateline', 'endAX', 'endCY']
+
+    """
+    return gpd.read_file(
+        get_trackframe_db(
+            output_dir=output_dir,
+            skip_existing=skip_existing,
+            granule_id=granule_id,
+        )
+    )
 
 
 def convert_to_gdf(df: pd.DataFrame, nisar_db: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
