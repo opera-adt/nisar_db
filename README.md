@@ -21,9 +21,24 @@ mkdocs serve   # then open http://127.0.0.1:8000
 
 ## Installation
 
-### Using conda
+### From PyPI
 
-Follow the steps below to install `nisar_db` using conda environment.
+```bash
+pip install nisar-db
+```
+
+### From conda
+
+```bash
+conda install -c conda-forge -c opera-adt nisar_db
+```
+
+`conda-forge` is needed for the dependencies; the `opera-adt` channel hosts the
+`nisar_db` package itself.
+
+### From source (conda environment)
+
+Follow the steps below to install `nisar_db` from a checkout.
 
 1. Download source code:
 
@@ -35,7 +50,8 @@ cd nisar_db
 2. Install dependencies:
 
 ```bash
-conda env create
+conda env create   # runtime dependencies only
+conda activate nisar-db-env
 ```
 
 3. Install via pip:
@@ -45,7 +61,18 @@ conda env create
 python -m pip install .
 ```
 
-### Using pixi
+The `environment.yml` deliberately carries only the runtime dependencies. The
+development tooling lives in the pyproject extras, so contributors add:
+
+```bash
+python -m pip install -e ".[dev]"   # test + docs + lint + publish tooling
+```
+
+Individual extras are also available: `[test]`, `[docs]`, `[lint]`, `[publish]`.
+Building the conda package additionally needs the conda-only tools:
+`conda install -c conda-forge conda-build anaconda-client`.
+
+### From source (pixi)
 
 Alternatively, you can use [pixi](https://pixi.sh) for a faster installation process:
 
@@ -79,12 +106,15 @@ Options:
   --help  Show this message and exit.
 
 Commands:
+  append-blackout-dates  Manually append blackout windows for a single frame.
+  build-s3-catalog       Scan an S3 bucket once and write a queryable catalog.
   create-blackout-dates  Create the NISAR blackout-dates JSON.
   create-catalog         Parse a NISAR GSLC file list into a structured CSV.
   create-consistent      Create the consistent-GSLC JSON for NISAR frames.
   create-frame-to-bound  Create a frame_to_bound JSON file for NISAR.
   create-nisar-catalog   Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
   download               Download NISAR granules/URLs from CMR.
+  query-catalog          Query a catalog built by build-s3-catalog.
   search                 Search for NISAR products.
 ```
 
@@ -189,6 +219,20 @@ The command supports three methods for creating blackout dates:
    nisar-db create-blackout-dates --manual --start-year 2025 --end-year 2030
    ```
 
+### Appending blackout dates for a single frame
+
+The commands above regenerate a whole file. To add a one-off `[start, end]` window to an existing blackout JSON, use `nisar-db append-blackout-dates`:
+
+```bash
+nisar-db append-blackout-dates \
+  --json-file nisar-blackout-dates.json \
+  --frame 5827 \
+  --period 2025-11-01 2026-05-31 \
+  --period 2026-11-01 2027-05-31
+```
+
+`--period` is repeatable and takes an inclusive `START END` pair; bare dates are normalized to `T00:00:00` / `T23:59:59` so the end day is fully covered. The frame entry is created if it is missing, windows stay sorted by start date, and identical windows are not duplicated. The file is edited in place (`--output` writes elsewhere), the `.json.zip` sidecar is refreshed (`--no-zip` skips it), and every edit is recorded under `metadata.manual_edits`. Pass `--create` to start a new blackout JSON.
+
 The output is a JSON file with the following structure:
 
 ```json
@@ -281,6 +325,44 @@ If you're using pixi, you can run the make commands directly:
 pixi run make -f Makefile VERSION=0.2.0
 ```
 
+## Publishing the package
+
+Pushing a `v*` tag runs two workflows: `release.yml` (builds the Path-A data
+assets and the GitHub Release) and `publish.yml` (builds the wheel/sdist and the
+conda package, then pushes them to PyPI and anaconda.org).
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`publish.yml` can also be run manually from the Actions tab to publish to
+TestPyPI first (`pypi_target: testpypi`), which is the recommended dry run
+before a real release. The conda package is always built and attached to the run
+as an artifact, and only uploaded when a token is configured.
+
+Repository secrets used by `publish.yml`:
+
+| Secret | Purpose |
+| --- | --- |
+| `PYPI_API_TOKEN` | PyPI upload. Omit it to use [trusted publishing](https://docs.pypi.org/trusted-publishers/) via the `pypi` GitHub environment. |
+| `TEST_PYPI_API_TOKEN` | Same, for TestPyPI. |
+| `ANACONDA_API_TOKEN` | anaconda.org upload for the conda package. |
+
+Everything can also be done locally from the same recipe/config the workflow
+uses:
+
+```bash
+make dist                 # sdist + wheel into dist/, checked with twine
+make publish-testpypi     # or: make publish-pypi
+make conda-build          # noarch package into build-conda/
+make publish-conda CONDA_CHANNEL=opera-adt
+```
+
+The conda recipe lives in [conda/meta.yaml](conda/meta.yaml). It builds from the
+working tree and takes its version from `NISAR_DB_VERSION` (the `Makefile` sets
+this from the latest git tag), since `setuptools_scm` cannot see the git history
+inside the conda build sandbox.
+
 ## Development with pixi
 
 The pixi.toml file includes several useful tasks for development:
@@ -310,6 +392,7 @@ from nisar_db.geodb import convert_to_gdf, get_opera_na_shape
 from nisar_db.download import download_earthdata_granule, download_from_url
 from nisar_db.catalog.create_gslc_catalog import search_gslc_products
 from nisar_db.catalog.create_blackout_dates import manual_blackout_dates
+from nisar_db.blackout import append_blackout_dates_json
 
 # Parse a GSLC filename
 gslc = GSLCFilename.from_path("path/to/NISAR_L2_GSLC_BETA_V1_123_456_D_789_4000_HH_20250101T120000_20250101T120100.h5")
@@ -324,6 +407,9 @@ gslc_products = search_gslc_products(max_results=1000)
 
 # Create manual blackout dates
 blackout_data = manual_blackout_dates(output_file="blackout_dates.json")
+
+# Append one more window for a single frame
+append_blackout_dates_json("blackout_dates.json", 5827, [("2025-11-01", "2026-05-31")])
 
 # Work with geographic data
 na_shape = get_opera_na_shape()  # Get the OPERA North America shape

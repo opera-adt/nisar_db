@@ -8,6 +8,7 @@ from click.testing import CliRunner
 from nisar_db.cli import cli_app
 
 _SUBCOMMANDS = [
+    "append-blackout-dates",
     "build-s3-catalog",
     "create-blackout-dates",
     "create-catalog",

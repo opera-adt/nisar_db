@@ -3,8 +3,8 @@
 Frame-database and product-catalog generation for **OPERA DISP-NISAR**.
 
 `nisar_db` builds the auxiliary databases that the DISP-NISAR processing system
-needs to decide *which* NISAR GSLC acquisitions to stack into a displacement time
-series, *where* on Earth to process, and *when* to exclude or reset. It is the
+needs to decide *which* NISAR GSLC acquisitions stack into a consistent displacement time
+series, *where* on to process, and *when* to exclude or reset. It is the
 NISAR counterpart of [`burst_db`](https://github.com/opera-adt/burst_db), which
 does the same job for Sentinel-1 (DISP-S1).
 
@@ -39,6 +39,20 @@ are no sub-frame burst IDs).
 
 ## Install
 
+=== "pip"
+
+    ```bash
+    pip install nisar-db
+    ```
+
+=== "conda"
+
+    ```bash
+    conda install -c conda-forge -c opera-adt nisar_db
+    ```
+
+Or from a checkout, for development:
+
 === "pixi"
 
     ```bash
@@ -49,13 +63,16 @@ are no sub-frame burst IDs).
     pixi run build
     ```
 
-=== "conda"
+=== "conda env"
 
     ```bash
     git clone https://github.com/opera-adt/nisar_db
     cd nisar_db
-    conda env create
+    conda env create          # runtime dependencies only
+    conda activate nisar-db-env
     python -m pip install .
+    # contributors: add the tooling extras
+    python -m pip install -e ".[dev]"
     ```
 
 Installing the package creates the `nisar-db` command line tool:

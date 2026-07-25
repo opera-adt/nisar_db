@@ -1,0 +1,12 @@
+# Extra dependencies for the snow analysis, on top of the nisar_db runtime.
+# Kept out of environment.yml: only this directory pulls a weather archive and
+# a plotting stack.
+aiohttp
+dask
+fsspec
+matplotlib
+rich
+seaborn
+tqdm
+xarray
+zarr>=3

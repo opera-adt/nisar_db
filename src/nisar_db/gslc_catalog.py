@@ -169,14 +169,14 @@ def main(
     na_only: bool,
     nisar_gpkg: Path | None,
 ):
-    r"""Parse a NISAR GSLC file list into a structured catalog CSV.
+    """Parse a NISAR GSLC file list into a structured catalog CSV.
 
     Adds two derived columns per row:
 
     \b
       common_mode  most frequent mode for the (track, frame) pair
       is_full      True when coverage == 'F' (full frame)
-    """
+    """  # noqa: D301
     if na_only and nisar_gpkg is None:
         raise click.UsageError("--nisar-gpkg is required when --na-only is set.")
 
@@ -228,17 +228,11 @@ def main(
     if output is None:
         output = input_file.parent / (input_file.stem + "_catalog.csv")
 
-    # Force zero-padded string columns (e.g. "0005") to be quoted so pandas
-    # doesn't strip leading zeros when reading the file back.
-    str_cols = [c for c in _STR_COLS if c in df.columns]
-    df[str_cols] = df[str_cols].astype(str)
-    df.to_csv(output, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    write_catalog_csv(df, output)
     click.echo(f"\nCatalog written to: {output}")
 
     summary_path = output.with_name(output.stem + "_frame_summary.csv")
-    str_cols_s = [c for c in _STR_COLS if c in frame_summary.columns]
-    frame_summary[str_cols_s] = frame_summary[str_cols_s].astype(str)
-    frame_summary.to_csv(summary_path, index=False, quoting=csv.QUOTE_NONNUMERIC)
+    write_catalog_csv(frame_summary, summary_path)
     click.echo(f"Frame summary written to: {summary_path}")
 
 

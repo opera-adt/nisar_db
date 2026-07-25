@@ -9,23 +9,22 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
-# Allow the workflow to publish to GitHub Pages.
+# Needs write access to push the built site to the gh-pages branch.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# One in-flight Pages deployment at a time.
 concurrency:
-  group: pages
+  group: docs-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build site
+  deploy:
+    name: Build and publish to GitHub Pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # gh-deploy needs full history for the gh-pages branch
 
       - uses: actions/setup-python@v5
         with:
@@ -37,20 +36,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[docs]'
 
-      - name: Build site (strict)
-        run: mkdocs build --strict
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # Pages is configured to serve from the gh-pages branch (build_type: legacy),
+      # so publish by pushing the built site there rather than via the Pages
+      # Actions artifact flow.
+      - name: Build and deploy to gh-pages
+        run: mkdocs gh-deploy --strict --force

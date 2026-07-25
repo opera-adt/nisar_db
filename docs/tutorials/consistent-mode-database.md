@@ -148,6 +148,27 @@ make -f /path/to/nisar_db/Makefile
 `make help` lists the individual targets (`FRAME_TO_BOUND`, `CONSISTENT_GSLC`,
 `gslc_catalog.csv`, `clean`, ...).
 
+## Do it all from an S3 bucket
+
+`make` starts from a GSLC file list you already have. To go all the way from a
+bucket instead, `scripts/prepare_viewer_inputs.py` chains Steps 1-3 and sources
+the granules by scanning S3:
+
+```bash
+python scripts/prepare_viewer_inputs.py \
+  --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg \
+  --outdir notebooks --profile saml-pub
+```
+
+It writes `opera-nisar-disp-frames.gpkg`, `gslc_catalog.duckdb`,
+`gslc_catalog.csv`, and `opera-nisar-disp-consistent-gslc-<YYYYMMDD>.json` —
+the inputs [the frame viewer](../frame-viewer.md) consumes. Unlike the file-list
+route, the DuckDB catalog carries a `production_datetime` column (the S3 object's
+`LastModified`, since granule names hold no production time).
+
+The S3 scan takes minutes; `--skip-frames` / `--skip-catalog` reuse existing
+artifacts while iterating on the selection step.
+
 ## Verify the output
 
 ```python

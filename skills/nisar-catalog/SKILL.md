@@ -20,6 +20,7 @@ nisar-db create-frame-to-bound   Create a frame_to_bound JSON file for NISAR.
 nisar-db create-consistent       Create the consistent-GSLC JSON for NISAR frames.
 nisar-db create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
 nisar-db create-blackout-dates   Create the NISAR blackout-dates JSON.
+nisar-db append-blackout-dates   Manually append blackout windows for one frame.
 nisar-db download                Download NISAR granules/URLs from CMR.
 nisar-db search                  Search for NISAR products.
 ```
@@ -29,7 +30,7 @@ nisar-db search                  Search for NISAR products.
 `cli_app` in [cli.py](../../src/nisar_db/cli.py) mixes two styles:
 
 - **Native click commands** reused directly as subcommands: `create-frame-to-bound`,
-  `create-catalog`, `create-consistent`, and `search`. Their options are defined on
+  `create-catalog`, `create-consistent`, `append-blackout-dates`, and `search`. Their options are defined on
   each module's `main`.
 - **Argparse pass-through commands**: `create-nisar-catalog`, `create-blackout-dates`,
   `download`. These forward all args to an argparse `main()` via `_run_argparse_main`,
@@ -73,6 +74,7 @@ Both builders share one pipeline in
 | `create-frame-to-bound` | `--nisar-gpkg` (NISAR_TrackFrame_L_*.gpkg) | `--output` JSON + `.json.zip`; `opera-nisar-disp-frames.gpkg` |
 | `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames | `--output` consistent JSON |
 | `create-blackout-dates` | `--input-file` snow/monthly GeoJSON, or `--manual` | `--output-file` blackout JSON |
+| `append-blackout-dates` | `--json-file` existing blackout JSON, `--frame`, repeatable `--period START END` | same file (or `--output`) + `.json.zip` |
 
 ### GSLC JSON outputs
 - `gslc_tracks.json` — track → list of pass directions

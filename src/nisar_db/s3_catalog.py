@@ -115,7 +115,10 @@ def _load_catalog(path: Union[str, Path]) -> pd.DataFrame:
 
         df = duckdb.connect(str(path)).execute("SELECT * FROM products").df()
     elif suffix == ".csv":
-        df = pd.read_csv(path, parse_dates=["start_datetime", "end_datetime"])
+        df = pd.read_csv(
+            path,
+            parse_dates=["start_datetime", "end_datetime", "production_datetime"],
+        )
     else:
         raise ValueError(
             f"Unsupported catalog format '{suffix}' (use .parquet/.duckdb/.csv)"

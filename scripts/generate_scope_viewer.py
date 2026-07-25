@@ -109,13 +109,43 @@ def load_consistent_json(path: Path) -> dict[str, dict]:
     Returns the ``data`` mapping keyed by ``frame_idx`` (as string), matching
     the schema written by :mod:`nisar_db.consistent_gslc`.
     """
+    payload = _load_json_payload(path)
+    return payload.get("data", payload)
+
+
+def _load_json_payload(path: Path) -> dict:
+    """Read a JSON (or ``.json.zip``) file and return the parsed object."""
     if path.suffix == ".zip" or zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as zf:
             inner = next(n for n in zf.namelist() if n.endswith(".json"))
-            payload = json.loads(zf.read(inner))
-    else:
-        payload = json.loads(path.read_text())
-    return payload.get("data", payload)
+            return json.loads(zf.read(inner))
+    return json.loads(path.read_text())
+
+
+def load_period_json(path: Path, *keys: str) -> dict[str, list]:
+    """Load a per-frame blackout/reference JSON keyed by ``frame_idx``.
+
+    Handles both the ``nisar_db`` and ``burst_db`` schemas: the per-frame map
+    lives under ``blackout_dates`` / ``data`` (whichever is present).
+
+    Parameters
+    ----------
+    path : Path
+        JSON or ``.json.zip`` file.
+    *keys : str
+        Candidate top-level keys to look under, in priority order.
+
+    Returns
+    -------
+    dict
+        ``{frame_idx (str): value}``.
+
+    """
+    payload = _load_json_payload(path)
+    for key in keys:
+        if key in payload:
+            return payload[key]
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -179,12 +209,74 @@ def summarize_frame(group: pd.DataFrame) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Blackout windows
+# ---------------------------------------------------------------------------
+_MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
+
+
+def blackout_summary(windows: list) -> dict:
+    """Summarize a frame's blackout windows into a recurring month range.
+
+    The per-frame windows repeat yearly (e.g. ``Nov 01 -> May 31`` every year),
+    so the first window defines the recurring pattern: its start/end months and
+    the duration in months.
+
+    Parameters
+    ----------
+    windows : list
+        ``[[start_iso, end_iso], ...]`` as stored in the blackout JSON.
+
+    Returns
+    -------
+    dict
+        ``months`` (float duration), ``label`` (e.g. ``"Nov-May"``),
+        ``start_month`` / ``end_month`` (1-12), ``n_windows``, and ``ranges``
+        (each window as ``"YYYY-MM-DD -> YYYY-MM-DD"`` for the popup).
+    """
+    if not windows:
+        return {
+            "months": 0.0,
+            "label": "",
+            "start_month": 0,
+            "end_month": 0,
+            "n_windows": 0,
+            "ranges": [],
+        }
+    start = datetime.fromisoformat(str(windows[0][0]))
+    end = datetime.fromisoformat(str(windows[0][1]))
+    months = round(((end - start).days + 1) / 30.44, 1)
+    return {
+        "months": months,
+        "label": f"{_MONTHS[start.month - 1]}-{_MONTHS[end.month - 1]}",
+        "start_month": start.month,
+        "end_month": end.month,
+        "n_windows": len(windows),
+        "ranges": [f"{str(a)[:10]} -> {str(b)[:10]}" for a, b in windows],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Feature building
 # ---------------------------------------------------------------------------
 def build_frame_data(
     gdf: gpd.GeoDataFrame,
     catalog: pd.DataFrame,
     consistent: dict[str, dict] | None,
+    blackout: dict[str, list] | None = None,
+    reference: dict[str, list] | None = None,
 ) -> dict:
     """Assemble the frames ``FeatureCollection`` embedded in the viewer."""
     stats = {
@@ -229,6 +321,23 @@ def build_frame_data(
             else:
                 props["n_consistent"] = 0
                 props["in_consistent"] = False
+
+        # Optional per-frame blackout windows (recurring seasonal snow, etc.).
+        if blackout is not None:
+            bo = blackout_summary(blackout.get(str(frame_idx), []))
+            props["has_blackout"] = bo["n_windows"] > 0
+            props["blackout_months"] = bo["months"]
+            props["blackout_label"] = bo["label"]
+            props["blackout_start_month"] = bo["start_month"]
+            props["blackout_end_month"] = bo["end_month"]
+            props["blackout_windows"] = bo["n_windows"]
+            props["blackout_ranges"] = bo["ranges"]
+
+        # Optional per-frame InSAR reference-date resets.
+        if reference is not None:
+            refs = [str(d)[:10] for d in reference.get(str(frame_idx), [])]
+            props["has_reference"] = len(refs) > 0
+            props["reference_dates"] = refs
 
         features.append(
             {
@@ -400,6 +509,7 @@ BODY_HTML = r"""<body>
             <option value="cons_mode">Consistent mode</option>
             <option value="cons_cov">Consistent coverage (full/partial)</option>
             <option value="n_modes">Distinct modes per frame</option>
+            <option value="blackout_months" id="opt-blackout" hidden>Blackout duration (months)</option>
             <option value="gslc_modes">GSLC mode (first)</option>
             <option value="gslc_pols">GSLC polarization (first)</option>
           </select>
@@ -424,6 +534,15 @@ BODY_HTML = r"""<body>
           <div class="chip-grid" id="chips-gslc-mode"></div>
           <label>Polarization</label>
           <div class="chip-grid" id="chips-gslc-pol"></div>
+        </div>
+      </div>
+
+      <div class="section" id="section-blackout" hidden>
+        <div class="section-head" data-target="sec-blackout"><span>Blackout &amp; Reference Dates</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-blackout">
+          <div class="check-row"><input type="checkbox" id="f-blackout"><label for="f-blackout" style="margin:0;color:var(--text)">Frames with a blackout window only</label></div>
+          <div class="stat-line">Blackout windows repeat yearly (e.g. seasonal snow). Color frames by "Blackout duration (months)" above; hover or click a frame to see the exact blacked-out ranges and any InSAR reference resets.</div>
+          <div id="blackout-summary"></div>
         </div>
       </div>
 
@@ -507,6 +626,7 @@ APP_JS = r"""
     cons_mode:     { label:"Consistent mode",      key:"cons_mode",     kind:"cat" },
     cons_cov:      { label:"Consistent coverage",  key:"cons_cov",      kind:"cat" },
     n_modes:       { label:"Distinct modes",       key:"n_modes",       kind:"num" },
+    blackout_months:{ label:"Blackout months",     key:"blackout_months", kind:"num" },
     gslc_modes:    { label:"GSLC mode",            key:"_gslcMode",     kind:"cat" },
     gslc_pols:     { label:"GSLC polarization",    key:"_gslcPol",      kind:"cat" }
   };
@@ -1042,6 +1162,21 @@ def main(argv: list[str] | None = None) -> None:
         "consistent mode/coverage fields (from 'nisar-db create-consistent').",
     )
     parser.add_argument(
+        "--blackout-json",
+        type=Path,
+        default=None,
+        help="Optional per-frame blackout-dates JSON/.json.zip (from "
+        "'nisar-db create-blackout-dates'); adds blackout duration coloring, "
+        "filtering, and hover details.",
+    )
+    parser.add_argument(
+        "--reference-json",
+        type=Path,
+        default=None,
+        help="Optional per-frame reference-dates JSON/.json.zip; shows InSAR "
+        "reference resets on hover/click.",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path("scripts/nisar_scope_viewer.html"),
@@ -1068,7 +1203,19 @@ def main(argv: list[str] | None = None) -> None:
         consistent = load_consistent_json(args.consistent_json)
         print(f"  {len(consistent)} frames in consistent catalog")
 
-    frame_data = build_frame_data(gdf, catalog, consistent)
+    blackout = None
+    if args.blackout_json is not None:
+        print(f"Loading blackout dates from {args.blackout_json}")
+        blackout = load_period_json(args.blackout_json, "blackout_dates", "data")
+        print(f"  {len(blackout)} frames with blackout windows")
+
+    reference = None
+    if args.reference_json is not None:
+        print(f"Loading reference dates from {args.reference_json}")
+        reference = load_period_json(args.reference_json, "data", "reference_dates")
+        print(f"  {len(reference)} frames with reference resets")
+
+    frame_data = build_frame_data(gdf, catalog, consistent, blackout, reference)
     n_with = sum(1 for f in frame_data["features"] if f["properties"]["gslc_count"] > 0)
 
     meta = {
@@ -1078,6 +1225,8 @@ def main(argv: list[str] | None = None) -> None:
         "n_frames_with_gslc": n_with,
         "n_granules": int(len(catalog)),
         "consistent_source": str(args.consistent_json) if consistent else "computed",
+        "has_blackout": blackout is not None,
+        "has_reference": reference is not None,
     }
 
     html = render_html(frame_data, meta)

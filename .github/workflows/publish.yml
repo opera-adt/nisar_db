@@ -1,0 +1,172 @@
+name: Publish package (PyPI + conda)
+
+# Build the `nisar_db` distributions and push them to the package indexes so the
+# tool can be installed with `pip install nisar-db` / `conda install nisar_db`.
+#
+# Triggers
+#   - push of a `v*` tag  -> build, publish to PyPI, upload the conda package
+#   - manual dispatch     -> pick the PyPI target (none/testpypi/pypi) and
+#                            whether to upload the conda package
+#
+# Credentials
+#   PyPI    : trusted publishing (OIDC) is used when no token secret is set.
+#             Otherwise set PYPI_API_TOKEN / TEST_PYPI_API_TOKEN.
+#   conda   : ANACONDA_API_TOKEN (anaconda.org). Without it the conda package is
+#             still built and attached to the workflow run as an artifact.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      pypi_target:
+        description: 'Where to publish the wheel/sdist'
+        type: choice
+        required: true
+        default: testpypi
+        options: [none, testpypi, pypi]
+      publish_conda:
+        description: 'Upload the conda package to anaconda.org'
+        type: boolean
+        required: false
+        default: false
+      conda_label:
+        description: 'anaconda.org label to upload under'
+        required: false
+        default: main
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # setuptools_scm derives the version from the tag history
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check dist/*
+
+      - name: Resolve version
+        id: version
+        run: |
+          python -m pip install --upgrade setuptools_scm
+          version=$(python -m setuptools_scm)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Built version ${version}"
+          # PyPI rejects local version segments (`+g1234abc`), which is what an
+          # untagged or dirty tree produces.
+          case "$version" in
+            *+*) echo "::warning::Version ${version} has a local segment; PyPI upload will be rejected. Tag the commit first." ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-dist
+          path: dist/*
+
+  testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.pypi_target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          skip-existing: true
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.pypi_target == 'pypi')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+  conda:
+    name: Build conda package
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          channels: conda-forge
+          conda-remove-defaults: true
+
+      - name: Install build tooling
+        run: conda install -y conda-build anaconda-client
+
+      - name: Build noarch package
+        env:
+          NISAR_DB_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          conda build conda --no-anaconda-upload --output-folder build-conda -c conda-forge
+          find build-conda -name '*.conda' -o -name '*.tar.bz2'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conda-package
+          path: |
+            build-conda/**/*.conda
+            build-conda/**/*.tar.bz2
+
+      - name: Upload to anaconda.org
+        if: >-
+          github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish_conda)
+        env:
+          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+          LABEL: ${{ inputs.conda_label || 'main' }}
+        run: |
+          if [ -z "$ANACONDA_API_TOKEN" ]; then
+            echo "::warning::ANACONDA_API_TOKEN is not set; skipping anaconda.org upload."
+            exit 0
+          fi
+          mapfile -t pkgs < <(find build-conda -name '*.conda' -o -name '*.tar.bz2')
+          anaconda upload --label "$LABEL" --skip-existing "${pkgs[@]}"

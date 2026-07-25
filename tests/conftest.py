@@ -8,6 +8,8 @@ active) and warning-clean (``filterwarnings = ["error"]``).
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import pandas as pd
 import pytest
 
@@ -44,8 +46,18 @@ def s3_products() -> list[NISARProduct]:
     key_old = f"products/L2_L_GSLC/{GSLC_NAME}.h5"
     key_new = key_old.replace("_P01234_", "_P09999_")
     return [
-        NISARProduct.from_s3_key("my-bucket", key_old, size=2_000_000_000),
-        NISARProduct.from_s3_key("my-bucket", key_new, size=3_000_000_000),
+        NISARProduct.from_s3_key(
+            "my-bucket",
+            key_old,
+            size=2_000_000_000,
+            last_modified=datetime(2024, 6, 2, 12, 0, tzinfo=timezone.utc),
+        ),
+        NISARProduct.from_s3_key(
+            "my-bucket",
+            key_new,
+            size=3_000_000_000,
+            last_modified=datetime(2024, 9, 30, 12, 0, tzinfo=timezone.utc),
+        ),
     ]
 
 

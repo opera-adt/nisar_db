@@ -3,32 +3,19 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.10
-  # Runtime (mirrors requirements.txt)
+  # Runtime only (mirrors requirements.txt). Development tooling lives in the
+  # pyproject extras: `pip install -e ".[dev]"` after creating this env.
   - boto3
   - click
   - duckdb
   - geopandas-base
   - numpy
   - pandas
+  - pip
   - pyarrow
   # geopandas-base ships no vector IO engine; the GPKG read/write path needs one
   - pyogrio
-  - pip
   - requests
   - shapely
   - tqdm
-  # Test (pyproject [test])
-  - pytest>=7
-  - pytest-cov
-  - pytest-randomly
-  # Docs (pyproject [docs])
-  - mkdocs>=1.5
-  - mkdocs-material>=9.5
-  - pymdown-extensions>=10
-  # Lint / type-check tooling driven by .pre-commit-config.yaml
-  - black
-  - mypy
-  - pre-commit
-  - ruff
-  - pip:
-    - unzip-http
+  - unzip-http

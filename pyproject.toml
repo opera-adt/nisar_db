@@ -14,9 +14,12 @@ requires-python = ">=3.9"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: GIS",
 ]
+keywords = ["NISAR", "OPERA", "InSAR", "DISP", "frame database"]
 license = { file = "LICENSE" }
 
 # The version will be written into a version.py upon install, auto-generated
@@ -28,6 +31,11 @@ dynamic = ["version", "dependencies"]
 [project.optional-dependencies]
 test = ["pytest>=7", "pytest-randomly", "pytest-cov"]
 docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "pymdown-extensions>=10"]
+publish = ["build>=1.0", "twine>=5.0"]
+# Everything needed to work on the package; the conda environment.yml stays
+# runtime-only so plain users do not pull the tooling in.
+lint = ["black", "mypy", "pre-commit", "ruff"]
+dev = ["nisar_db[test,docs,publish,lint]"]
 
 [project.urls]
 Homepage = "https://github.com/opera-adt/nisar_db"

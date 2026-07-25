@@ -17,7 +17,8 @@ shape, keyed by NISAR `frame_idx` instead of DISP-S1 frame ID.
 |---|---|
 | JSON builders (three input modes) | [`catalog/create_blackout_dates.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/catalog/create_blackout_dates.py) |
 | Filter applied during selection | `apply_blackout` / `is_excluded` in [`blackout.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/blackout.py) |
-| CLI entry point | `nisar-db create-blackout-dates` |
+| Manual per-frame edits | `append_blackout_dates_json` in [`blackout.py`](https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/blackout.py) |
+| CLI entry points | `nisar-db create-blackout-dates`, `nisar-db append-blackout-dates` |
 
 ## The JSON shape
 
@@ -88,6 +89,40 @@ There are three input modes, all in `create_blackout_dates.py`:
       --start-year 2025 --end-year 2030 \
       --output-file nisar-manual-blackout-dates.json
     ```
+
+## Adding a window by hand
+
+The three builders above regenerate a whole file. For a one-off exclusion -- a
+frame affected by an event the snow analysis knows nothing about -- append the
+window to an existing JSON instead:
+
+```bash
+nisar-db append-blackout-dates \
+  --json-file nisar-blackout-dates.json \
+  --frame 5827 \
+  --period 2025-11-01 2026-05-31 \
+  --period 2026-11-01 2027-05-31
+```
+
+- `--period` is repeatable and takes an inclusive `START END` pair. Bare dates
+  are normalised to `T00:00:00` / `T23:59:59`, so the end day is fully covered;
+  pass an explicit time (`2025-11-01T06:00:00`) to keep it.
+- The frame entry is created if missing, windows stay sorted by start date, and
+  an identical window is never duplicated.
+- The file is edited in place (use `--output` to write elsewhere), the
+  `.json.zip` sidecar is refreshed (`--no-zip` to skip), and each edit is
+  recorded under `metadata.manual_edits` for provenance.
+- `--create` starts a new blackout JSON when the file does not exist yet.
+
+From Python, the same thing:
+
+```python
+from nisar_db.blackout import append_blackout_dates_json
+
+append_blackout_dates_json(
+    "nisar-blackout-dates.json", 5827, [("2025-11-01", "2026-05-31")]
+)
+```
 
 !!! note "Snow analysis is upstream"
     The snow-cover analysis that produces the input GeoJSON lives outside this

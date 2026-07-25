@@ -42,6 +42,10 @@ def test_workflow_query(s3_products, tmp_path: Path) -> None:
     # A non-matching filter yields an empty frame (not an error).
     assert query_catalog(catalog, frame=999).empty
 
+    # The S3 LastModified survives the catalog round-trip as the production time.
+    produced = query_catalog(catalog, crid_min="P09999").iloc[0]["production_datetime"]
+    assert pd.Timestamp(produced) == pd.Timestamp("2024-09-30 12:00", tz="UTC")
+
 
 # ---------------------------------------------------------------------------
 # 2. download
@@ -124,6 +128,31 @@ def test_workflow_make_consistent(
     ]
     assert data["2002"]["common_mode"] == "7700"
     assert data["2002"]["common_coverage"] == "P"
+
+
+def test_workflow_make_consistent_from_create_catalog_csv(
+    consistent_catalog_df: pd.DataFrame, frames_gpkg: Path, tmp_path: Path
+) -> None:
+    """Check the Step 2 -> Step 3 handoff: create-catalog CSV into create-consistent.
+
+    ``create-catalog`` emits its own ``common_mode`` holding the 2-char mode
+    *family*, which used to collide with the 4-char mode ``create-consistent``
+    computes and break the merge.
+    """
+    catalog_csv = tmp_path / "gslc_catalog.csv"
+    df = consistent_catalog_df.copy()
+    df["mode_family"] = df["mode"].str[:2]
+    df["common_mode"] = "40"  # what create-catalog writes: the family, not the mode
+    df["is_full"] = df["coverage"] == "F"
+    df.to_csv(catalog_csv, index=False)
+
+    out = tmp_path / "consistent.json"
+    make_consistent_gslc_json(catalog_csv, frames_gpkg, output=out)
+
+    data = json.loads(out.read_text())["data"]
+    # Full 4-char modes, not the "40" family value carried in from the catalog.
+    assert data["1001"]["common_mode"] == "4005"
+    assert data["2002"]["common_mode"] == "7700"
 
 
 def test_workflow_make_consistent_with_blackout(

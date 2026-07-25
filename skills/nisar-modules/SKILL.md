@@ -111,7 +111,9 @@ src/nisar_db/
 - **[consistent_gslc.py](../../src/nisar_db/consistent_gslc.py)** —
   `select_consistent_acquisitions`, `build_frame_idx_map`, `make_consistent_gslc_json`.
 - **[blackout.py](../../src/nisar_db/blackout.py)** — `is_excluded`, `apply_blackout`,
-  `create_blackout_dates_json`, `create_reference_dates_json`.
+  `create_blackout_dates_json`, `create_reference_dates_json`;
+  manual editing via `append_blackout_period`, `append_blackout_dates_json`,
+  `load_blackout_json` (CLI `append-blackout-dates`).
 - **[frame_to_bound.py](../../src/nisar_db/frame_to_bound.py)** — `build_frame_to_bound`.
 - **[geodb.py](../../src/nisar_db/geodb.py)** — `get_opera_na_shape` (OPERA NA
   polygon), `filter_frames_to_na`, `convert_to_gdf`.

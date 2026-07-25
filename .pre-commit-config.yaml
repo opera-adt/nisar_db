@@ -19,6 +19,8 @@ repos:
       - id: check-yaml
         # --unsafe allows mkdocs.yml's `!!python/name:` tags (pymdownx superfences)
         args: [--allow-multiple-documents, --unsafe]
+        # conda/meta.yaml is a jinja2 template, not parseable as plain YAML
+        exclude: ^conda/meta\.yaml$
       - id: debug-statements
       - id: end-of-file-fixer
       - id: file-contents-sorter
@@ -47,7 +49,8 @@ repos:
         - types-python-dateutil
 
   # Full test suite runs on `git push` only (too slow for every commit). Uses the
-  # pytest on PATH, so run pushes from the project env (e.g. nisar-db-env).
+  # pytest on PATH, so run pushes from an env with the dev extras installed
+  # (`pip install -e ".[dev]"`).
   - repo: local
     hooks:
       - id: pytest

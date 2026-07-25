@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from nisar_db.search.models import NISARProduct, ProductType, UrlType
 
 
@@ -29,6 +31,15 @@ class TestFromS3Key:
     def test_size_optional(self, gslc_name: str) -> None:
         p = NISARProduct.from_s3_key("bkt", f"{gslc_name}.h5")
         assert "s3_size_bytes" not in p.metadata
+
+    def test_last_modified_recorded(self, gslc_name: str) -> None:
+        produced = datetime(2026, 6, 15, 3, 21, 9, tzinfo=timezone.utc)
+        p = NISARProduct.from_s3_key("bkt", f"{gslc_name}.h5", last_modified=produced)
+        assert p.metadata["s3_last_modified"] == produced
+
+    def test_last_modified_optional(self, gslc_name: str) -> None:
+        p = NISARProduct.from_s3_key("bkt", f"{gslc_name}.h5")
+        assert "s3_last_modified" not in p.metadata
 
 
 class TestFromCmrItem:

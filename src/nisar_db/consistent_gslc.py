@@ -183,6 +183,10 @@ def select_consistent_acquisitions(df: pd.DataFrame) -> pd.DataFrame:
     )
     result = result.drop(columns=[0])
 
+    # ``create-catalog`` writes its own ``common_mode`` (the 2-char mode *family*),
+    # which would collide with the full 4-char mode computed above and turn the
+    # merge into _x/_y suffixes. Ours is authoritative, so drop theirs first.
+    df = df.drop(columns=["common_mode", "common_coverage"], errors="ignore")
     df = df.merge(result, on=["track", "frame"], how="left")
 
     # Keep only rows matching the winning (mode, coverage)
@@ -384,14 +388,14 @@ def main(
     output: Path | None,
     blackout_file: Path | None,
 ):
-    r"""Create the consistent-GSLC JSON for NISAR frames.
+    """Create the consistent-GSLC JSON for NISAR frames.
 
     \b
     Selection logic:
       1. Dominant mode per frame  (standard "4005"/"2005" preferred)
       2. Majority coverage within that mode (F beats P on tie)
       3. One acquisition per calendar date (earliest sensing time)
-    """
+    """  # noqa: D301
     make_consistent_gslc_json(
         catalog_csv=catalog_csv,
         nisar_gpkg=nisar_gpkg,

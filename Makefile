@@ -58,6 +58,35 @@ clean:
 cleanall: clean
 	rm -f gslc_catalog*.csv *_frame_summary.csv
 
+# --- Packaging -------------------------------------------------------------
+# Anaconda.org channel/user the conda package is uploaded to
+CONDA_CHANNEL ?= opera-adt
+CONDA_LABEL ?= main
+
+# Build the sdist + wheel into dist/
+dist:
+	python -m pip install --upgrade build twine
+	rm -rf dist
+	python -m build
+	twine check dist/*
+
+# Upload to TestPyPI first; needs ~/.pypirc or TWINE_USERNAME/TWINE_PASSWORD
+publish-testpypi: dist
+	twine upload --repository testpypi dist/*
+
+publish-pypi: dist
+	twine upload dist/*
+
+# Build the noarch conda package into build-conda/
+conda-build:
+	NISAR_DB_VERSION=$(VERSION) conda build conda \
+		--no-anaconda-upload --output-folder build-conda -c conda-forge
+
+# Upload to anaconda.org; needs ANACONDA_API_TOKEN or `anaconda login`
+publish-conda: conda-build
+	anaconda upload --user $(CONDA_CHANNEL) --label $(CONDA_LABEL) --skip-existing \
+		$$(find build-conda -name '*.conda' -o -name '*.tar.bz2')
+
 # Show current version
 show-version:
 	@echo "Current version: $(VERSION)"
@@ -75,9 +104,19 @@ help:
 	@echo "  make cleanall              Remove all generated files"
 	@echo "  make show-version          Show current version"
 	@echo ""
+	@echo "Packaging:"
+	@echo "  make dist                  Build sdist + wheel into dist/"
+	@echo "  make publish-testpypi      Upload dist/ to TestPyPI"
+	@echo "  make publish-pypi          Upload dist/ to PyPI"
+	@echo "  make conda-build           Build the noarch conda package"
+	@echo "  make publish-conda         Upload the conda package to anaconda.org"
+	@echo ""
 	@echo "Parameters:"
 	@echo "  VERSION=x.y.z              Override version number"
 	@echo "  NISAR_GPKG=file.gpkg       Specify NISAR TrackFrame GeoPackage"
 	@echo "  GSLC_CATALOG=file.csv      Specify GSLC catalog file"
+	@echo "  CONDA_CHANNEL=name         anaconda.org user/channel (default: opera-adt)"
+	@echo "  CONDA_LABEL=name           anaconda.org label (default: main)"
 
-.PHONY: all clean cleanall show-version help
+.PHONY: all clean cleanall show-version help \
+	dist publish-testpypi publish-pypi conda-build publish-conda

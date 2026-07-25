@@ -2,6 +2,7 @@
 
 import click
 
+from nisar_db.blackout import main as append_blackout_dates_cmd
 from nisar_db.consistent_gslc import main as create_consistent_cmd
 from nisar_db.frame_to_bound import main as create_frame_to_bound_cmd
 from nisar_db.gslc_catalog import main as create_catalog_cmd
@@ -18,6 +19,7 @@ def cli_app():
 cli_app.add_command(create_frame_to_bound_cmd, name="create-frame-to-bound")
 cli_app.add_command(create_catalog_cmd, name="create-catalog")
 cli_app.add_command(create_consistent_cmd, name="create-consistent")
+cli_app.add_command(append_blackout_dates_cmd, name="append-blackout-dates")
 
 
 def _run_argparse_main(module_name: str, prog: str, args: tuple[str, ...]) -> None:
