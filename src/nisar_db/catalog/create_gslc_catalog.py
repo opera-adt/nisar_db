@@ -62,7 +62,7 @@ _SCHEMA = """
 """
 
 
-def search_gslc_products(max_results: int = 25000) -> pd.DataFrame:
+def search_gslc_products(max_results: int | None = None) -> pd.DataFrame:
     """Search for NISAR GSLC products in CMR."""
     logger.info("Searching for NISAR GSLC products in CMR...")
 
@@ -171,8 +171,8 @@ def main():
     parser.add_argument(
         "--max-results",
         type=int,
-        default=25000,
-        help="Maximum number of results to return from CMR search",
+        default=0,
+        help="Cap on CMR results; 0 (the default) keeps the whole archive",
     )
 
     args = parser.parse_args()
