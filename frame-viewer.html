@@ -658,14 +658,22 @@ release, since those are climatological rather than weekly.</p>
 <p>The sidebar header carries the <strong>CMR queried</strong> timestamp of the catalog the
 page was built from, so a scheduled run and a manual <code>workflow_dispatch</code>
 both show up there.</p>
+<p>Each run queries the <strong>entire</strong> GSLC archive (<code>--max-results 0</code>), not a
+capped slice.</p>
 </div>
 <p>It opens on the globe projection (the control at the bottom right switches to
-Mercator), with frames coloured by GSLC count in CMR. Clicking a frame opens the
-frame panel, where <strong>Show granules</strong> expands the granule list, <strong>Export CSV</strong>
-downloads that frame's granules, and <strong>Show plot</strong> charts observation mode
-against acquisition date. Turn on <strong>Map Tools → Hover info</strong> to also get a
-summary popup while pointing at frames; it stays until you move on or close it
-with its <code>x</code>.</p>
+Mercator), with frames coloured by GSLC count in CMR and the science modes
+(<code>2005</code>, <code>4005</code>) and polarizations (<code>DHDH</code>, <code>QPDH</code>) preselected under
+<strong>GSLC Mode / Polarization</strong>. The count colouring follows those chips, so the
+ramp always answers "how many granules of the kind I selected". Clicking a frame
+opens the frame panel, where <strong>Show granules</strong> expands the granule list,
+<strong>Export CSV</strong> downloads that frame's granules, and <strong>Show plot</strong> charts
+observation mode against acquisition date.</p>
+<p>The <strong>(i)</strong> button above the globe toggle turns on hover summaries: with it on,
+pointing at a frame pops up its summary, which stays until you move on or close
+it with its <code>x</code>. <strong>GSLC Acquisitions Over Time</strong> in the sidebar counts granules
+by acquisition date across the frames currently shown, binning to weeks or
+months as the time span grows.</p>
 <div class="admonition note">
 <p class="admonition-title">Keeping the CalVal frames current</p>
 <p>The <code>isCalVal</code>, <code>isSNWG</code>, and <code>isDNC</code> flags behind the <strong>Product / Site
