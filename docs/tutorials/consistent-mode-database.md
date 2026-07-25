@@ -15,6 +15,8 @@ opera-nisar-disp-frame-to-bounds-<date>.json(.zip)   # frame bounding boxes
 opera-nisar-disp-frames.gpkg                          # NA frames + frame_idx  (side output)
 gslc_catalog.csv                                      # parsed GSLC file list
 opera-nisar-disp-consistent-gslc-<date>.json(.zip)    # the consistent-mode database
+opera-nisar-disp-reference-dates-<date>.json(.zip)    # reference-epoch resets
+opera-nisar-disp-consistent-gslc-with-processing-mode-<date>.json(.zip)
 ```
 
 ## Prerequisites
@@ -25,8 +27,14 @@ opera-nisar-disp-consistent-gslc-<date>.json(.zip)    # the consistent-mode data
 
     | Input | What it is | How to get it |
     |---|---|---|
-    | `NISAR_TrackFrame_L_YYYYMMDD.gpkg` | Global NISAR track/frame GeoPackage | Public CMR granule `G3817504902-ASF` (ASF) |
+    | `NISAR_TrackFrame_L_YYYYMMDD.gpkg` | Global NISAR track/frame GeoPackage | `nisar-db download-frame-db` (public CMR granule `G3817504902-ASF`) |
     | `gslc_files.txt` | One NISAR GSLC S3 path / granule ID per line | List your GSLC bucket, or `nisar-db search --output-csv` |
+
+!!! tip "Fetching the TrackFrame database"
+    `nisar-db download-frame-db` needs only Earthdata Login credentials in
+    `~/.netrc`, and reuses the file if it is already there. Step 1 fetches it
+    on its own when `--nisar-gpkg` is omitted, so you can skip this if the
+    GeoPackage is the only input you are missing.
 
 !!! tip "Getting a GSLC file list"
     Any newline-delimited list of GSLC names works — S3 URIs, local paths, or
@@ -55,6 +63,13 @@ Build the frame-to-bound mapping. Its **side output**,
 nisar-db create-frame-to-bound \
   --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg \
   --output opera-nisar-disp-frame-to-bounds.json
+```
+
+Drop `--nisar-gpkg` to download the TrackFrame database first (into `--gpkg-dir`,
+the current directory by default):
+
+```bash
+nisar-db create-frame-to-bound --output opera-nisar-disp-frame-to-bounds.json
 ```
 
 Produces:
@@ -123,32 +138,57 @@ nisar-db create-consistent \
 As in `burst_db`, keep **both** the blackout-applied and the unfiltered database:
 the filtered one is operational, the unfiltered one is the full record.
 
-## Step 4 (optional) — Reference (reset) dates
+## Step 4 — Reference (reset) dates
 
-Add per-frame reference resets so the processor caps interferogram baselines.
-This is currently a Python-API step (see
-[Reference dates](../background/reference-dates.md)):
+Add per-frame reference resets so the processor caps interferogram baselines
+(see [Reference dates](../background/reference-dates.md)). Passing the blackout
+file anchors each frame on a snow-free month:
 
-```python
-from nisar_db.blackout import create_reference_dates_json
-
-refs = {"5827": ["2026-01-15"]}   # {frame_idx: [reset dates]}
-create_reference_dates_json(refs, output="nisar-reference-dates.json")
+```bash
+nisar-db create-reference-dates \
+  --consistent-json opera-nisar-disp-consistent-gslc.json \
+  --blackout-file nisar-blackout-dates.json \
+  --output opera-nisar-disp-reference-dates.json
 ```
+
+Without `--blackout-file`, the epochs instead follow each frame's own
+acquisition history — a new one every `--interval` years, but only once
+`--min-acquisitions` acquisitions have accumulated.
+
+## Step 5 — Processing-mode labels
+
+Mark which acquisitions form complete batches the processor can run now (see
+[Processing modes](../background/processing-modes.md)):
+
+```bash
+nisar-db label-processing-mode \
+  --consistent-json opera-nisar-disp-consistent-gslc.json \
+  --previous-json opera-nisar-disp-consistent-gslc-2026-04-25.json \
+  --output opera-nisar-disp-consistent-gslc-with-processing-mode.json
+```
+
+`sensing_time_list` becomes a `{sensing_time: label}` map of `historical_NN`,
+`forward_NN`, and `no_run`. `--previous-json` is optional; it adds
+`metadata.frames_with_changed_mode`, the frames whose winning
+`(common_mode, common_coverage)` flipped since the last release and whose
+existing stack therefore cannot be reused.
 
 ## Do it all with `make`
 
-The repository `Makefile` chains Steps 1 and 3 (given a catalog CSV and a
-`NISAR_TrackFrame_L_*.gpkg` in the current directory), mirroring `burst_db`'s
-release build:
+The repository `Makefile` chains every step above (given a catalog CSV, a
+`NISAR_TrackFrame_L_*.gpkg`, and a snow-analysis GeoJSON in the current
+directory), mirroring `burst_db`'s release build:
 
 ```bash
-# from a directory containing the .gpkg and gslc_catalog*.csv
+# from a directory containing the .gpkg, gslc_catalog*.csv and snow analysis
 make -f /path/to/nisar_db/Makefile
 ```
 
-`make help` lists the individual targets (`FRAME_TO_BOUND`, `CONSISTENT_GSLC`,
-`gslc_catalog.csv`, `clean`, ...).
+That produces the full release asset set: frame-to-bounds, the simplified frame
+geometries, blackout dates, both consistent-GSLC variants, the processing-mode
+labelled version, and the reference dates. `make help` lists the parameters
+(`NISAR_GPKG`, `GSLC_CATALOG`, `SNOW_GEOJSON`, `PREVIOUS_CONSISTENT`) and the
+`clean` / `cleanall` targets.
 
 ## Do it all from an S3 bucket
 
@@ -161,6 +201,9 @@ python scripts/prepare_viewer_inputs.py \
   --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg \
   --outdir notebooks --profile saml-pub
 ```
+
+`--nisar-gpkg` is optional here too; omit it and the TrackFrame database is
+downloaded into `--outdir`.
 
 It writes `opera-nisar-disp-frames.gpkg`, `gslc_catalog.duckdb`,
 `gslc_catalog.csv`, and `opera-nisar-disp-consistent-gslc-<YYYYMMDD>.json` —
@@ -198,7 +241,9 @@ flowchart TD
     L["gslc_files.txt"] -->|Step 2| CAT["create-catalog<br/>→ gslc_catalog.csv"]
     FTB -->|Step 3| CON["create-consistent"]
     CAT -->|Step 3| CON
-    BL["create-blackout-dates<br/>(optional)"] -.-> CON
+    BL["create-blackout-dates"] --> CON
     CON --> OUT["opera-nisar-disp-consistent-gslc-*.json"]
-    OUT -.->|Step 4, optional| REF["reference (reset) dates JSON"]
+    OUT -->|Step 4| REF["create-reference-dates<br/>→ reference-dates JSON"]
+    BL -.-> REF
+    OUT -->|Step 5| PM["label-processing-mode<br/>→ …-with-processing-mode-*.json"]
 ```
