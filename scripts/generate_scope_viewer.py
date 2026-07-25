@@ -100,6 +100,20 @@ def load_frames(gpkg_path: Path) -> gpd.GeoDataFrame:
     return gdf
 
 
+#: Per-granule columns the viewer summarizes a frame with.
+_CATALOG_COLUMNS = [
+    "track",
+    "frame",
+    "direction",
+    "mode",
+    "coverage",
+    "polarization",
+    "cycle",
+    "granule_id",
+    "start_datetime",
+]
+
+
 def load_gslc_catalog(db_path: Path) -> pd.DataFrame:
     """Read the GSLC product catalog from the DuckDB store.
 
@@ -107,13 +121,34 @@ def load_gslc_catalog(db_path: Path) -> pd.DataFrame:
     """
     con = duckdb.connect(str(db_path), read_only=True)
     try:
-        df = con.execute("""
-            SELECT track, frame, direction, mode, coverage, polarization,
-                   cycle, granule_id, start_datetime
-            FROM products
-            """).fetchdf()
+        df = con.execute(
+            f"SELECT {', '.join(_CATALOG_COLUMNS)} FROM products"
+        ).fetchdf()
     finally:
         con.close()
+    return _add_date_column(df)
+
+
+def load_gslc_catalog_csv(csv_path: Path) -> pd.DataFrame:
+    """Read the GSLC catalog CSV written by ``nisar-db create-catalog``.
+
+    The CSV route is what the CMR-sourced pipeline produces: a bucket scan
+    (`build-s3-catalog`) yields the DuckDB store, but CMR gives granule names,
+    which `create-catalog` parses into the same per-granule fields under
+    slightly different names.
+    """
+    df = pd.read_csv(csv_path, dtype={"mode": str, "cycle": str, "crid": str})
+    df = df.rename(
+        columns={"pass_direction": "direction", "sensing_time": "start_datetime"}
+    )
+    missing = [c for c in _CATALOG_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(f"{csv_path} is missing catalog columns: {missing}")
+    return _add_date_column(df[_CATALOG_COLUMNS])
+
+
+def _add_date_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Add the ``date`` column the timeline chart groups on."""
     df["date"] = pd.to_datetime(df["start_datetime"]).dt.strftime("%Y-%m-%d")
     return df
 
@@ -413,6 +448,7 @@ APP_CSS = r"""
   #map{flex:1;position:relative;}
   h1{font-size:15px;margin:0;padding:14px 14px 10px 14px;border-bottom:1px solid var(--border);font-weight:600;}
   h1 small{display:block;font-weight:400;color:var(--text-dim);font-size:11px;margin-top:2px;}
+  #hdr-queried{font-size:10.5px;}
   .section{margin-bottom:14px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);}
   .section-head{padding:8px 10px;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text-dim);
     text-transform:uppercase;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;}
@@ -510,6 +546,7 @@ BODY_HTML = r"""<body>
   <div id="sidebar">
     <h1>OPERA NISAR-DB Viewer
       <small>North America &middot; <span id="hdr-count">0</span> frames shown</small>
+      <small id="hdr-queried">CMR queried: unknown</small>
     </h1>
     <div id="sidebar-scroll">
 
@@ -770,6 +807,15 @@ APP_JS = r"""
   }
   buildChips("chips-gslc-mode", allModesGslc, activeChips.gslcMode);
   buildChips("chips-gslc-pol", allPolsGslc, activeChips.gslcPol);
+
+  // When CMR (or the bucket scan) was last queried for the catalog behind this
+  // page. The refresh workflow builds the catalog in the same run, so this
+  // tracks the cron schedule -- or a manual run -- on its own.
+  const queriedAt = META.catalog_queried_at || META.generated_at;
+  if (queriedAt) {
+    document.getElementById("hdr-queried").textContent =
+      `CMR queried: ${new Date(queriedAt).toISOString().slice(0,16).replace("T"," ")} UTC`;
+  }
 
   // Reveal the blackout controls only when the viewer was built with blackout data.
   if (META.has_blackout) {
@@ -1433,7 +1479,14 @@ def main(argv: list[str] | None = None) -> None:
         "--gslc-db",
         type=Path,
         default=Path("notebooks/gslc_catalog.duckdb"),
-        help="GSLC catalog DuckDB store (table 'products').",
+        help="GSLC catalog DuckDB store (table 'products'), from build-s3-catalog.",
+    )
+    parser.add_argument(
+        "--gslc-catalog",
+        type=Path,
+        default=None,
+        help="GSLC catalog CSV from 'nisar-db create-catalog'; use instead of "
+        "--gslc-db when the granules came from CMR rather than a bucket scan.",
     )
     parser.add_argument(
         "--consistent-json",
@@ -1474,8 +1527,12 @@ def main(argv: list[str] | None = None) -> None:
     gdf = load_frames(args.frames_gpkg)
     print(f"  {len(gdf)} frames")
 
-    print(f"Loading GSLC catalog from {args.gslc_db}")
-    catalog = load_gslc_catalog(args.gslc_db)
+    if args.gslc_catalog is not None:
+        print(f"Loading GSLC catalog from {args.gslc_catalog}")
+        catalog = load_gslc_catalog_csv(args.gslc_catalog)
+    else:
+        print(f"Loading GSLC catalog from {args.gslc_db}")
+        catalog = load_gslc_catalog(args.gslc_db)
     print(f"  {len(catalog)} GSLC granules")
 
     consistent = None
@@ -1499,9 +1556,19 @@ def main(argv: list[str] | None = None) -> None:
     frame_data = build_frame_data(gdf, catalog, consistent, blackout, reference)
     n_with = sum(1 for f in frame_data["features"] if f["properties"]["gslc_count"] > 0)
 
+    catalog_path = args.gslc_catalog if args.gslc_catalog is not None else args.gslc_db
     meta = {
         "title": args.title,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        # When the catalog was written, i.e. when CMR (or the bucket) was last
+        # queried. The refresh workflow builds the catalog in the same run, so
+        # this tracks the cron schedule without extra plumbing.
+        "catalog_queried_at": (
+            datetime.fromtimestamp(
+                catalog_path.stat().st_mtime, tz=timezone.utc
+            ).isoformat(timespec="seconds")
+        ),
+        "catalog_source": catalog_path.name,
         "n_frames": len(frame_data["features"]),
         "n_frames_with_gslc": n_with,
         "n_granules": int(len(catalog)),
