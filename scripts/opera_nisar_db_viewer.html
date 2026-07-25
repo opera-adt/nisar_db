@@ -68,7 +68,12 @@
   #basemap-ctrl{position:absolute;top:10px;right:10px;background:rgba(15,20,24,.9);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
   #basemap-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
-  .maplibregl-popup-content{background:#161c22;color:var(--text);font-size:12px;border-radius:6px;padding:8px 10px;}
+  .maplibregl-popup-content{background:#161c22;color:var(--text);font-size:12px;border-radius:6px;padding:8px 22px 8px 10px;}
+  .maplibregl-popup-close-button{color:var(--text-dim);font-size:15px;line-height:1;padding:2px 6px;background:none;border:none;}
+  .maplibregl-popup-close-button:hover{background:none;color:#ff5d5d;}
+  .pop-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .btn[disabled]{opacity:.45;cursor:default;}
+  .btn[disabled]:hover{border-color:var(--border);color:var(--text);}
   .maplibregl-popup-tip{border-top-color:#161c22 !important;border-bottom-color:#161c22 !important;}
   .maplibregl-ctrl-attrib{font-size:10px;}
   .pop-title{font-weight:600;margin-bottom:3px;}
@@ -77,6 +82,21 @@
   .granule-row{font-size:10.5px;color:var(--text-dim);padding:2px 0;border-bottom:1px solid rgba(42,51,59,.5);font-family:ui-monospace,Menlo,Consolas,monospace;}
   .granule-row .gdate{color:var(--text);}
   .granule-row .gmode{color:var(--accent2);}
+  #chart-modal{position:fixed;inset:0;z-index:20;background:rgba(4,8,11,.62);display:flex;align-items:center;justify-content:center;}
+  #chart-modal[hidden]{display:none;}
+  .chart-card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    padding:12px 14px;max-width:min(780px,94vw);max-height:88vh;overflow:auto;}
+  .chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;}
+  .chart-sub{color:var(--text-dim);font-size:11px;margin:2px 0 8px 0;}
+  .chart-tick{fill:var(--text-dim);font-size:10px;}
+  .chart-row-label{fill:var(--text);font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .chart-grid{stroke:#2a333b;stroke-width:1;}
+  .chart-dot{stroke:var(--panel);stroke-width:2;cursor:pointer;}
+  .chart-dot:hover{stroke:#e8edf2;}
+  .chart-tip{position:absolute;pointer-events:none;background:#0f1418;border:1px solid var(--border);border-radius:5px;
+    padding:5px 7px;font-size:11px;color:var(--text);white-space:nowrap;z-index:2;}
+  .chart-tip[hidden]{display:none;}
+  .chart-tip .tdim{color:var(--text-dim);}
   .summary-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
   .stat-tile{flex:1;min-width:70px;background:#0f1418;border:1px solid var(--border);border-radius:6px;padding:6px 8px;}
   .stat-tile .num{font-size:16px;font-weight:700;color:var(--text);}
@@ -210,6 +230,19 @@
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
       <label><input type="radio" name="basemap" value="sat"> Satellite</label>
+    </div>
+    <div id="chart-modal" hidden>
+      <div class="chart-card">
+        <div class="chart-head">
+          <div>
+            <div class="pop-title" id="chart-title"></div>
+            <div class="chart-sub" id="chart-sub"></div>
+          </div>
+          <button class="li-x" id="chart-close" title="Close">&times;</button>
+        </div>
+        <div id="chart-body"></div>
+        <div class="chart-tip" id="chart-tip" hidden></div>
+      </div>
     </div>
   </div>
 </div>
@@ -719,6 +752,9 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
   });
 
   // ---------- export ----------
+  function toCsv(rows){
+    return rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  }
   function downloadBlob(content, filename, mime){
     const blob = new Blob([content], {type:mime});
     const a = document.createElement("a");
@@ -733,8 +769,7 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
       rows.push([p.track,p.frame,p.id,p.passDirection,e.color,p.gslc_count,p.cons_mode,p.cons_cov,
         p.n_modes,p.n_full,p.n_partial,p.isCalVal,p.isSNWG,p.isDNC]);
     });
-    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
-    downloadBlob(csv, "nisar_selected_frames.csv", "text/csv");
+    downloadBlob(toCsv(rows), "nisar_selected_frames.csv", "text/csv");
   });
   document.getElementById("btn-export-geojson").addEventListener("click", ()=>{
     const feats = Array.from(selected.values()).map(e=>{
@@ -749,6 +784,7 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
   // ---------- map ----------
   const style = {
     version: 8,
+    projection: {type: "globe"},   // read at style load; the GlobeControl toggles from here
     sources: {
       "carto-light": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
       "carto-dark": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
@@ -766,7 +802,6 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     style: style,
     center: [-100, 40],
     zoom: 1.4,
-    projection: {type: "globe"},   // global projection is the default at start
     attributionControl: true
   });
   map.addControl(new maplibregl.NavigationControl(), "bottom-right");
@@ -781,8 +816,18 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     });
   });
 
+  function parseGranules(p){
+    return JSON.parse(typeof p.granules === "string" ? p.granules : JSON.stringify(p.granules));
+  }
+
+  function granuleCsv(p, granules){
+    const rows = [["frame_id","track","frame","pass","date","mode","coverage","polarization","cycle","granule_id"]];
+    granules.forEach(g=> rows.push([p.id,p.track,p.frame,p.passDirection,g.date,g.mode,g.cov,g.pol,g.cycle,g.gid]));
+    return toCsv(rows);
+  }
+
   function granulePopupHtml(p){
-    const granules = JSON.parse(typeof p.granules === "string" ? p.granules : JSON.stringify(p.granules));
+    const granules = parseGranules(p);
     const isSel = selected.has(p.id);
     let rows = granules.map(g=>
       `<div class="granule-row"><span class="gdate">${g.date}</span> `+
@@ -794,10 +839,149 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
       <div class="pop-row">Pass: ${p.passDirection} &middot; consistent: ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
       <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
       ${blackoutDetailBlock(p)}
-      <button class="btn small primary" id="pop-select" style="margin-top:6px;">${isSel ? "Remove from selection" : "Add to selection"}</button>
-      <div class="pop-row" style="margin-top:6px;">GSLC granules:</div>
-      <div class="granule-list">${rows}</div>`;
+      <div class="pop-actions">
+        <button class="btn small primary" id="pop-select">${isSel ? "Remove from selection" : "Add to selection"}</button>
+        <button class="btn small" id="pop-granules"${granules.length ? "" : " disabled"}>Show granules (${granules.length})</button>
+        <button class="btn small" id="pop-csv"${granules.length ? "" : " disabled"}>Export CSV</button>
+        <button class="btn small" id="pop-plot"${granules.length ? "" : " disabled"}>Show plot</button>
+      </div>
+      <div class="granule-list" id="pop-granule-list" hidden>${rows}</div>`;
   }
+
+  function wireGranulePopup(feature){
+    const p = feature.properties;
+    const granules = parseGranules(p);
+    const selBtn = document.getElementById("pop-select");
+    if (selBtn) selBtn.addEventListener("click", ()=>{
+      toggleSelectFrame(feature);
+      selBtn.textContent = selected.has(p.id) ? "Remove from selection" : "Add to selection";
+    });
+    const listBtn = document.getElementById("pop-granules");
+    const list = document.getElementById("pop-granule-list");
+    if (listBtn && list) listBtn.addEventListener("click", ()=>{
+      list.hidden = !list.hidden;
+      listBtn.textContent = `${list.hidden ? "Show" : "Hide"} granules (${granules.length})`;
+    });
+    const csvBtn = document.getElementById("pop-csv");
+    if (csvBtn) csvBtn.addEventListener("click", ()=>
+      downloadBlob(granuleCsv(p, granules), `nisar_granules_${p.id}.csv`, "text/csv"));
+    const plotBtn = document.getElementById("pop-plot");
+    if (plotBtn) plotBtn.addEventListener("click", ()=> showModeTimeline(p, granules));
+  }
+
+  // ---------- acquisition timeline: mode (y) vs. acquisition date (x) ----------
+  // Categorical steps chosen for the dark panel surface; adjacent pairs clear the
+  // colour-vision-deficiency separation floor. Every row is also directly
+  // labelled, so identity never rests on colour alone.
+  const CHART_PALETTE = ["#3987e5","#d95926","#199e70","#c98500","#d55181","#008300","#9085e9","#e66767"];
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const DAY_MS = 86400000;
+  let modeKeyOrder = null;
+  let chartPoints = [];
+
+  function modeKeys(){
+    if (!modeKeyOrder) {
+      const seen = new Set();
+      FRAME_DATA.features.forEach(f=> parseGranules(f.properties).forEach(g=> seen.add(`${g.mode}_${g.cov}`)));
+      modeKeyOrder = Array.from(seen).sort();
+    }
+    return modeKeyOrder;
+  }
+
+  // Fixed hue per mode across every frame, so a mode keeps its colour when the popup changes.
+  function modeColor(key){
+    const i = modeKeys().indexOf(key);
+    return i < 0 ? "#9aa7b2" : CHART_PALETTE[i % CHART_PALETTE.length];
+  }
+
+  function timeTicks(t0, t1){
+    const months = (t1 - t0) / DAY_MS / 30.4;
+    const step = months > 30 ? 12 : months > 10 ? 3 : 1;
+    const start = new Date(t0);
+    let m = start.getUTCMonth();
+    if (step > 1) m = Math.floor(m / step) * step;
+    let d = new Date(Date.UTC(start.getUTCFullYear(), m, 1));
+    const ticks = [];
+    while (d.getTime() <= t1 && ticks.length < 14) {
+      if (d.getTime() >= t0) ticks.push({t: d.getTime(),
+        label: step === 12 ? String(d.getUTCFullYear())
+                           : `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`});
+      d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + step, 1));
+    }
+    return ticks;
+  }
+
+  function modeTimelineSvg(granules){
+    chartPoints = granules.filter(g=>g.date).map(g=>({
+      t: Date.parse(`${g.date}T00:00:00Z`), key: `${g.mode}_${g.cov}`, g
+    })).sort((a,b)=>a.t-b.t);
+    if (!chartPoints.length) return `<div class="stat-line">No dated granules to plot.</div>`;
+
+    const rows = uniqSorted(chartPoints.map(pt=>pt.key));
+    const padL = 96, padR = 24, padT = 10, padB = 30, rowH = 34;
+    const W = Math.min(720, Math.max(420, window.innerWidth - 140));
+    const H = padT + rows.length * rowH + padB;
+    let t0 = chartPoints[0].t, t1 = chartPoints[chartPoints.length-1].t;
+    if (t1 === t0) { t0 -= 15 * DAY_MS; t1 += 15 * DAY_MS; }
+    const pad = (t1 - t0) * 0.03;
+    t0 -= pad; t1 += pad;
+    const xOf = t => padL + (t - t0) / (t1 - t0) * (W - padL - padR);
+    const yOf = key => padT + rows.indexOf(key) * rowH + rowH / 2;
+
+    const ticks = timeTicks(t0, t1).map(tk=>
+      `<line class="chart-grid" x1="${xOf(tk.t).toFixed(1)}" x2="${xOf(tk.t).toFixed(1)}" y1="${padT}" y2="${H-padB}" opacity="0.55"/>`+
+      `<text class="chart-tick" x="${xOf(tk.t).toFixed(1)}" y="${H-padB+14}" text-anchor="middle">${tk.label}</text>`
+    ).join("");
+
+    const lanes = rows.map(key=>
+      `<line class="chart-grid" x1="${padL}" x2="${W-padR}" y1="${yOf(key)}" y2="${yOf(key)}"/>`+
+      `<text class="chart-row-label" x="${padL-10}" y="${yOf(key)+3.5}" text-anchor="end">${key}</text>`
+    ).join("");
+
+    const dots = chartPoints.map((pt,i)=>
+      `<circle class="chart-dot" data-i="${i}" cx="${xOf(pt.t).toFixed(1)}" cy="${yOf(pt.key)}" r="4.5" fill="${modeColor(pt.key)}"/>`
+    ).join("");
+
+    return `<svg id="chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
+      aria-label="GSLC acquisitions by mode over time">${ticks}${lanes}${dots}</svg>`;
+  }
+
+  function showModeTimeline(p, granules){
+    const dated = granules.filter(g=>g.date).map(g=>g.date).sort();
+    document.getElementById("chart-title").textContent =
+      `Track ${p.track} / Frame ${p.frame} - acquisitions by mode`;
+    document.getElementById("chart-sub").textContent = dated.length
+      ? `${dated.length} GSLC granules - ${dated[0]} to ${dated[dated.length-1]}`
+      : "No dated GSLC granules";
+    document.getElementById("chart-body").innerHTML = modeTimelineSvg(granules);
+    document.getElementById("chart-modal").hidden = false;
+  }
+
+  function hideModeTimeline(){
+    document.getElementById("chart-modal").hidden = true;
+    document.getElementById("chart-tip").hidden = true;
+  }
+
+  document.getElementById("chart-close").addEventListener("click", hideModeTimeline);
+  document.getElementById("chart-modal").addEventListener("click", (e)=>{
+    if (e.target.id === "chart-modal") hideModeTimeline();
+  });
+  document.addEventListener("keydown", (e)=>{ if (e.key === "Escape") hideModeTimeline(); });
+
+  const chartTip = document.getElementById("chart-tip");
+  document.getElementById("chart-body").addEventListener("mousemove", (e)=>{
+    const dot = e.target.closest ? e.target.closest("circle[data-i]") : null;
+    if (!dot) { chartTip.hidden = true; return; }
+    const pt = chartPoints[Number(dot.dataset.i)];
+    chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.key}<br>`+
+      `<span class="tdim">${pt.g.pol} &middot; cycle ${pt.g.cycle}</span><br>`+
+      `<span class="tdim">${pt.g.gid}</span>`;
+    const card = chartTip.parentElement.getBoundingClientRect();
+    chartTip.style.left = `${Math.min(e.clientX - card.left + 12, card.width - chartTip.offsetWidth - 8)}px`;
+    chartTip.style.top = `${e.clientY - card.top + 14}px`;
+    chartTip.hidden = false;
+  });
+  document.getElementById("chart-body").addEventListener("mouseleave", ()=>{ chartTip.hidden = true; });
 
   map.on("load", ()=>{
     map.addSource("frames", { type:"geojson", data: FRAME_DATA });
@@ -845,9 +1029,13 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
     applyFilters();
 
     // hover summary
-    const popup = new maplibregl.Popup({ closeButton:false, closeOnClick:false });
+    const popup = new maplibregl.Popup({ closeButton:true, closeOnClick:false });
+    let hoverCloseTimer = null;
+    const cancelHoverClose = ()=>{ clearTimeout(hoverCloseTimer); hoverCloseTimer = null; };
+    const scheduleHoverClose = ()=>{ cancelHoverClose(); hoverCloseTimer = setTimeout(()=>popup.remove(), 350); };
     map.on("mousemove", "frames-fill", (e)=>{
       map.getCanvas().style.cursor = "pointer";
+      cancelHoverClose();
       const p = e.features[0].properties;
       popup.setLngLat(e.lngLat).setHTML(`
         <div class="pop-title">Track ${p.track} / Frame ${p.frame}</div>
@@ -857,21 +1045,25 @@ const META = {"title":"OPERA NISAR-DB Viewer","generated_at":"2026-07-25T16:32:0
         ${referenceHoverLine(p)}
         <div class="pop-row" style="color:var(--accent)">click to list granules &amp; select</div>
       `).addTo(map);
+      const el = popup.getElement();
+      if (el && !el.dataset.hoverBound) {
+        el.dataset.hoverBound = "1";
+        el.addEventListener("mouseenter", cancelHoverClose);
+        el.addEventListener("mouseleave", scheduleHoverClose);
+      }
     });
-    map.on("mouseleave", "frames-fill", ()=>{ map.getCanvas().style.cursor = ""; popup.remove(); });
+    // Close on a delay so the pointer can travel onto the popup (and its X) first.
+    map.on("mouseleave", "frames-fill", ()=>{ map.getCanvas().style.cursor = ""; scheduleHoverClose(); });
 
     // click -> granule list popup with a select toggle
     const clickPopup = new maplibregl.Popup({ closeButton:true, closeOnClick:false, maxWidth:"340px" });
     map.on("click", "frames-fill", (e)=>{
       const feature = idToFeature(e.features[0].properties.id);
       if (!feature) return;
+      cancelHoverClose();
       popup.remove();
       clickPopup.setLngLat(e.lngLat).setHTML(granulePopupHtml(feature.properties)).addTo(map);
-      const btn = document.getElementById("pop-select");
-      if (btn) btn.addEventListener("click", ()=>{
-        toggleSelectFrame(feature);
-        btn.textContent = selected.has(feature.properties.id) ? "Remove from selection" : "Add to selection";
-      });
+      wireGranulePopup(feature);
     });
   });
 
