@@ -100,7 +100,9 @@ each frame. **This is the consistent-mode database.**
 ### Optional: apply a blackout filter
 
 To remove seasonally unusable acquisitions (e.g. snow winters), pass a
-[blackout-dates JSON](../background/blackout-dates.md). First build it:
+[blackout-dates JSON](../background/blackout-dates.md). First build it — the
+`snow_analysis.geojson` input comes from
+[Derive blackout dates from snow cover](snow-analysis.md):
 
 ```bash
 nisar-db create-blackout-dates \

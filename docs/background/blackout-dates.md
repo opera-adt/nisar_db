@@ -125,9 +125,13 @@ append_blackout_dates_json(
 ```
 
 !!! note "Snow analysis is upstream"
-    The snow-cover analysis that produces the input GeoJSON lives outside this
-    package (it mirrors `burst_db`'s `snow-analysis/`). `nisar_db` only turns
-    that analysis into per-frame yearly windows.
+    The snow-cover analysis that produces the input GeoJSON lives outside the
+    package, in `scripts/snow-analysis/` (it mirrors `burst_db`'s
+    `snow-analysis/`): it pulls NOAA GEFS snow and temperature fields, flags
+    snowed-in weeks per frame, and collapses them into the `start_*`/`end_*`
+    columns read here. `nisar_db` only turns that analysis into per-frame yearly
+    windows. See
+    **[Tutorial: derive blackout dates from snow cover](../tutorials/snow-analysis.md)**.
 
 ## How the filter is applied
 

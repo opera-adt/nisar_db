@@ -39,10 +39,8 @@ import zipfile
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from rich.console import Console
 from rich.table import Table
 
@@ -106,12 +104,13 @@ def add_groups(
     gdf["frame_idx"] = gdf.frame_idx.astype(int)
     if group_by == "latitude":
         # representative_point stays inside the frame, unlike a centroid on the
-        # dateline-crossing MultiPolygons.
+        # dateline-crossing MultiPolygons. The result stays categorical so the
+        # summary rows come out south-to-north rather than alphabetically.
         gdf["group"] = pd.cut(
             gdf.geometry.representative_point().y,
             bins=LAT_BINS,
             labels=LAT_LABELS,
-        ).astype(str)
+        ).cat.add_categories("unknown")
     else:
         gdf["group"] = gdf.track.astype(int).astype(str)
 
@@ -136,7 +135,7 @@ def print_summary(df: pd.DataFrame, group_label: str, min_stack: int) -> None:
 
     summary = (
         df.assign(long_enough=df.sensing_time_count_selected >= min_stack)
-        .groupby("group")
+        .groupby("group", observed=True)
         .agg(
             frames=("frame_idx", "count"),
             kept=("sensing_time_count_selected", "sum"),
@@ -147,24 +146,25 @@ def print_summary(df: pd.DataFrame, group_label: str, min_stack: int) -> None:
         .sort_index()
     )
 
+    # iterrows() collapses the row to a single float dtype, hence the int casts.
     for group, row in summary.iterrows():
         table.add_row(
             str(group),
-            f"{row.frames:,d}",
-            f"{row.kept:,d}",
-            f"{row.lost:,d}",
+            f"{int(row.frames):,d}",
+            f"{int(row.kept):,d}",
+            f"{int(row.lost):,d}",
             f"{row.pct_lost:.1f}",
-            f"{row.long_enough:,d}",
+            f"{int(row.long_enough):,d}",
         )
     totals = summary.sum()
     table.add_section()
     table.add_row(
         "TOTAL",
-        f"{totals.frames:,d}",
-        f"{totals.kept:,d}",
-        f"{totals.lost:,d}",
+        f"{int(totals.frames):,d}",
+        f"{int(totals.kept):,d}",
+        f"{int(totals.lost):,d}",
         f"{100 * totals.lost / (totals.kept + totals.lost):.1f}",
-        f"{totals.long_enough:,d}",
+        f"{int(totals.long_enough):,d}",
     )
     console.print(table)
 
@@ -175,6 +175,11 @@ def print_summary(df: pd.DataFrame, group_label: str, min_stack: int) -> None:
 
 def make_plots(df: pd.DataFrame, min_stack: int, outdir: Path | None) -> None:
     """Draw the coverage, loss and before/after scatter figures."""
+    # Imported here so `--no-plots` runs in an environment without the plotting
+    # stack installed.
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
     sns.set_theme(style="whitegrid")
     bins = np.arange(0, df.sensing_time_count_all.max() + 12, 12)
 

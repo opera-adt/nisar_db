@@ -45,6 +45,7 @@ nav:
       - Reference (reset) dates: background/reference-dates.md
   - Tutorials:
       - Build a consistent-mode database: tutorials/consistent-mode-database.md
+      - Derive blackout dates from snow cover: tutorials/snow-analysis.md
   - Frame viewer: frame-viewer.md
 
 markdown_extensions:

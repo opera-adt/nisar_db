@@ -11,6 +11,7 @@ Usage:
 
 from __future__ import annotations
 
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,10 @@ import geopandas as gpd
 
 from nisar_db.geodb import filter_frames_to_na
 from nisar_db.io_json import write_zipped_json
+
+#: Attributes carried into the simplified GeoJSON, matching the spirit of
+#: burst_db's ``frame-geometries-simple``.
+_GEOJSON_COLUMNS = ["frame_idx", "track", "frame", "passDirection", "epsg", "hasLand"]
 
 
 def build_frame_to_bound(
@@ -62,6 +67,45 @@ def build_frame_to_bound(
     return {"data": data_dict, "metadata": metadata}, nisar_df
 
 
+def write_frame_geometries_geojson(
+    frames_gdf: gpd.GeoDataFrame,
+    output: Path,
+    tolerance: float = 0.1,
+) -> Path:
+    """Write the frame polygons as a simplified, zipped GeoJSON.
+
+    The NISAR counterpart of burst_db's ``frame-geometries-simple`` asset: the
+    full-resolution polygons live in the GeoPackage, while this is the
+    lightweight version meant for web maps and quick spatial joins.
+
+    Parameters
+    ----------
+    frames_gdf : gpd.GeoDataFrame
+        Filtered NISAR frames, carrying a ``frame_idx`` column.
+    output : Path
+        Destination ``.geojson``; the zip is written alongside as
+        ``<output>.zip``.
+    tolerance : float
+        Douglas-Peucker tolerance in degrees.
+
+    Returns
+    -------
+    Path
+        Path to the written ``.geojson.zip``.
+
+    """
+    simplified = frames_gdf[
+        [c for c in _GEOJSON_COLUMNS if c in frames_gdf.columns] + ["geometry"]
+    ].copy()
+    simplified["geometry"] = simplified.geometry.simplify(tolerance)
+    simplified.to_file(output, driver="GeoJSON")
+
+    zip_path = output.with_suffix(output.suffix + ".zip")
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(output, arcname=output.name)
+    return zip_path
+
+
 @click.command(context_settings={"show_default": True})
 @click.option(
     "--nisar-gpkg",
@@ -75,7 +119,22 @@ def build_frame_to_bound(
     default="opera-nisar-disp-frame-to-bounds.json",
     help="Output JSON filename (will also create a .json.zip).",
 )
-def main(nisar_gpkg: str, output: str):
+@click.option(
+    "--geojson",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Also write the frame polygons as a simplified, zipped GeoJSON to this "
+        "path, e.g. opera-nisar-disp-frame-geometries-simple.geojson."
+    ),
+)
+@click.option(
+    "--simplify-tolerance",
+    type=float,
+    default=0.1,
+    help="Simplification tolerance, in degrees, for --geojson.",
+)
+def main(nisar_gpkg: str, output: str, geojson: Path | None, simplify_tolerance: float):
     """Create a frame_to_bound JSON file for NISAR.
 
     Extracts NISAR frames that intersect the OPERA North America polygon
@@ -100,6 +159,13 @@ def main(nisar_gpkg: str, output: str):
     gpkg_path = Path(output).parent / f"{output_name}.gpkg"
     filtered_gdf.to_file(gpkg_path, driver="GPKG")
     click.echo(f"Written to {gpkg_path}")
+
+    if geojson is not None:
+        zip_path = write_frame_geometries_geojson(
+            filtered_gdf, geojson, tolerance=simplify_tolerance
+        )
+        click.echo(f"Written to {geojson}")
+        click.echo(f"Written to {zip_path}")
 
 
 if __name__ == "__main__":

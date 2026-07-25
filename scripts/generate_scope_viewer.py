@@ -18,9 +18,13 @@ It is intentionally a design sibling of ``scripts/nisar_frame_viewer_v1.html``
 * frames can be colored by GSLC count or by consistent mode / coverage,
 * hovering a frame shows a summary and clicking it lists the granules,
 * a live "Consistent Mode Summary" panel aggregates the shown frames,
-* the solid-earth CalVal site boxes are dropped, and
+* the solid-earth CalVal site boxes are dropped,
 * selected frames can be imported from a CSV, a GeoJSON, or a consistent-GSLC
-  catalog JSON (the output of ``nisar-db create-consistent``).
+  catalog JSON (the output of ``nisar-db create-consistent``), and
+* an optional blackout-dates JSON adds blackout-duration (months) coloring, a
+  "blackout frames only" filter, a summary panel, and per-frame hover/click
+  detail of the blacked-out ranges; an optional reference-dates JSON adds the
+  InSAR reference resets to the same hover/click detail.
 
 Examples
 --------
@@ -38,6 +42,15 @@ recomputing them::
         --frames-gpkg notebooks/opera-nisar-disp-frames.gpkg \\
         --gslc-db notebooks/gslc_catalog.duckdb \\
         --consistent-json opera-nisar-disp-consistent-gslc-20260724.json \\
+        --output scripts/nisar_scope_viewer.html
+
+Layer in optional blackout / reference dates (both keyed by ``frame_idx``)::
+
+    python scripts/generate_scope_viewer.py \\
+        --frames-gpkg notebooks/opera-nisar-disp-frames.gpkg \\
+        --gslc-db notebooks/gslc_catalog.duckdb \\
+        --blackout-json nisar-blackout-dates-20260724.json \\
+        --reference-json opera-disp-nisar-reference-dates.json \\
         --output scripts/nisar_scope_viewer.html
 """
 
@@ -713,6 +726,56 @@ APP_JS = r"""
   buildChips("chips-gslc-mode", allModesGslc, activeChips.gslcMode);
   buildChips("chips-gslc-pol", allPolsGslc, activeChips.gslcPol);
 
+  // Reveal the blackout controls only when the viewer was built with blackout data.
+  if (META.has_blackout) {
+    const sec = document.getElementById("section-blackout");
+    const opt = document.getElementById("opt-blackout");
+    if (sec) sec.hidden = false;
+    if (opt) opt.hidden = false;
+  }
+
+  // ---------- blackout / reference helpers ----------
+  function asArray(v){ return typeof v === "string" ? JSON.parse(v) : (v || []); }
+
+  function blackoutHoverLine(p){
+    if (!p.has_blackout) return META.has_blackout ? `<div class="pop-row">Blackout: none</div>` : "";
+    return `<div class="pop-row">Blackout: <b>${p.blackout_label}</b> `+
+           `(${p.blackout_months} mo, ${p.blackout_windows} yr)</div>`;
+  }
+  function referenceHoverLine(p){
+    if (!META.has_reference) return "";
+    const refs = asArray(p.reference_dates);
+    return `<div class="pop-row">Ref resets: ${refs.length ? refs.join(", ") : "default"}</div>`;
+  }
+  function blackoutDetailBlock(p){
+    let html = "";
+    if (META.has_blackout && p.has_blackout) {
+      const ranges = asArray(p.blackout_ranges).map(r=>`<div class="granule-row">${r}</div>`).join("");
+      html += `<div class="pop-row" style="margin-top:6px;">Blackout windows (${p.blackout_label}, ${p.blackout_months} mo):</div>`+
+              `<div class="granule-list">${ranges}</div>`;
+    }
+    if (META.has_reference) {
+      const refs = asArray(p.reference_dates);
+      html += `<div class="pop-row" style="margin-top:6px;">Reference resets: ${refs.length ? refs.join(", ") : "default (first acquisition)"}</div>`;
+    }
+    return html;
+  }
+
+  function refreshBlackoutSummary(features){
+    if (!META.has_blackout) return;
+    const el = document.getElementById("blackout-summary");
+    if (!el) return;
+    const bo = features.filter(f=>f.properties.has_blackout);
+    if (!bo.length) { el.innerHTML = `<div class="stat-line">No blacked-out frames shown.</div>`; return; }
+    const months = bo.map(f=>f.properties.blackout_months);
+    const avg = (months.reduce((a,b)=>a+b,0)/months.length).toFixed(1);
+    el.innerHTML = `<div class="summary-grid">
+      <div class="stat-tile"><div class="num">${bo.length}</div><div class="cap">blackout frames</div></div>
+      <div class="stat-tile"><div class="num">${avg}</div><div class="cap">avg months</div></div>
+      <div class="stat-tile"><div class="num">${Math.max(...months)}</div><div class="cap">max months</div></div>
+    </div>`;
+  }
+
   // ---------- palette ----------
   const paletteEl = document.getElementById("palette");
   function renderPalette(){
@@ -765,6 +828,8 @@ APP_JS = r"""
     const idFilter = document.getElementById("f-id").value.trim().toLowerCase();
     const passVal = document.querySelector('input[name="pass"]:checked').value;
     const calval = document.getElementById("f-calval").checked;
+    const blackoutEl = document.getElementById("f-blackout");
+    const blackoutOnly = blackoutEl && blackoutEl.checked;
     return FRAME_DATA.features.filter(f=>{
       const p = f.properties;
       if (trackSet && !trackSet.has(p.track)) return false;
@@ -772,6 +837,7 @@ APP_JS = r"""
       if (idFilter && !p.id.toLowerCase().includes(idFilter)) return false;
       if (passVal !== "all" && p.passDirection !== passVal) return false;
       if (calval && !p.isCalVal) return false;
+      if (blackoutOnly && !p.has_blackout) return false;
       if (!matchesArrayFilter(p.gslc_modes, activeChips.gslcMode)) return false;
       if (!matchesArrayFilter(p.gslc_pols, activeChips.gslcPol)) return false;
       return true;
@@ -785,18 +851,22 @@ APP_JS = r"""
     }
     document.getElementById("hdr-count").textContent = filtered.length;
     refreshSummary(filtered);
+    refreshBlackoutSummary(filtered);
   }
 
   ["f-track","f-frame","f-id"].forEach(id=>document.getElementById(id).addEventListener("input", applyFilters));
   document.querySelectorAll('input[name="pass"]').forEach(r=>r.addEventListener("change", applyFilters));
-  ["f-calval"].forEach(id=>document.getElementById(id).addEventListener("change", applyFilters));
+  ["f-calval","f-blackout"].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", applyFilters);
+  });
 
   document.getElementById("btn-clear-filters").addEventListener("click", ()=>{
     document.getElementById("f-track").value = "";
     document.getElementById("f-frame").value = "";
     document.getElementById("f-id").value = "";
     document.querySelector('input[name="pass"][value="all"]').checked = true;
-    ["f-calval"].forEach(id=>document.getElementById(id).checked=false);
+    ["f-calval","f-blackout"].forEach(id=>{ const el=document.getElementById(id); if (el) el.checked=false; });
     Object.values(activeChips).forEach(s=>s.clear());
     document.querySelectorAll(".chip.active").forEach(c=>c.classList.remove("active"));
     applyFilters();
@@ -1053,7 +1123,9 @@ APP_JS = r"""
       <div class="pop-title">Track ${p.track} / Frame ${p.frame} (${p.id})</div>
       <div class="pop-row">Pass: ${p.passDirection} &middot; consistent: ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
       <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
+      ${blackoutDetailBlock(p)}
       <button class="btn small primary" id="pop-select" style="margin-top:6px;">${isSel ? "Remove from selection" : "Add to selection"}</button>
+      <div class="pop-row" style="margin-top:6px;">GSLC granules:</div>
       <div class="granule-list">${rows}</div>`;
   }
 
@@ -1111,6 +1183,8 @@ APP_JS = r"""
         <div class="pop-title">Track ${p.track} / Frame ${p.frame}</div>
         <div class="pop-row">Pass: ${p.passDirection} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
         <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s)</div>
+        ${blackoutHoverLine(p)}
+        ${referenceHoverLine(p)}
         <div class="pop-row" style="color:var(--accent)">click to list granules &amp; select</div>
       `).addTo(map);
     });

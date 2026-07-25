@@ -6,6 +6,8 @@ from nisar_db.blackout import main as append_blackout_dates_cmd
 from nisar_db.consistent_gslc import main as create_consistent_cmd
 from nisar_db.frame_to_bound import main as create_frame_to_bound_cmd
 from nisar_db.gslc_catalog import main as create_catalog_cmd
+from nisar_db.processing_mode import main as label_processing_mode_cmd
+from nisar_db.reference_dates import main as create_reference_dates_cmd
 from nisar_db.search_nisar import main as search_nisar_main
 
 
@@ -20,6 +22,8 @@ cli_app.add_command(create_frame_to_bound_cmd, name="create-frame-to-bound")
 cli_app.add_command(create_catalog_cmd, name="create-catalog")
 cli_app.add_command(create_consistent_cmd, name="create-consistent")
 cli_app.add_command(append_blackout_dates_cmd, name="append-blackout-dates")
+cli_app.add_command(create_reference_dates_cmd, name="create-reference-dates")
+cli_app.add_command(label_processing_mode_cmd, name="label-processing-mode")
 
 
 def _run_argparse_main(module_name: str, prog: str, args: tuple[str, ...]) -> None:

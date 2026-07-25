@@ -36,6 +36,9 @@ are no sub-frame burst IDs).
 - **[Tutorials → Build a consistent-mode database](tutorials/consistent-mode-database.md)**
   — a step-by-step recipe anyone can follow to produce the consistent-GSLC
   database from scratch.
+- **[Tutorials → Derive blackout dates from snow cover](tutorials/snow-analysis.md)**
+  — the upstream analysis: NOAA GEFS snow and temperature into per-frame
+  blackout windows, and what those windows cost the stack.
 
 ## Install
 

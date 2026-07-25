@@ -106,17 +106,42 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  append-blackout-dates  Manually append blackout windows for a single frame.
-  build-s3-catalog       Scan an S3 bucket once and write a queryable catalog.
-  create-blackout-dates  Create the NISAR blackout-dates JSON.
-  create-catalog         Parse a NISAR GSLC file list into a structured CSV.
-  create-consistent      Create the consistent-GSLC JSON for NISAR frames.
-  create-frame-to-bound  Create a frame_to_bound JSON file for NISAR.
-  create-nisar-catalog   Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
-  download               Download NISAR granules/URLs from CMR.
-  query-catalog          Query a catalog built by build-s3-catalog.
-  search                 Search for NISAR products.
+  append-blackout-dates   Manually append blackout windows for a single frame.
+  build-s3-catalog        Scan an S3 bucket once and write a queryable catalog.
+  create-blackout-dates   Create the NISAR blackout-dates JSON.
+  create-catalog          Parse a NISAR GSLC file list into a structured CSV.
+  create-consistent       Create the consistent-GSLC JSON for NISAR frames.
+  create-frame-to-bound   Create a frame_to_bound JSON file for NISAR.
+  create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
+  create-reference-dates  Create the NISAR reference-dates JSON.
+  download                Download NISAR granules/URLs from CMR.
+  label-processing-mode   Add historical/forward processing-mode labels.
+  query-catalog           Query a catalog built by build-s3-catalog.
+  search                  Search for NISAR products.
 ```
+
+## Release assets
+
+`make all` builds the full set of DISP-NISAR assets, the frame-based
+counterpart of the DISP-S1 assets released by
+[burst_db](https://github.com/opera-adt/burst_db). The same set is attached to
+a GitHub Release by `.github/workflows/release.yml` when a `v*` tag is pushed.
+
+| Asset | Built by |
+| --- | --- |
+| `opera-nisar-disp-frame-to-bounds-{date}.json[.zip]` | `create-frame-to-bound` |
+| `opera-nisar-disp-frame-geometries-simple-{version}.geojson.zip` | `create-frame-to-bound --geojson` |
+| `opera-nisar-disp-blackout-dates-{date}.json[.zip]` | `create-blackout-dates` |
+| `opera-nisar-disp-consistent-gslc-{date}.json[.zip]` | `create-consistent --blackout-file` |
+| `opera-nisar-disp-consistent-gslc-no-blackout.json[.zip]` | `create-consistent` |
+| `opera-nisar-disp-consistent-gslc-with-processing-mode-{date}.json[.zip]` | `label-processing-mode` |
+| `opera-nisar-disp-reference-dates-{date}.json[.zip]` | `create-reference-dates` |
+| `gslc_catalog.csv` | `create-catalog` |
+
+burst_db's burst-level assets (`burst-id-geometries-simple`, `burst-to-frame`,
+`frame-to-burst`) have no counterpart here: NISAR frames are defined by the
+mission, not assembled from bursts, so `frame-to-bounds` carries what the
+processor needs to know about a frame.
 
 ## Creating GSLC Catalogs
 
@@ -140,7 +165,18 @@ The `nisar-db create-frame-to-bound` command creates a JSON mapping of NISAR fra
 nisar-db create-frame-to-bound --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg --output nisar-frame-to-bounds.json
 ```
 
-This generates both an uncompressed JSON file and a compressed .json.zip file for use in DISP-NISAR processing.
+This generates both an uncompressed JSON file and a compressed .json.zip file for use in DISP-NISAR processing, plus `opera-nisar-disp-frames.gpkg` holding the full-resolution frame polygons.
+
+Add `--geojson` to also write the polygons as a simplified, zipped GeoJSON -- the lightweight version for web maps and quick spatial joins, matching burst_db's `frame-geometries-simple` asset:
+
+```bash
+nisar-db create-frame-to-bound \
+  --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg \
+  --output opera-nisar-disp-frame-to-bounds.json \
+  --geojson opera-nisar-disp-frame-geometries-simple.geojson
+```
+
+`--simplify-tolerance` (default `0.1` degrees) controls how aggressively the polygons are thinned.
 
 ## Creating Consistent GSLC Catalogs
 

@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import json
 import zipfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import Any
 
 import click
 import pandas as pd
@@ -286,9 +287,10 @@ def append_blackout_dates_json(
 
 
 def create_reference_dates_json(
-    reference_dates: dict[str | int, list[str]],
+    reference_dates: Mapping[Any, list[str]],
     output: Path | None = None,
     description: str = "",
+    extra_metadata: dict | None = None,
 ) -> Path:
     """Write a per-frame reference-date change JSON.
 
@@ -306,6 +308,9 @@ def create_reference_dates_json(
         Output path.  Defaults to ``nisar-reference-dates-{today}.json``.
     description:
         Free-text note stored in ``metadata.description``.
+    extra_metadata:
+        Additional key/value pairs merged into ``metadata`` (e.g. the inputs
+        and parameters the dates were derived from).
 
     Returns
     -------
@@ -337,6 +342,7 @@ def create_reference_dates_json(
                     "(e.g. after a major earthquake or a data gap)."
                 )
             ),
+            **(extra_metadata or {}),
         },
         "data": normalised,
     }
