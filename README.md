@@ -1,5 +1,26 @@
 # NISAR_DB
 
+[![CI][ci-badge]][ci-link]
+[![Docs][docs-badge]][docs-link]
+[![PyPI version][pypi-badge]][pypi-link]
+[![PyPI platforms][pypi-platforms]][pypi-link]
+[![Conda][conda-badge]][conda-link]
+[![License][license-badge]][license-link]
+
+<!-- prettier-ignore-start -->
+[ci-badge]:        https://github.com/opera-adt/nisar_db/actions/workflows/ci.yml/badge.svg?branch=main
+[ci-link]:         https://github.com/opera-adt/nisar_db/actions/workflows/ci.yml
+[docs-badge]:      https://github.com/opera-adt/nisar_db/actions/workflows/docs.yml/badge.svg?branch=main
+[docs-link]:       https://opera-adt.github.io/nisar_db/
+[pypi-badge]:      https://img.shields.io/pypi/v/nisar-db
+[pypi-platforms]:  https://img.shields.io/pypi/pyversions/nisar-db
+[pypi-link]:       https://pypi.org/project/nisar-db/
+[conda-badge]:     https://img.shields.io/conda/vn/opera-adt/nisar_db
+[conda-link]:      https://anaconda.org/opera-adt/nisar_db
+[license-badge]:   https://img.shields.io/badge/license-BSD--3--Clause%20OR%20Apache--2.0-blue
+[license-link]:    https://github.com/opera-adt/nisar_db/blob/main/LICENSE
+<!-- prettier-ignore-end -->
+
 Frame database generation for OPERA products from NISAR.
 
 ## Documentation
