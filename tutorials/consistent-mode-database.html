@@ -644,10 +644,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-optional-reference-reset-dates" class="md-nav__link">
+  <a href="#step-4-reference-reset-dates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4 (optional) — Reference (reset) dates
+        Step 4 — Reference (reset) dates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-processing-mode-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Processing-mode labels
       
     </span>
   </a>
@@ -868,10 +879,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-4-optional-reference-reset-dates" class="md-nav__link">
+  <a href="#step-4-reference-reset-dates" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step 4 (optional) — Reference (reset) dates
+        Step 4 — Reference (reset) dates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-processing-mode-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Processing-mode labels
       
     </span>
   </a>
@@ -954,6 +976,8 @@ DISP-S1.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>opera-nisar-disp-frames.gpkg                          # NA frames + frame_idx  (side output)
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>gslc_catalog.csv                                      # parsed GSLC file list
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>opera-nisar-disp-consistent-gslc-&lt;date&gt;.json(.zip)    # the consistent-mode database
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>opera-nisar-disp-reference-dates-&lt;date&gt;.json(.zip)    # reference-epoch resets
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>opera-nisar-disp-consistent-gslc-with-processing-mode-&lt;date&gt;.json(.zip)
 </code></pre></div>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
@@ -973,7 +997,7 @@ DISP-S1.</p>
 <tr>
 <td><code>NISAR_TrackFrame_L_YYYYMMDD.gpkg</code></td>
 <td>Global NISAR track/frame GeoPackage</td>
-<td>Public CMR granule <code>G3817504902-ASF</code> (ASF)</td>
+<td><code>nisar-db download-frame-db</code> (public CMR granule <code>G3817504902-ASF</code>)</td>
 </tr>
 <tr>
 <td><code>gslc_files.txt</code></td>
@@ -984,6 +1008,13 @@ DISP-S1.</p>
 </table>
 </li>
 </ul>
+<div class="admonition tip">
+<p class="admonition-title">Fetching the TrackFrame database</p>
+<p><code>nisar-db download-frame-db</code> needs only Earthdata Login credentials in
+<code>~/.netrc</code>, and reuses the file if it is already there. Step 1 fetches it
+on its own when <code>--nisar-gpkg</code> is omitted, so you can skip this if the
+GeoPackage is the only input you are missing.</p>
+</div>
 <div class="admonition tip">
 <p class="admonition-title">Getting a GSLC file list</p>
 <p>Any newline-delimited list of GSLC names works — S3 URIs, local paths, or
@@ -1006,6 +1037,10 @@ bare granule IDs. For example, from a bucket scan:
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>NISAR_TrackFrame_L_YYYYMMDD.gpkg<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-frame-to-bounds.json
 </code></pre></div>
+<p>Drop <code>--nisar-gpkg</code> to download the TrackFrame database first (into <code>--gpkg-dir</code>,
+the current directory by default):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nisar-db<span class="w"> </span>create-frame-to-bound<span class="w"> </span>--output<span class="w"> </span>opera-nisar-disp-frame-to-bounds.json
+</code></pre></div>
 <p>Produces:</p>
 <ul>
 <li><code>opera-nisar-disp-frame-to-bounds.json</code> (+ <code>.json.zip</code>)</li>
@@ -1015,11 +1050,11 @@ bare granule IDs. For example, from a bucket scan:
 <p>Turn the raw file list into a structured CSV with the <code>mode</code>, <code>coverage</code>,
 <code>track</code>, <code>frame</code>, and <code>sensing_time</code> columns the selection needs. Restrict to
 North America with <code>--na-only</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nisar-db<span class="w"> </span>create-catalog<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--input<span class="w"> </span>gslc_files.txt<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--output<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--na-only<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>NISAR_TrackFrame_L_YYYYMMDD.gpkg
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-catalog<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--input<span class="w"> </span>gslc_files.txt<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--output<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--na-only<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>NISAR_TrackFrame_L_YYYYMMDD.gpkg
 </code></pre></div>
 <p>The command prints a <code>mode_family</code> and coverage summary so you can sanity-check
 the distribution before selecting. Produces <code>gslc_catalog.csv</code> (and a
@@ -1028,10 +1063,10 @@ the distribution before selecting. Produces <code>gslc_catalog.csv</code> (and a
 <p>Combine the catalog (Step 2) with the filtered frames GPKG (Step 1). This applies
 the <a href="../background/consistent-mode.html#the-selection-logic">selection logic</a>:
 dominant mode → majority coverage → one acquisition per date.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc.json
 </code></pre></div>
 <p>Produces <code>opera-nisar-disp-consistent-gslc.json</code> (+ <code>.json.zip</code>), keyed by
 <code>frame_idx</code> with <code>common_mode</code>, <code>common_coverage</code>, and <code>sensing_time_list</code> for
@@ -1041,45 +1076,66 @@ each frame. <strong>This is the consistent-mode database.</strong></p>
 <a href="../background/blackout-dates.html">blackout-dates JSON</a>. First build it — the
 <code>snow_analysis.geojson</code> input comes from
 <a href="snow-analysis.html">Derive blackout dates from snow cover</a>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nisar-db<span class="w"> </span>create-blackout-dates<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--input-file<span class="w"> </span>snow_analysis.geojson<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--output-file<span class="w"> </span>nisar-blackout-dates.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nisar-db<span class="w"> </span>create-blackout-dates<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--input-file<span class="w"> </span>snow_analysis.geojson<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--output-file<span class="w"> </span>nisar-blackout-dates.json
 </code></pre></div>
 <p>Then re-run Step 3 with <code>--blackout-file</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc-no-snow.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc-no-snow.json
 </code></pre></div>
 <p>As in <code>burst_db</code>, keep <strong>both</strong> the blackout-applied and the unfiltered database:
 the filtered one is operational, the unfiltered one is the full record.</p>
-<h2 id="step-4-optional-reference-reset-dates">Step 4 (optional) — Reference (reset) dates<a class="headerlink" href="#step-4-optional-reference-reset-dates" title="Permanent link">&para;</a></h2>
-<p>Add per-frame reference resets so the processor caps interferogram baselines.
-This is currently a Python-API step (see
-<a href="../background/reference-dates.html">Reference dates</a>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nisar_db.blackout</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_reference_dates_json</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">refs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;5827&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2026-01-15&quot;</span><span class="p">]}</span>   <span class="c1"># {frame_idx: [reset dates]}</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">create_reference_dates_json</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;nisar-reference-dates.json&quot;</span><span class="p">)</span>
+<h2 id="step-4-reference-reset-dates">Step 4 — Reference (reset) dates<a class="headerlink" href="#step-4-reference-reset-dates" title="Permanent link">&para;</a></h2>
+<p>Add per-frame reference resets so the processor caps interferogram baselines
+(see <a href="../background/reference-dates.html">Reference dates</a>). Passing the blackout
+file anchors each frame on a snow-free month:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>nisar-db<span class="w"> </span>create-reference-dates<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-reference-dates.json
 </code></pre></div>
+<p>Without <code>--blackout-file</code>, the epochs instead follow each frame's own
+acquisition history — a new one every <code>--interval</code> years, but only once
+<code>--min-acquisitions</code> acquisitions have accumulated.</p>
+<h2 id="step-5-processing-mode-labels">Step 5 — Processing-mode labels<a class="headerlink" href="#step-5-processing-mode-labels" title="Permanent link">&para;</a></h2>
+<p>Mark which acquisitions form complete batches the processor can run now (see
+<a href="../background/processing-modes.html">Processing modes</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>nisar-db<span class="w"> </span>label-processing-mode<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--previous-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-04-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc-with-processing-mode.json
+</code></pre></div>
+<p><code>sensing_time_list</code> becomes a <code>{sensing_time: label}</code> map of <code>historical_NN</code>,
+<code>forward_NN</code>, and <code>no_run</code>. <code>--previous-json</code> is optional; it adds
+<code>metadata.frames_with_changed_mode</code>, the frames whose winning
+<code>(common_mode, common_coverage)</code> flipped since the last release and whose
+existing stack therefore cannot be reused.</p>
 <h2 id="do-it-all-with-make">Do it all with <code>make</code><a class="headerlink" href="#do-it-all-with-make" title="Permanent link">&para;</a></h2>
-<p>The repository <code>Makefile</code> chains Steps 1 and 3 (given a catalog CSV and a
-<code>NISAR_TrackFrame_L_*.gpkg</code> in the current directory), mirroring <code>burst_db</code>'s
-release build:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># from a directory containing the .gpkg and gslc_catalog*.csv</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>make<span class="w"> </span>-f<span class="w"> </span>/path/to/nisar_db/Makefile
+<p>The repository <code>Makefile</code> chains every step above (given a catalog CSV, a
+<code>NISAR_TrackFrame_L_*.gpkg</code>, and a snow-analysis GeoJSON in the current
+directory), mirroring <code>burst_db</code>'s release build:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># from a directory containing the .gpkg, gslc_catalog*.csv and snow analysis</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>make<span class="w"> </span>-f<span class="w"> </span>/path/to/nisar_db/Makefile
 </code></pre></div>
-<p><code>make help</code> lists the individual targets (<code>FRAME_TO_BOUND</code>, <code>CONSISTENT_GSLC</code>,
-<code>gslc_catalog.csv</code>, <code>clean</code>, ...).</p>
+<p>That produces the full release asset set: frame-to-bounds, the simplified frame
+geometries, blackout dates, both consistent-GSLC variants, the processing-mode
+labelled version, and the reference dates. <code>make help</code> lists the parameters
+(<code>NISAR_GPKG</code>, <code>GSLC_CATALOG</code>, <code>SNOW_GEOJSON</code>, <code>PREVIOUS_CONSISTENT</code>) and the
+<code>clean</code> / <code>cleanall</code> targets.</p>
 <h2 id="do-it-all-from-an-s3-bucket">Do it all from an S3 bucket<a class="headerlink" href="#do-it-all-from-an-s3-bucket" title="Permanent link">&para;</a></h2>
 <p><code>make</code> starts from a GSLC file list you already have. To go all the way from a
 bucket instead, <code>scripts/prepare_viewer_inputs.py</code> chains Steps 1-3 and sources
 the granules by scanning S3:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>python<span class="w"> </span>scripts/prepare_viewer_inputs.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>NISAR_TrackFrame_L_YYYYMMDD.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--outdir<span class="w"> </span>notebooks<span class="w"> </span>--profile<span class="w"> </span>saml-pub
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>python<span class="w"> </span>scripts/prepare_viewer_inputs.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>NISAR_TrackFrame_L_YYYYMMDD.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span>--outdir<span class="w"> </span>notebooks<span class="w"> </span>--profile<span class="w"> </span>saml-pub
 </code></pre></div>
+<p><code>--nisar-gpkg</code> is optional here too; omit it and the TrackFrame database is
+downloaded into <code>--outdir</code>.</p>
 <p>It writes <code>opera-nisar-disp-frames.gpkg</code>, <code>gslc_catalog.duckdb</code>,
 <code>gslc_catalog.csv</code>, and <code>opera-nisar-disp-consistent-gslc-&lt;YYYYMMDD&gt;.json</code> —
 the inputs <a href="../frame-viewer.html">the frame viewer</a> consumes. Unlike the file-list
@@ -1088,16 +1144,16 @@ route, the DuckDB catalog carries a <code>production_datetime</code> column (the
 <p>The S3 scan takes minutes; <code>--skip-frames</code> / <code>--skip-catalog</code> reuse existing
 artifacts while iterating on the selection step.</p>
 <h2 id="verify-the-output">Verify the output<a class="headerlink" href="#verify-the-output" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="o">,</span><span class="w"> </span><span class="nn">zipfile</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="s2">&quot;opera-nisar-disp-consistent-gslc.json.zip&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">z</span><span class="p">:</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">namelist</span><span class="p">()[</span><span class="mi">0</span><span class="p">]))</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frames</span><span class="p">)</span><span class="si">}</span><span class="s2"> frames&quot;</span><span class="p">)</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="n">example</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">example</span><span class="p">[</span><span class="s2">&quot;common_mode&quot;</span><span class="p">],</span> <span class="n">example</span><span class="p">[</span><span class="s2">&quot;common_coverage&quot;</span><span class="p">],</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>      <span class="nb">len</span><span class="p">(</span><span class="n">example</span><span class="p">[</span><span class="s2">&quot;sensing_time_list&quot;</span><span class="p">]),</span> <span class="s2">&quot;acquisitions&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="o">,</span><span class="w"> </span><span class="nn">zipfile</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="k">with</span> <span class="n">zipfile</span><span class="o">.</span><span class="n">ZipFile</span><span class="p">(</span><span class="s2">&quot;opera-nisar-disp-consistent-gslc.json.zip&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">z</span><span class="p">:</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">namelist</span><span class="p">()[</span><span class="mi">0</span><span class="p">]))</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">frames</span><span class="p">)</span><span class="si">}</span><span class="s2"> frames&quot;</span><span class="p">)</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="n">example</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">example</span><span class="p">[</span><span class="s2">&quot;common_mode&quot;</span><span class="p">],</span> <span class="n">example</span><span class="p">[</span><span class="s2">&quot;common_coverage&quot;</span><span class="p">],</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>      <span class="nb">len</span><span class="p">(</span><span class="n">example</span><span class="p">[</span><span class="s2">&quot;sensing_time_list&quot;</span><span class="p">]),</span> <span class="s2">&quot;acquisitions&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>You should see one entry per North America frame, each with a single
 <code>(common_mode, common_coverage)</code> and a sorted <code>sensing_time_list</code> of one epoch
@@ -1108,9 +1164,11 @@ per calendar date — exactly the stack DISP-NISAR will process.</p>
     L["gslc_files.txt"] --&gt;|Step 2| CAT["create-catalog&lt;br/&gt;→ gslc_catalog.csv"]
     FTB --&gt;|Step 3| CON["create-consistent"]
     CAT --&gt;|Step 3| CON
-    BL["create-blackout-dates&lt;br/&gt;(optional)"] -.-&gt; CON
+    BL["create-blackout-dates"] --&gt; CON
     CON --&gt; OUT["opera-nisar-disp-consistent-gslc-*.json"]
-    OUT -.-&gt;|Step 4, optional| REF["reference (reset) dates JSON"]</code></pre>
+    OUT --&gt;|Step 4| REF["create-reference-dates&lt;br/&gt;→ reference-dates JSON"]
+    BL -.-&gt; REF
+    OUT --&gt;|Step 5| PM["label-processing-mode&lt;br/&gt;→ …-with-processing-mode-*.json"]</code></pre>
 
 
 
