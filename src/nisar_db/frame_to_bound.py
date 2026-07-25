@@ -7,6 +7,9 @@ Usage:
     python create_frame_to_bound.py --nisar-gpkg NISAR_TrackFrame_L_20250909.gpkg
     python create_frame_to_bound.py --nisar-gpkg NISAR_TrackFrame_L_20250909.gpkg \
         --output nisar-frame-to-bound.json
+
+    # omit --nisar-gpkg to fetch the TrackFrame database from CMR first
+    python create_frame_to_bound.py --gpkg-dir data/
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ from pathlib import Path
 import click
 import geopandas as gpd
 
-from nisar_db.geodb import filter_frames_to_na
+from nisar_db.geodb import filter_frames_to_na, get_trackframe_db
 from nisar_db.io_json import write_zipped_json
 
 #: Attributes carried into the simplified GeoJSON, matching the spirit of
@@ -110,8 +113,17 @@ def write_frame_geometries_geojson(
 @click.option(
     "--nisar-gpkg",
     type=click.Path(exists=True, dir_okay=False),
-    required=True,
-    help="Path to the NISAR TrackFrame GeoPackage file.",
+    default=None,
+    help=(
+        "Path to the NISAR TrackFrame GeoPackage. Omit to download it from CMR "
+        "into --gpkg-dir (needs Earthdata Login credentials in ~/.netrc)."
+    ),
+)
+@click.option(
+    "--gpkg-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path(),
+    help="Where to download the TrackFrame GeoPackage when --nisar-gpkg is omitted.",
 )
 @click.option(
     "--output",
@@ -134,14 +146,26 @@ def write_frame_geometries_geojson(
     default=0.1,
     help="Simplification tolerance, in degrees, for --geojson.",
 )
-def main(nisar_gpkg: str, output: str, geojson: Path | None, simplify_tolerance: float):
+def main(
+    nisar_gpkg: str | None,
+    gpkg_dir: Path,
+    output: str,
+    geojson: Path | None,
+    simplify_tolerance: float,
+):
     """Create a frame_to_bound JSON file for NISAR.
 
     Extracts NISAR frames that intersect the OPERA North America polygon
     and writes their bounding boxes. Analogous to burst_db's frame_to_burst
     file, but without burst IDs since NISAR is frame-based.
     """
-    result, filtered_gdf = build_frame_to_bound(nisar_gpkg_path=Path(nisar_gpkg))
+    if nisar_gpkg is None:
+        gpkg_path = get_trackframe_db(output_dir=gpkg_dir)
+        click.echo(f"Using TrackFrame database {gpkg_path}")
+    else:
+        gpkg_path = Path(nisar_gpkg)
+
+    result, filtered_gdf = build_frame_to_bound(nisar_gpkg_path=gpkg_path)
 
     n_frames = len(result["data"])
     click.echo(f"Writing {n_frames} NISAR frame entries.")

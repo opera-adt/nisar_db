@@ -74,16 +74,9 @@ jobs:
 
       - name: Download NISAR TrackFrame database (public granule)
         run: |
-          python - <<'PY'
-          from nisar_db.download import download_earthdata_granule
-          import os, shutil, glob
-          paths = download_earthdata_granule(os.environ["NISAR_DB_GRANULE_ID"])
-          if not paths:
-              raise SystemExit("Failed to download the NISAR TrackFrame granule")
-          gpkg = next((p for p in paths if p.endswith(".gpkg")), paths[0])
-          shutil.copy(gpkg, "NISAR_TrackFrame_L.gpkg")
-          print("gpkg:", gpkg)
-          PY
+          nisar-db download-frame-db --granule-id "$NISAR_DB_GRANULE_ID"
+          # Later steps reference a date-independent name.
+          cp NISAR_TrackFrame_L_*.gpkg NISAR_TrackFrame_L.gpkg
 
       - name: Build frame-to-bounds and frame-geometry assets
         run: |

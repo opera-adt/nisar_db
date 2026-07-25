@@ -16,6 +16,7 @@ _SUBCOMMANDS = [
     "create-frame-to-bound",
     "create-nisar-catalog",
     "download",
+    "download-frame-db",
     "query-catalog",
     "search",
 ]

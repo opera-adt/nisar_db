@@ -115,6 +115,7 @@ Commands:
   create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
   create-reference-dates  Create the NISAR reference-dates JSON.
   download                Download NISAR granules/URLs from CMR.
+  download-frame-db       Download the global NISAR TrackFrame database.
   label-processing-mode   Add historical/forward processing-mode labels.
   query-catalog           Query a catalog built by build-s3-catalog.
   search                  Search for NISAR products.
@@ -142,6 +143,26 @@ burst_db's burst-level assets (`burst-id-geometries-simple`, `burst-to-frame`,
 `frame-to-burst`) have no counterpart here: NISAR frames are defined by the
 mission, not assembled from bursts, so `frame-to-bounds` carries what the
 processor needs to know about a frame.
+
+## Getting the NISAR TrackFrame database
+
+Most commands need `NISAR_TrackFrame_L_YYYYMMDD.gpkg`, the global track/frame
+GeoPackage. It is a public CMR granule (`G3817504902-ASF`), so `nisar-db` can
+fetch it for you -- all it needs is Earthdata Login credentials in `~/.netrc`:
+
+```bash
+nisar-db download-frame-db --output-dir .
+```
+
+The file is reused if already present; `--force` re-downloads it, and
+`--granule-id` pins an older version of the database.
+
+`create-frame-to-bound` fetches it on its own when `--nisar-gpkg` is omitted, so
+the first step of a release build can be a single command:
+
+```bash
+nisar-db create-frame-to-bound --output opera-nisar-disp-frame-to-bounds.json
+```
 
 ## Creating GSLC Catalogs
 
@@ -472,7 +493,7 @@ You can use the Python API directly:
 
 ```python
 from nisar_db.filenames import GSLCFilename, GUNWFilename
-from nisar_db.geodb import convert_to_gdf, get_opera_na_shape
+from nisar_db.geodb import convert_to_gdf, get_opera_na_shape, load_trackframe_db
 from nisar_db.download import download_earthdata_granule, download_from_url
 from nisar_db.catalog.create_gslc_catalog import search_gslc_products
 from nisar_db.catalog.create_blackout_dates import manual_blackout_dates
@@ -485,6 +506,9 @@ print(gslc.scene_id)   # Get scene identifier (track/frame/direction)
 
 # Download data from EarthData (requires .netrc credentials)
 files = download_earthdata_granule("granule_id", output_dir="downloads")
+
+# Fetch (once) and read the global NISAR TrackFrame database
+frames = load_trackframe_db(output_dir="data")
 
 # Search for GSLC products
 gslc_products = search_gslc_products(max_results=1000)
