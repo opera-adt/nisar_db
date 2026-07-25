@@ -1,0 +1,181 @@
+# Tutorial: build a consistent-mode database
+
+This walkthrough produces the **consistent-GSLC (consistent-mode) database** for
+NISAR frames over North America, from scratch. Anyone with the two inputs below
+can follow it end to end. It mirrors the `make` flow used by `burst_db` for
+DISP-S1.
+
+For the *why* behind each step, read
+**[Background: how consistent mode works](../background/consistent-mode.md)**.
+
+## What you'll produce
+
+```
+opera-nisar-disp-frame-to-bounds-<date>.json(.zip)   # frame bounding boxes
+opera-nisar-disp-frames.gpkg                          # NA frames + frame_idx  (side output)
+gslc_catalog.csv                                      # parsed GSLC file list
+opera-nisar-disp-consistent-gslc-<date>.json(.zip)    # the consistent-mode database
+```
+
+## Prerequisites
+
+- `nisar_db` installed and the `nisar-db` CLI on your `PATH`
+  (see [Install](../index.md#install)).
+- Two inputs:
+
+    | Input | What it is | How to get it |
+    |---|---|---|
+    | `NISAR_TrackFrame_L_YYYYMMDD.gpkg` | Global NISAR track/frame GeoPackage | Public CMR granule `G3817504902-ASF` (ASF) |
+    | `gslc_files.txt` | One NISAR GSLC S3 path / granule ID per line | List your GSLC bucket, or `nisar-db search --output-csv` |
+
+!!! tip "Getting a GSLC file list"
+    Any newline-delimited list of GSLC names works — S3 URIs, local paths, or
+    bare granule IDs. For example, from a bucket scan:
+    ```bash
+    nisar-db build-s3-catalog --bucket my-nisar-bucket \
+      --prefix products/L2_L_GSLC/ --output gslc.parquet
+    nisar-db query-catalog gslc.parquet --product-type GSLC --output-csv gslc.csv
+    # then take the granule_id column into gslc_files.txt
+    ```
+
+Work in a clean output directory:
+
+```bash
+mkdir -p release && cd release
+# place NISAR_TrackFrame_L_YYYYMMDD.gpkg and gslc_files.txt here
+```
+
+## Step 1 — Filter frames to North America
+
+Build the frame-to-bound mapping. Its **side output**,
+`opera-nisar-disp-frames.gpkg`, is the filtered set of NA frames carrying the
+`frame_idx` key that every later step uses.
+
+```bash
+nisar-db create-frame-to-bound \
+  --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg \
+  --output opera-nisar-disp-frame-to-bounds.json
+```
+
+Produces:
+
+- `opera-nisar-disp-frame-to-bounds.json` (+ `.json.zip`)
+- `opera-nisar-disp-frames.gpkg`  ← needed by Step 3
+
+## Step 2 — Parse the GSLC file list into a catalog
+
+Turn the raw file list into a structured CSV with the `mode`, `coverage`,
+`track`, `frame`, and `sensing_time` columns the selection needs. Restrict to
+North America with `--na-only`.
+
+```bash
+nisar-db create-catalog \
+  --input gslc_files.txt \
+  --output gslc_catalog.csv \
+  --na-only \
+  --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg
+```
+
+The command prints a `mode_family` and coverage summary so you can sanity-check
+the distribution before selecting. Produces `gslc_catalog.csv` (and a
+`*_frame_summary.csv`).
+
+## Step 3 — Select the consistent mode per frame
+
+Combine the catalog (Step 2) with the filtered frames GPKG (Step 1). This applies
+the [selection logic](../background/consistent-mode.md#the-selection-logic):
+dominant mode → majority coverage → one acquisition per date.
+
+```bash
+nisar-db create-consistent \
+  --catalog gslc_catalog.csv \
+  --nisar-gpkg opera-nisar-disp-frames.gpkg \
+  --output opera-nisar-disp-consistent-gslc.json
+```
+
+Produces `opera-nisar-disp-consistent-gslc.json` (+ `.json.zip`), keyed by
+`frame_idx` with `common_mode`, `common_coverage`, and `sensing_time_list` for
+each frame. **This is the consistent-mode database.**
+
+### Optional: apply a blackout filter
+
+To remove seasonally unusable acquisitions (e.g. snow winters), pass a
+[blackout-dates JSON](../background/blackout-dates.md). First build it:
+
+```bash
+nisar-db create-blackout-dates \
+  --input-file snow_analysis.geojson \
+  --output-file nisar-blackout-dates.json
+```
+
+Then re-run Step 3 with `--blackout-file`:
+
+```bash
+nisar-db create-consistent \
+  --catalog gslc_catalog.csv \
+  --nisar-gpkg opera-nisar-disp-frames.gpkg \
+  --blackout-file nisar-blackout-dates.json \
+  --output opera-nisar-disp-consistent-gslc-no-snow.json
+```
+
+As in `burst_db`, keep **both** the blackout-applied and the unfiltered database:
+the filtered one is operational, the unfiltered one is the full record.
+
+## Step 4 (optional) — Reference (reset) dates
+
+Add per-frame reference resets so the processor caps interferogram baselines.
+This is currently a Python-API step (see
+[Reference dates](../background/reference-dates.md)):
+
+```python
+from nisar_db.blackout import create_reference_dates_json
+
+refs = {"5827": ["2026-01-15"]}   # {frame_idx: [reset dates]}
+create_reference_dates_json(refs, output="nisar-reference-dates.json")
+```
+
+## Do it all with `make`
+
+The repository `Makefile` chains Steps 1 and 3 (given a catalog CSV and a
+`NISAR_TrackFrame_L_*.gpkg` in the current directory), mirroring `burst_db`'s
+release build:
+
+```bash
+# from a directory containing the .gpkg and gslc_catalog*.csv
+make -f /path/to/nisar_db/Makefile
+```
+
+`make help` lists the individual targets (`FRAME_TO_BOUND`, `CONSISTENT_GSLC`,
+`gslc_catalog.csv`, `clean`, ...).
+
+## Verify the output
+
+```python
+import json, zipfile
+
+with zipfile.ZipFile("opera-nisar-disp-consistent-gslc.json.zip") as z:
+    data = json.loads(z.read(z.namelist()[0]))
+
+frames = data["data"]
+print(f"{len(frames)} frames")
+example = next(iter(frames.values()))
+print(example["common_mode"], example["common_coverage"],
+      len(example["sensing_time_list"]), "acquisitions")
+```
+
+You should see one entry per North America frame, each with a single
+`(common_mode, common_coverage)` and a sorted `sensing_time_list` of one epoch
+per calendar date — exactly the stack DISP-NISAR will process.
+
+## Recap
+
+```mermaid
+flowchart TD
+    G["NISAR_TrackFrame_L_*.gpkg"] -->|Step 1| FTB["create-frame-to-bound<br/>→ opera-nisar-disp-frames.gpkg"]
+    L["gslc_files.txt"] -->|Step 2| CAT["create-catalog<br/>→ gslc_catalog.csv"]
+    FTB -->|Step 3| CON["create-consistent"]
+    CAT -->|Step 3| CON
+    BL["create-blackout-dates<br/>(optional)"] -.-> CON
+    CON --> OUT["opera-nisar-disp-consistent-gslc-*.json"]
+    OUT -.->|Step 4, optional| REF["reference (reset) dates JSON"]
+```

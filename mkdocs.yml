@@ -1,0 +1,72 @@
+site_name: NISAR_DB
+site_description: >-
+  Frame database and product-catalog generation for OPERA DISP-NISAR.
+  Mirrors the burst_db workflow used for Sentinel-1 (DISP-S1).
+site_url: https://opera-adt.github.io/nisar_db/
+repo_url: https://github.com/opera-adt/nisar_db
+repo_name: opera-adt/nisar_db
+edit_uri: edit/main/docs/
+
+# Flat output paths (page.html instead of page/index.html) so that the raw
+# <iframe> in frame-viewer.md and its markdown links resolve to the same
+# relative assets/ directory.
+use_directory_urls: false
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Background:
+      - Consistent mode: background/consistent-mode.md
+      - Blackout dates: background/blackout-dates.md
+      - Reference (reset) dates: background/reference-dates.md
+  - Tutorials:
+      - Build a consistent-mode database: tutorials/consistent-mode-database.md
+  - Frame viewer: frame-viewer.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search

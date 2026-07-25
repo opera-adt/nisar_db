@@ -1,5 +1,4 @@
-"""
-NISAR catalog module for generating and maintaining a database of NISAR products.
+"""NISAR catalog module for generating and maintaining a database of NISAR products.
 
 This module provides tools to:
 1. Search for NISAR products in CMR

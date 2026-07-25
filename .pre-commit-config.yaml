@@ -1,6 +1,14 @@
 ci:
   autofix_prs: false
 
+# `pre-commit install` wires up both the per-commit hooks and the pre-push gate
+# (lint/format/type on every commit; the full test suite additionally on push).
+default_install_hook_types: [pre-commit, pre-push]
+
+# Experimental notebooks / scratch scripts are not part of the package and
+# are not held to the package's lint/type standards.
+exclude: ^notebooks/
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: "v6.0.0"
@@ -9,7 +17,8 @@ repos:
       - id: check-docstring-first
       - id: check-merge-conflict
       - id: check-yaml
-        args: [--allow-multiple-documents]
+        # --unsafe allows mkdocs.yml's `!!python/name:` tags (pymdownx superfences)
+        args: [--allow-multiple-documents, --unsafe]
       - id: debug-statements
       - id: end-of-file-fixer
       - id: file-contents-sorter
@@ -36,3 +45,15 @@ repos:
         - types-setuptools
         - types-requests
         - types-python-dateutil
+
+  # Full test suite runs on `git push` only (too slow for every commit). Uses the
+  # pytest on PATH, so run pushes from the project env (e.g. nisar-db-env).
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest (full suite)
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

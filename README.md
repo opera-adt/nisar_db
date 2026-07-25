@@ -2,6 +2,23 @@
 
 Frame database generation for OPERA products from NISAR.
 
+## Documentation
+
+Full documentation is published at **<https://opera-adt.github.io/nisar_db/>**, including:
+
+- [Background: how consistent mode works](https://opera-adt.github.io/nisar_db/background/consistent-mode.html)
+- [Background: blackout dates](https://opera-adt.github.io/nisar_db/background/blackout-dates.html)
+- [Background: reference (reset) dates](https://opera-adt.github.io/nisar_db/background/reference-dates.html)
+- [Tutorial: build a consistent-mode database](https://opera-adt.github.io/nisar_db/tutorials/consistent-mode-database.html)
+- [Interactive NISAR frame viewer](https://opera-adt.github.io/nisar_db/frame-viewer.html)
+
+To build and preview the docs locally:
+
+```bash
+pip install -e ".[docs]"
+mkdocs serve   # then open http://127.0.0.1:8000
+```
+
 ## Installation
 
 ### Using conda
@@ -155,19 +172,19 @@ nisar-db create-blackout-dates --manual --output-file nisar-manual-blackout-date
 The command supports three methods for creating blackout dates:
 
 1. **Snow Analysis Data** (default): Uses a GeoJSON or Parquet file with snow cover analysis data, containing aggressive, median, and conservative blackout periods for each frame.
-   
+
    ```bash
    nisar-db create-blackout-dates --input-file snow_analysis.geojson --max-default-duration 180
    ```
 
 2. **Monthly Data** (`--monthly`): Uses a GeoJSON file with year, month, frame_id, and to_process fields, where to_process=0 indicates a blackout month.
-   
+
    ```bash
    nisar-db create-blackout-dates --input-file monthly_data.geojson --monthly
    ```
 
 3. **Manual Definition** (`--manual`): Creates blackout dates from predefined periods without requiring an input file.
-   
+
    ```bash
    nisar-db create-blackout-dates --manual --start-year 2025 --end-year 2030
    ```

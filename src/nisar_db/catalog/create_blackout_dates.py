@@ -1,19 +1,16 @@
-#!/usr/bin/env python3
-"""
-Create blackout dates for NISAR frames.
+"""Create blackout dates for NISAR frames.
 
 This script:
 1. Reads a GeoJSON or Parquet file with blackout periods for NISAR frames
 2. Processes the data to create blackout dates
 3. Saves the results as a JSON file
 
-The blackout dates indicate periods when data for certain frames should not be processed,
-typically due to environmental conditions like snow cover or extreme weather.
+The blackout dates indicate periods when data for certain frames should not be
+processed, typically due to environmental conditions like snow or extreme weather.
 """
 
 import argparse
 import json
-import logging
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -23,13 +20,9 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("create_blackout_dates")
+from nisar_db.logging_setup import configure_logging
+
+logger = configure_logging("create_blackout_dates")
 
 
 def _yearly_windows(
@@ -55,6 +48,7 @@ def _yearly_windows(
     -------
     List[List[str]]
         List of date ranges as [start, end] pairs in ISO format.
+
     """
     s_month, s_day = start_ts.month, start_ts.day
     e_month, e_day = end_ts.month, end_ts.day
@@ -88,6 +82,7 @@ def _select_blackout_dates(
     -------
     gpd.GeoDataFrame
         GeoDataFrame with selected blackout dates.
+
     """
     use_aggressive_mask = gdf.blackout_duration_median > max_default_duration
     gdf["start_selected"] = np.where(
@@ -132,12 +127,13 @@ def snow_months_to_blackout_json(
     -------
     Dict
         Dictionary containing blackout dates for each frame.
+
     """
     input_path = Path(input_file)
     generation_time = datetime.now().strftime("%Y-%m-%d")
     output_filename = output_file or f"nisar-blackout-dates-{generation_time}.json"
 
-    result = {
+    result: Dict[str, object] = {
         "metadata": {
             "generation_time": datetime.now().isoformat(),
             "max_default_duration": max_default_duration,
@@ -200,6 +196,7 @@ def monthly_data_to_blackout_json(
     -------
     Dict
         Dictionary containing blackout dates for each frame.
+
     """
     input_path = Path(input_file)
     generation_time = datetime.now().strftime("%Y-%m-%d")
@@ -251,9 +248,7 @@ def monthly_data_to_blackout_json(
                 blackout_end = next_month - timedelta(days=1)
                 blackout_end = blackout_end.replace(hour=23, minute=59, second=59)
 
-            frame_dates.append(
-                [blackout_start.isoformat(), blackout_end.isoformat()]
-            )
+            frame_dates.append([blackout_start.isoformat(), blackout_end.isoformat()])
 
         blackout_dates[str(frame_id)] = frame_dates or []
 
@@ -270,7 +265,9 @@ def monthly_data_to_blackout_json(
     with open(output_filename, "w") as f:
         json.dump(result, f, indent=2)
 
-    logger.info(f"Blackout JSON created: {output_filename} ({len(blackout_dates)} frames)")
+    logger.info(
+        f"Blackout JSON created: {output_filename} ({len(blackout_dates)} frames)"
+    )
 
     return result
 
@@ -278,7 +275,7 @@ def monthly_data_to_blackout_json(
 def manual_blackout_dates(
     output_file: Optional[Union[Path, str]] = None,
     year_range: Optional[List[int]] = None,
-    blackout_periods: Optional[Dict[str, List[Dict[str, str]]]] = None,
+    blackout_periods: Optional[Dict[str, List[Dict[str, int]]]] = None,
 ) -> Dict:
     """Create a JSON of blackout periods from manually defined periods.
 
@@ -288,11 +285,15 @@ def manual_blackout_dates(
         Path to the output JSON file. If None, a default name is generated.
     year_range : List[int], optional
         Range of years to generate blackout dates for, by default None.
-    blackout_periods : Dict[str, List[Dict[str, str]]], optional
-        Manually defined blackout periods by frame ID. Format:
+    blackout_periods : Dict[str, List[Dict[str, int]]], optional
+        Manually defined blackout periods by frame ID. Month/day values are
+        integers (consumed by ``pandas.Timestamp``). Format:
         {
             "frame_id": [
-                {"start_month": "11", "start_day": "1", "end_month": "5", "end_day": "31"}
+                {
+                    "start_month": 11, "start_day": 1,
+                    "end_month": 5, "end_day": 31,
+                }
             ]
         }
 
@@ -300,9 +301,12 @@ def manual_blackout_dates(
     -------
     Dict
         Dictionary containing blackout dates for each frame.
+
     """
     generation_time = datetime.now().strftime("%Y-%m-%d")
-    output_filename = output_file or f"nisar-manual-blackout-dates-{generation_time}.json"
+    output_filename = (
+        output_file or f"nisar-manual-blackout-dates-{generation_time}.json"
+    )
 
     # Span of calendar years to pre-compute
     if year_range is None:
@@ -315,8 +319,12 @@ def manual_blackout_dates(
         # Example: Northern US states have snow cover from November to May
         blackout_periods = {
             # Example frames with winter snow cover
-            "1001": [{"start_month": 11, "start_day": 1, "end_month": 5, "end_day": 31}],
-            "1002": [{"start_month": 11, "start_day": 15, "end_month": 4, "end_day": 30}],
+            "1001": [
+                {"start_month": 11, "start_day": 1, "end_month": 5, "end_day": 31}
+            ],
+            "1002": [
+                {"start_month": 11, "start_day": 15, "end_month": 4, "end_day": 30}
+            ],
             # Example tropical frames with monsoon season
             "2001": [{"start_month": 6, "start_day": 1, "end_month": 9, "end_day": 30}],
         }
@@ -353,27 +361,48 @@ def manual_blackout_dates(
     with open(output_filename, "w") as f:
         json.dump(result, f, indent=2)
 
-    logger.info(f"Manual blackout JSON created: {output_filename} ({len(blackout_dates)} frames)")
+    logger.info(
+        f"Manual blackout JSON created: {output_filename} "
+        f"({len(blackout_dates)} frames)"
+    )
 
     return result
 
 
 def main():
-    """Main function to create blackout dates."""
-    parser = argparse.ArgumentParser(description="Create blackout dates for NISAR frames")
+    """Create the NISAR blackout-dates JSON from the command line."""
+    parser = argparse.ArgumentParser(
+        description="Create blackout dates for NISAR frames"
+    )
 
     parser.add_argument("--input-file", help="Path to input file (GeoJSON or Parquet)")
     parser.add_argument("--output-file", help="Path to output JSON file")
-    parser.add_argument("--max-default-duration", type=float, default=180,
-                      help="Maximum number of days for default blackout period")
-    parser.add_argument("--start-year", type=int, default=2025,
-                      help="Start year for blackout date generation")
-    parser.add_argument("--end-year", type=int, default=2030,
-                      help="End year for blackout date generation")
-    parser.add_argument("--manual", action="store_true",
-                      help="Create manual blackout dates without input file")
-    parser.add_argument("--monthly", action="store_true",
-                      help="Use monthly data format for input file")
+    parser.add_argument(
+        "--max-default-duration",
+        type=float,
+        default=180,
+        help="Maximum number of days for default blackout period",
+    )
+    parser.add_argument(
+        "--start-year",
+        type=int,
+        default=2025,
+        help="Start year for blackout date generation",
+    )
+    parser.add_argument(
+        "--end-year",
+        type=int,
+        default=2030,
+        help="End year for blackout date generation",
+    )
+    parser.add_argument(
+        "--manual",
+        action="store_true",
+        help="Create manual blackout dates without input file",
+    )
+    parser.add_argument(
+        "--monthly", action="store_true", help="Use monthly data format for input file"
+    )
 
     args = parser.parse_args()
 

@@ -11,7 +11,6 @@ from nisar_db.search_nisar import main as search_nisar_main
 @click.group()
 def cli_app():
     """Create/interact with OPERA's NISAR frame database."""
-    pass
 
 
 # Each of these modules defines a fully-decorated click command as ``main``.
@@ -36,7 +35,9 @@ def _run_argparse_main(module_name: str, prog: str, args: tuple[str, ...]) -> No
     module.main()
 
 
-_PASSTHROUGH = {"context_settings": dict(ignore_unknown_options=True, help_option_names=[])}
+_PASSTHROUGH = {
+    "context_settings": {"ignore_unknown_options": True, "help_option_names": []}
+}
 
 
 @cli_app.command(name="create-nisar-catalog", **_PASSTHROUGH)
@@ -89,10 +90,26 @@ def download_cmd(args):
 @click.option("--polarization", type=str, help="Polarization (e.g., HH)")
 @click.option("--start-date", type=str, help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", type=str, help="End date (YYYY-MM-DD)")
-@click.option("--provider", type=str, default="ASF", help="Data provider (default: ASF)")
-@click.option("--max-results", type=int, default=100, help="Maximum results (default: 100)")
+@click.option(
+    "--provider", type=str, default="ASF", help="Data provider (default: ASF)"
+)
+@click.option(
+    "--max-results", type=int, default=100, help="Maximum results (default: 100)"
+)
 @click.option("--download", type=str, help="Download to this directory")
 @click.option("--output-csv", type=str, help="Save results to CSV")
+@click.option(
+    "--s3-bucket",
+    type=str,
+    help="Search this S3 bucket instead of CMR (name or s3:// URI)",
+)
+@click.option(
+    "--s3-prefix", type=str, help="Key prefix to scan, e.g. products/L2_L_GSLC/"
+)
+@click.option("--profile", type=str, help="AWS named profile for the S3 search")
+@click.option(
+    "--region", type=str, help="AWS region for the S3 search (default: us-west-2)"
+)
 @click.option(
     "--url-type",
     type=click.Choice(["https", "s3"]),
@@ -115,6 +132,71 @@ def search_cmd(**kwargs):
             if not isinstance(value, bool):
                 sys.argv.append(str(value))
     search_nisar_main()
+
+
+@cli_app.command(name="build-s3-catalog")
+@click.option("--bucket", required=True, help="S3 bucket name (or s3:// URI)")
+@click.option("--prefix", default="", help="Key prefix, e.g. products/L2_L_GSLC/")
+@click.option("--output", required=True, help="Catalog file (.parquet/.duckdb/.csv)")
+@click.option("--profile", help="AWS named profile")
+@click.option("--region", default="us-west-2", help="AWS region (default: us-west-2)")
+@click.option(
+    "--product-type",
+    type=click.Choice(["GSLC", "GUNW"]),
+    default="GSLC",
+    help="Product type (default: GSLC)",
+)
+@click.option(
+    "--max-workers", type=int, default=8, help="Parallel listing workers (default: 8)"
+)
+def build_s3_catalog_cmd(
+    bucket, prefix, output, profile, region, product_type, max_workers
+):
+    """Scan an S3 bucket once and write a queryable NISAR product catalog.
+
+    Enumerates every granule under the prefix (slow, one time) so later
+    track/frame lookups via ``query-catalog`` are instant local filters.
+    """
+    from nisar_db.s3_catalog import build_s3_catalog
+
+    out = build_s3_catalog(
+        bucket,
+        prefix,
+        output,
+        profile=profile,
+        region=region,
+        product_type=product_type,
+        max_workers=max_workers,
+    )
+    click.echo(f"Catalog written to {out}")
+
+
+@cli_app.command(name="query-catalog")
+@click.argument("catalog", type=click.Path(exists=True))
+@click.option("--track", type=int, help="Track number")
+@click.option("--frame", type=int, help="Frame number")
+@click.option("--direction", type=str, help="Orbit direction (A/D)")
+@click.option("--cycle", type=int, help="Cycle number")
+@click.option("--polarization", type=str, help="Polarization (e.g. DHDH)")
+@click.option("--mode", type=str, help="Mode code (e.g. 4005)")
+@click.option("--crid", type=str, help="Exact CRID / processing version")
+@click.option("--crid-min", type=str, help="Keep crid >= this (latest-version filter)")
+@click.option(
+    "--product-type", type=click.Choice(["GSLC", "GUNW"]), help="Product type"
+)
+@click.option("--output-csv", type=str, help="Write matches to this CSV")
+def query_catalog_cmd(catalog, output_csv, **filters):
+    """Query a catalog built by ``build-s3-catalog`` (fast local filter)."""
+    from nisar_db.s3_catalog import query_catalog
+
+    df = query_catalog(catalog, **{k: v for k, v in filters.items() if v is not None})
+    click.echo(f"{len(df)} matches")
+    if len(df):
+        cols = ["granule_id", "track", "frame", "direction", "mode", "crid", "size_gb"]
+        click.echo(df[[c for c in cols if c in df.columns]].to_string(index=False))
+    if output_csv:
+        df.to_csv(output_csv, index=False)
+        click.echo(f"Written to {output_csv}")
 
 
 if __name__ == "__main__":

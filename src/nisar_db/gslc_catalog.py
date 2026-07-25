@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Parse NISAR GSLC file list into a structured catalog CSV.
 
 Reads a text file of S3 paths or local file paths (one per line), parses
@@ -32,13 +31,11 @@ import click
 import pandas as pd
 
 from nisar_db.filenames import GSLCFilename
+from nisar_db.modes import STANDARD_FAMILIES, dominant_value
 
 # Columns that contain zero-padded numeric strings (e.g. "0005", "003").
 # Written with explicit quoting so pandas doesn't drop leading zeros on re-read.
 _STR_COLS = ["cycle", "mode", "mode_family", "common_mode", "crid", "version"]
-
-# Mode families considered "standard" for common_mode voting.
-_STANDARD_FAMILIES = {"40", "20"}
 
 
 def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
@@ -55,8 +52,11 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
         One row per granule with parsed fields + derived columns.
     failed:
         List of (line, error_message) for lines that could not be parsed.
+
     """
-    lines = [l.strip() for l in input_file.read_text().splitlines() if l.strip()]
+    lines = [
+        line.strip() for line in input_file.read_text().splitlines() if line.strip()
+    ]
 
     rows: list[dict] = []
     failed: list[tuple[str, str]] = []
@@ -97,14 +97,9 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
     # common_mode per (track, frame): dominant standard family ("40" or "20").
     # Only standard-family rows vote; fall back to overall most-frequent if the
     # frame has no standard-family acquisitions at all.
-    def _common_mode(grp: pd.Series) -> str:
-        standard = grp[grp.isin(_STANDARD_FAMILIES)]
-        votes = standard if not standard.empty else grp
-        return votes.value_counts().index[0]
-
     common_mode = (
         df.groupby(["track", "frame"])["mode_family"]
-        .agg(_common_mode)
+        .agg(lambda grp: dominant_value(grp, STANDARD_FAMILIES))
         .rename("common_mode")
         .reset_index()
     )
@@ -116,21 +111,26 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
     return df, failed
 
 
+def write_catalog_csv(df: pd.DataFrame, output: Path) -> None:
+    """Write a catalog DataFrame to CSV, preserving zero-padded numeric strings.
+
+    Columns like ``mode`` ("4005") or ``cycle`` ("003") are quoted explicitly so
+    ``pandas.read_csv`` does not strip their leading zeros on the way back in.
+    """
+    df = df.copy()
+    str_cols = [c for c in _STR_COLS if c in df.columns]
+    df[str_cols] = df[str_cols].astype(str)
+    df.to_csv(output, index=False, quoting=csv.QUOTE_NONNUMERIC)
+
+
 def filter_north_america(df: pd.DataFrame, nisar_gpkg: Path) -> pd.DataFrame:
     """Keep only rows whose (track, frame) intersects the OPERA NA polygon."""
     import geopandas as gpd
 
+    from nisar_db.geodb import filter_frames_to_na
+
     nisar_gdf = gpd.read_file(nisar_gpkg)
-
-    url = (
-        "https://raw.githubusercontent.com/"
-        "nasa/opera-sds-pcm/develop/geo/data/north_america_opera_expanded.geojson"
-    )
-    na_shape = gpd.read_file(url).geometry.union_all()
-
-    na_frames = nisar_gdf[
-        nisar_gdf.geometry.intersects(na_shape) | nisar_gdf.geometry.touches(na_shape)
-    ][["track", "frame"]].copy()
+    na_frames = filter_frames_to_na(nisar_gdf)[["track", "frame"]].copy()
     na_frames["track"] = na_frames["track"].astype(int)
     na_frames["frame"] = na_frames["frame"].astype(int)
 
@@ -169,7 +169,7 @@ def main(
     na_only: bool,
     nisar_gpkg: Path | None,
 ):
-    """Parse a NISAR GSLC file list into a structured catalog CSV.
+    r"""Parse a NISAR GSLC file list into a structured catalog CSV.
 
     Adds two derived columns per row:
 
@@ -188,12 +188,16 @@ def main(
         for line, err in failed[:5]:
             click.echo(f"    {line[:80]}: {err}", err=True)
 
-    click.echo(f"  Parsed {len(df):,} granules, {df[['track','frame']].drop_duplicates().shape[0]:,} unique (track, frame) pairs.")
+    n_pairs = df[["track", "frame"]].drop_duplicates().shape[0]
+    click.echo(
+        f"  Parsed {len(df):,} granules, {n_pairs:,} unique (track, frame) pairs."
+    )
 
     if na_only:
+        assert nisar_gpkg is not None  # guaranteed by the UsageError check above
         before = len(df)
         df = filter_north_america(df, nisar_gpkg)
-        click.echo(f"  NA filter: {before:,} → {len(df):,} granules.")
+        click.echo(f"  NA filter: {before:,} -> {len(df):,} granules.")
 
     # Print a quick per-frame mode summary
     frame_summary = (
@@ -206,9 +210,20 @@ def main(
         .reset_index()
         .sort_values(["track", "frame"])
     )
-    click.echo(f"\nmode_family distribution:\n{df['mode_family'].value_counts().to_string()}")
-    click.echo(f"\ncommon_mode per frame (standard families only):\n{df[['track','frame','common_mode']].drop_duplicates()['common_mode'].value_counts().to_string()}")
-    click.echo(f"\nCoverage:\n  full={df['is_full'].sum():,}  partial={(~df['is_full']).sum():,}")
+    mode_family_dist = df["mode_family"].value_counts().to_string()
+    common_mode_per_frame = (
+        df[["track", "frame", "common_mode"]]
+        .drop_duplicates()["common_mode"]
+        .value_counts()
+        .to_string()
+    )
+    click.echo(f"\nmode_family distribution:\n{mode_family_dist}")
+    click.echo(
+        f"\ncommon_mode per frame (standard families only):\n{common_mode_per_frame}"
+    )
+    n_full = df["is_full"].sum()
+    n_partial = (~df["is_full"]).sum()
+    click.echo(f"\nCoverage:\n  full={n_full:,}  partial={n_partial:,}")
 
     if output is None:
         output = input_file.parent / (input_file.stem + "_catalog.csv")

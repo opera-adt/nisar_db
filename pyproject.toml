@@ -25,6 +25,10 @@ license = { file = "LICENSE" }
 # dependencies will be read from text files
 dynamic = ["version", "dependencies"]
 
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-randomly", "pytest-cov"]
+docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "pymdown-extensions>=10"]
+
 [project.urls]
 Homepage = "https://github.com/opera-adt/nisar_db"
 "Bug Tracker" = "https://github.com/opera-adt/nisar_db/issues"
@@ -107,6 +111,7 @@ python_version = "3.10"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+testpaths = ["tests"]
 doctest_optionflags = "NORMALIZE_WHITESPACE NUMBER"
 addopts = " --doctest-modules --randomly-seed=1234 --ignore=scripts --ignore=docs --ignore=data"
 filterwarnings = ["error"]

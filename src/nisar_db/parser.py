@@ -1,22 +1,44 @@
 import logging
+
 import pandas as pd
+
 from .filenames import GSLCFilename, GUNWFilename
 
 logger = logging.getLogger(__name__)
 
+
 def parse_gslc(file: str) -> pd.DataFrame | None:
+    """Parse a GSLC granule name to a one-row DataFrame, or None if it fails."""
     try:
         return GSLCFilename.from_path(file).to_dataframe()
     except Exception:
         return None
 
+
 def parse_gunw(file: str) -> pd.DataFrame | None:
+    """Parse a GUNW granule name to a one-row DataFrame, or None if it fails."""
     try:
         return GUNWFilename.from_path(file).to_dataframe()
     except Exception:
         return None
 
+
 def parse_s3_files_to_dataframe(s3_files: list, product_type="GUNW") -> pd.DataFrame:
+    """Parse a list of S3 file objects into a combined product DataFrame.
+
+    Parameters
+    ----------
+    s3_files : list
+        Objects exposing ``get_path()`` returning the granule name/path.
+    product_type : str
+        ``"GUNW"`` or ``"GSLC"``; selects the filename parser.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per successfully parsed granule (empty if none parse).
+
+    """
     if not s3_files:
         logger.warning("No S3 files provided to parse")
         return pd.DataFrame()

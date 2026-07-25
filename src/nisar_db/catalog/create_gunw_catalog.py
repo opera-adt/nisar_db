@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""
-Create a catalog of NISAR GUNW products.
+"""Create a catalog of NISAR GUNW products.
 
 This script:
 1. Searches for NISAR GUNW products in CMR
@@ -12,262 +10,83 @@ The JSON files can be used by applications to find NISAR GUNW products.
 """
 
 import argparse
-import json
-import logging
-import os
 import sys
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, List, Optional, Union
 
-import duckdb
 import pandas as pd
 
+from nisar_db.catalog._common import (
+    create_database,
+    extract_metadata,
+    generate_track_frame_json,
+    update_database,
+    write_catalog_json,
+)
 from nisar_db.filenames import GUNWFilename, NISARCollection
+from nisar_db.logging_setup import configure_logging
 from nisar_db.search_nisar import search_nisar_granules
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-    datefmt="%H:%M:%S",
-)
-logger = logging.getLogger("create_gunw_catalog")
+logger = configure_logging("create_gunw_catalog")
 
+TABLE = "gunw_products"
 
-def create_database(db_path: str) -> duckdb.DuckDBPyConnection:
-    """
-    Create or connect to a DuckDB database for storing GUNW metadata.
-
-    Parameters
-    ----------
-    db_path : str
-        Path to the DuckDB database file.
-
-    Returns
-    -------
-    duckdb.DuckDBPyConnection
-        Connection to the DuckDB database.
-    """
-    conn = duckdb.connect(db_path)
-
-    # Create table for GUNW products if it doesn't exist
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS gunw_products (
-        id VARCHAR PRIMARY KEY,
-        mission VARCHAR,
-        instrument VARCHAR,
-        processing_type VARCHAR,
-        product VARCHAR,
-        cycle1 VARCHAR,
-        relative_orbit VARCHAR,
-        track VARCHAR,
-        pass_direction VARCHAR,
-        track_frame VARCHAR,
-        frame VARCHAR,
-        cycle2 VARCHAR,
-        mode VARCHAR,
-        polarization VARCHAR,
-        reference_start_datetime TIMESTAMP,
-        reference_end_datetime TIMESTAMP,
-        secondary_start_datetime TIMESTAMP,
-        secondary_end_datetime TIMESTAMP,
-        ref_date VARCHAR,
-        sec_date VARCHAR,
-        date VARCHAR,
-        scene_id VARCHAR,
-        crid VARCHAR,
-        orbits VARCHAR,
-        coverage VARCHAR,
-        location VARCHAR,
-        version VARCHAR,
-        granule_id VARCHAR,
-        url VARCHAR,
-        s3_url VARCHAR,
-        browse_url VARCHAR,
-        metadata_url VARCHAR,
-        inserted_at TIMESTAMP
-    )
-    """)
-
-    return conn
+_SCHEMA = """
+    id VARCHAR PRIMARY KEY,
+    mission VARCHAR,
+    instrument VARCHAR,
+    processing_type VARCHAR,
+    product VARCHAR,
+    cycle1 VARCHAR,
+    relative_orbit VARCHAR,
+    track VARCHAR,
+    pass_direction VARCHAR,
+    track_frame VARCHAR,
+    frame VARCHAR,
+    cycle2 VARCHAR,
+    mode VARCHAR,
+    polarization VARCHAR,
+    reference_start_datetime TIMESTAMP,
+    reference_end_datetime TIMESTAMP,
+    secondary_start_datetime TIMESTAMP,
+    secondary_end_datetime TIMESTAMP,
+    ref_date VARCHAR,
+    sec_date VARCHAR,
+    date VARCHAR,
+    scene_id VARCHAR,
+    crid VARCHAR,
+    orbits VARCHAR,
+    coverage VARCHAR,
+    location VARCHAR,
+    version VARCHAR,
+    granule_id VARCHAR,
+    url VARCHAR,
+    s3_url VARCHAR,
+    browse_url VARCHAR,
+    metadata_url VARCHAR,
+    inserted_at TIMESTAMP
+"""
 
 
 def search_gunw_products(max_results: int = 25000) -> pd.DataFrame:
-    """
-    Search for NISAR GUNW products in CMR.
-
-    Parameters
-    ----------
-    max_results : int, optional
-        Maximum number of results to return.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing the search results.
-    """
+    """Search for NISAR GUNW products in CMR."""
     logger.info("Searching for NISAR GUNW products in CMR...")
 
     results = search_nisar_granules(
         short_name=NISARCollection.GUNW_BETA_V1_SHORT_NAME,
         provider=NISARCollection.DEFAULT_PROVIDER,
         max_results=max_results,
-        output_format="umm_json"
+        output_format="umm_json",
     )
 
     logger.info(f"Found {len(results)} GUNW products")
     return results
 
 
-def extract_metadata(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extract metadata from CMR search results.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing CMR search results.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing extracted metadata.
-    """
-    logger.info("Extracting metadata from search results...")
-
-    metadata_list = []
-
-    for _, row in df.iterrows():
-        granule_id = row['granule_id']
-        title = row['title']
-
-        # Extract URLs
-        urls = {}
-        for link in row.get('links', []):
-            rel = link.get('rel', '')
-            if rel == 'http://esipfed.org/ns/fedsearch/1.1/data#':
-                if link.get('href', '').startswith('s3://'):
-                    urls['s3_url'] = link.get('href', '')
-                else:
-                    urls['url'] = link.get('href', '')
-            elif rel == 'http://esipfed.org/ns/fedsearch/1.1/browse#':
-                urls['browse_url'] = link.get('href', '')
-            elif rel == 'http://esipfed.org/ns/fedsearch/1.1/metadata#':
-                urls['metadata_url'] = link.get('href', '')
-
-        # Try to extract filename information
-        try:
-            filename_obj = GUNWFilename.from_path(title)
-
-            metadata = {
-                'id': title.replace('.h5', ''),  # Use filename without extension as ID
-                'granule_id': granule_id,
-                **urls,
-                **filename_obj.to_dataframe().iloc[0].to_dict(),
-                'inserted_at': datetime.now(timezone.utc)
-            }
-
-            metadata_list.append(metadata)
-        except Exception as e:
-            logger.warning(f"Could not extract metadata from {title}: {e}")
-
-    metadata_df = pd.DataFrame(metadata_list)
-    logger.info(f"Extracted metadata from {len(metadata_df)} products")
-    return metadata_df
-
-
-def update_database(conn: duckdb.DuckDBPyConnection, metadata_df: pd.DataFrame) -> None:
-    """
-    Update the database with metadata.
-
-    Parameters
-    ----------
-    conn : duckdb.DuckDBPyConnection
-        Connection to the DuckDB database.
-    metadata_df : pd.DataFrame
-        DataFrame containing metadata.
-    """
-    logger.info("Updating database with metadata...")
-
-    # Insert new rows
-    conn.execute("""
-    INSERT OR REPLACE INTO gunw_products
-    SELECT * FROM metadata_df
-    """)
-
-    conn.commit()
-
-    # Check how many rows were inserted
-    count = conn.execute("SELECT COUNT(*) FROM gunw_products").fetchone()[0]
-    logger.info(f"Database now contains {count} GUNW products")
-
-
-def generate_catalog_json(conn: duckdb.DuckDBPyConnection, output_dir: str) -> None:
-    """
-    Generate catalog JSON files similar to burst_db.
-
-    Parameters
-    ----------
-    conn : duckdb.DuckDBPyConnection
-        Connection to the DuckDB database.
-    output_dir : str
-        Directory to save JSON files.
-    """
+def generate_catalog_json(conn, output_dir: str) -> None:
+    """Generate GUNW catalog JSON files similar to burst_db."""
     logger.info("Generating catalog JSON files...")
 
-    # Create output directory if it doesn't exist
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-
-    # Generate track catalog
-    tracks_df = conn.execute("""
-    SELECT DISTINCT track, pass_direction
-    FROM gunw_products
-    ORDER BY track::INTEGER, pass_direction
-    """).fetchdf()
-
-    tracks = {}
-    for _, row in tracks_df.iterrows():
-        track = row['track']
-        pass_direction = row['pass_direction']
-
-        if track not in tracks:
-            tracks[track] = []
-
-        tracks[track].append(pass_direction)
-
-    # Save track catalog
-    with open(os.path.join(output_dir, 'gunw_tracks.json'), 'w') as f:
-        json.dump({
-            'tracks': tracks,
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }, f, indent=2)
-
-    # Generate frames catalog
-    frames_df = conn.execute("""
-    SELECT DISTINCT track, frame, pass_direction
-    FROM gunw_products
-    ORDER BY track::INTEGER, frame::INTEGER, pass_direction
-    """).fetchdf()
-
-    frames = {}
-    for _, row in frames_df.iterrows():
-        track = row['track']
-        frame = row['frame']
-        pass_direction = row['pass_direction']
-
-        key = f"T{track}_{pass_direction}"
-        if key not in frames:
-            frames[key] = []
-
-        frames[key].append(frame)
-
-    # Save frames catalog
-    with open(os.path.join(output_dir, 'gunw_frames.json'), 'w') as f:
-        json.dump({
-            'frames': frames,
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }, f, indent=2)
+    # Shared tracks/frames catalogs
+    generate_track_frame_json(conn, TABLE, output_dir, prefix="gunw")
 
     # Generate interferogram pairs catalog
     pairs_df = conn.execute("""
@@ -282,30 +101,17 @@ def generate_catalog_json(conn: duckdb.DuckDBPyConnection, output_dir: str) -> N
     ORDER BY track::INTEGER, frame::INTEGER, pass_direction, ref_date, sec_date
     """).fetchdf()
 
-    pairs = {}
+    pairs: dict[str, list[dict]] = {}
     for _, row in pairs_df.iterrows():
-        track = row['track']
-        frame = row['frame']
-        pass_direction = row['pass_direction']
-        ref_date = row['ref_date']
-        sec_date = row['sec_date']
-
-        key = f"T{track}_F{frame}_{pass_direction}"
-        if key not in pairs:
-            pairs[key] = []
-
-        pairs[key].append({
-            'ref_date': ref_date,
-            'sec_date': sec_date,
-            'pair': row['date']
-        })
-
-    # Save pairs catalog
-    with open(os.path.join(output_dir, 'gunw_pairs.json'), 'w') as f:
-        json.dump({
-            'pairs': pairs,
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }, f, indent=2)
+        key = f"T{row['track']}_F{row['frame']}_{row['pass_direction']}"
+        pairs.setdefault(key, []).append(
+            {
+                "ref_date": row["ref_date"],
+                "sec_date": row["sec_date"],
+                "pair": row["date"],
+            }
+        )
+    write_catalog_json(output_dir, "gunw_pairs.json", "pairs", pairs)
 
     # Generate interferograms catalog
     ifgs_df = conn.execute("""
@@ -324,93 +130,95 @@ def generate_catalog_json(conn: duckdb.DuckDBPyConnection, output_dir: str) -> N
         browse_url,
         metadata_url
     FROM gunw_products
-    ORDER BY track::INTEGER, frame::INTEGER, pass_direction, ref_date, sec_date, polarization
+    ORDER BY track::INTEGER, frame::INTEGER, pass_direction,
+             ref_date, sec_date, polarization
     """).fetchdf()
 
     ifgs = {}
     for _, row in ifgs_df.iterrows():
-        track = row['track']
-        frame = row['frame']
-        pass_direction = row['pass_direction']
-        ref_date = row['ref_date']
-        sec_date = row['sec_date']
-        date = row['date']
-        polarization = row['polarization']
+        track = row["track"]
+        frame = row["frame"]
+        pass_direction = row["pass_direction"]
+        ref_date = row["ref_date"]
+        sec_date = row["sec_date"]
+        date = row["date"]
+        polarization = row["polarization"]
 
         scene_id = f"T{track}_F{frame}_{pass_direction}"
         ifg_key = f"{scene_id}_{date}"
 
         if ifg_key not in ifgs:
             ifgs[ifg_key] = {
-                'scene_id': scene_id,
-                'track': track,
-                'frame': frame,
-                'pass_direction': pass_direction,
-                'ref_date': ref_date,
-                'sec_date': sec_date,
-                'date': date,
-                'polarizations': {},
-                'granule_ids': []
+                "scene_id": scene_id,
+                "track": track,
+                "frame": frame,
+                "pass_direction": pass_direction,
+                "ref_date": ref_date,
+                "sec_date": sec_date,
+                "date": date,
+                "polarizations": {},
+                "granule_ids": [],
             }
 
-        ifgs[ifg_key]['polarizations'][polarization] = {
-            'id': row['id'],
-            'granule_id': row['granule_id'],
-            'url': row['url'],
-            's3_url': row['s3_url'],
-            'browse_url': row['browse_url'],
-            'metadata_url': row['metadata_url']
+        ifgs[ifg_key]["polarizations"][polarization] = {
+            "id": row["id"],
+            "granule_id": row["granule_id"],
+            "url": row["url"],
+            "s3_url": row["s3_url"],
+            "browse_url": row["browse_url"],
+            "metadata_url": row["metadata_url"],
         }
 
-        if row['granule_id'] not in ifgs[ifg_key]['granule_ids']:
-            ifgs[ifg_key]['granule_ids'].append(row['granule_id'])
+        if row["granule_id"] not in ifgs[ifg_key]["granule_ids"]:
+            ifgs[ifg_key]["granule_ids"].append(row["granule_id"])
 
-    # Save interferograms catalog
-    with open(os.path.join(output_dir, 'gunw_interferograms.json'), 'w') as f:
-        json.dump({
-            'interferograms': list(ifgs.values()),
-            'generated_at': datetime.now(timezone.utc).isoformat()
-        }, f, indent=2)
+    write_catalog_json(
+        output_dir, "gunw_interferograms.json", "interferograms", list(ifgs.values())
+    )
 
     logger.info(f"Generated catalog JSON files in {output_dir}")
 
 
 def main():
-    """Main function to create GUNW catalog."""
-    parser = argparse.ArgumentParser(description="Create a catalog of NISAR GUNW products")
+    """Create the GUNW catalog (DuckDB + JSON) from the command line."""
+    parser = argparse.ArgumentParser(
+        description="Create a catalog of NISAR GUNW products"
+    )
 
-    parser.add_argument("--db-path", default="gunw_catalog.duckdb",
-                        help="Path to the DuckDB database file")
-    parser.add_argument("--output-dir", default="catalog",
-                        help="Directory to save JSON files")
-    parser.add_argument("--max-results", type=int, default=25000,
-                        help="Maximum number of results to return from CMR search")
+    parser.add_argument(
+        "--db-path",
+        default="gunw_catalog.duckdb",
+        help="Path to the DuckDB database file",
+    )
+    parser.add_argument(
+        "--output-dir", default="catalog", help="Directory to save JSON files"
+    )
+    parser.add_argument(
+        "--max-results",
+        type=int,
+        default=25000,
+        help="Maximum number of results to return from CMR search",
+    )
 
     args = parser.parse_args()
 
     # Create or connect to the database
-    conn = create_database(args.db_path)
+    conn = create_database(args.db_path, TABLE, _SCHEMA)
 
     try:
-        # Search for GUNW products
         results_df = search_gunw_products(max_results=args.max_results)
 
         if len(results_df) > 0:
-            # Extract metadata
-            metadata_df = extract_metadata(results_df)
-
-            # Update database
-            update_database(conn, metadata_df)
-
-            # Generate catalog JSON files
+            metadata_df = extract_metadata(results_df, GUNWFilename, logger)
+            update_database(conn, metadata_df, TABLE, logger)
             generate_catalog_json(conn, args.output_dir)
         else:
             logger.warning("No GUNW products found")
-
-        return 0
-    except Exception as e:
-        logger.error(f"Error creating GUNW catalog: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error creating GUNW catalog")
         return 1
+    else:
+        return 0
     finally:
         conn.close()
 

@@ -1,0 +1,1093 @@
+#!/usr/bin/env python
+"""Generate a self-contained HTML viewer for the NISAR OPERA (North America) scope.
+
+The viewer is a single offline HTML file (MapLibre GL is vendored under
+``scripts/vendor/``) that draws every OPERA NISAR-DISP frame and joins in the
+GSLC catalog so each frame carries:
+
+* the number of GSLC granules present in CMR (``gslc_count``),
+* the *consistent* observation mode / coverage chosen for DISP time series
+  (``cons_mode`` / ``cons_cov``, following the same voting rule as
+  :mod:`nisar_db.consistent_gslc`), and
+* the full granule list, surfaced in a click-to-open popup.
+
+It is intentionally a design sibling of ``scripts/nisar_frame_viewer_v1.html``
+(same look and controls) with these deliberate differences:
+
+* globe (global) projection is the default at start,
+* frames can be colored by GSLC count or by consistent mode / coverage,
+* hovering a frame shows a summary and clicking it lists the granules,
+* a live "Consistent Mode Summary" panel aggregates the shown frames,
+* the solid-earth CalVal site boxes are dropped, and
+* selected frames can be imported from a CSV, a GeoJSON, or a consistent-GSLC
+  catalog JSON (the output of ``nisar-db create-consistent``).
+
+Examples
+--------
+Build the viewer from the notebook artifacts::
+
+    python scripts/generate_scope_viewer.py \\
+        --frames-gpkg notebooks/opera-nisar-disp-frames.gpkg \\
+        --gslc-db notebooks/gslc_catalog.duckdb \\
+        --output scripts/nisar_scope_viewer.html
+
+Drive the consistent-mode fields from a published catalog instead of
+recomputing them::
+
+    python scripts/generate_scope_viewer.py \\
+        --frames-gpkg notebooks/opera-nisar-disp-frames.gpkg \\
+        --gslc-db notebooks/gslc_catalog.duckdb \\
+        --consistent-json opera-nisar-disp-consistent-gslc-20260724.json \\
+        --output scripts/nisar_scope_viewer.html
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import zipfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+import duckdb
+import geopandas as gpd
+import pandas as pd
+
+# Same standard science modes used by ``nisar_db.consistent_gslc`` /
+# ``nisar_db.modes``; kept local so the generator runs without importing the
+# package (the notebooks env may not have it installed).
+STANDARD_MODES = {"4005", "2005"}
+
+VENDOR_DIR = Path(__file__).resolve().parent / "vendor"
+
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+def load_frames(gpkg_path: Path) -> gpd.GeoDataFrame:
+    """Load the OPERA frame polygons in EPSG:4326.
+
+    Parameters
+    ----------
+    gpkg_path : Path
+        Path to ``opera-nisar-disp-frames.gpkg``.
+
+    Returns
+    -------
+    geopandas.GeoDataFrame
+        Frames in lon/lat with a single-letter ``direction`` column added.
+
+    """
+    gdf = gpd.read_file(gpkg_path)
+    if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+        gdf = gdf.to_crs(4326)
+    gdf["direction"] = gdf["passDirection"].str[0]
+    return gdf
+
+
+def load_gslc_catalog(db_path: Path) -> pd.DataFrame:
+    """Read the GSLC product catalog from the DuckDB store.
+
+    Returns one row per granule with the columns needed to summarize a frame.
+    """
+    con = duckdb.connect(str(db_path), read_only=True)
+    try:
+        df = con.execute("""
+            SELECT track, frame, direction, mode, coverage, polarization,
+                   cycle, granule_id, start_datetime
+            FROM products
+            """).fetchdf()
+    finally:
+        con.close()
+    df["date"] = pd.to_datetime(df["start_datetime"]).dt.strftime("%Y-%m-%d")
+    return df
+
+
+def load_consistent_json(path: Path) -> dict[str, dict]:
+    """Load a consistent-GSLC catalog (plain ``.json`` or ``.json.zip``).
+
+    Returns the ``data`` mapping keyed by ``frame_idx`` (as string), matching
+    the schema written by :mod:`nisar_db.consistent_gslc`.
+    """
+    if path.suffix == ".zip" or zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as zf:
+            inner = next(n for n in zf.namelist() if n.endswith(".json"))
+            payload = json.loads(zf.read(inner))
+    else:
+        payload = json.loads(path.read_text())
+    return payload.get("data", payload)
+
+
+# ---------------------------------------------------------------------------
+# Consistent-mode voting (mirrors nisar_db.consistent_gslc._common_mode_coverage)
+# ---------------------------------------------------------------------------
+def common_mode_coverage(group: pd.DataFrame) -> tuple[str, str]:
+    """Return the ``(common_mode, common_coverage)`` for one frame's granules.
+
+    Priority, identical to :func:`nisar_db.consistent_gslc._common_mode_coverage`:
+
+    1. standard science modes (``4005``/``2005``) vote before others,
+    2. the most frequent mode wins (total F+P count),
+    3. on a mode-count tie, the mode with more full-frame (``F``) acquisitions
+       wins, and
+    4. within the winning mode, ``F`` beats ``P`` on a tie.
+    """
+    combos = group.groupby(["mode", "coverage"]).size().reset_index(name="n")
+    standard = combos[combos["mode"].isin(STANDARD_MODES)]
+    candidates = standard if not standard.empty else combos
+
+    per_mode = (
+        candidates.assign(n_F=lambda d: d["n"].where(d["coverage"] == "F", 0))
+        .groupby("mode")
+        .agg(total=("n", "sum"), n_F=("n_F", "sum"))
+        .reset_index()
+    )
+    per_mode["rank"] = per_mode["mode"].apply(lambda m: 0 if m in STANDARD_MODES else 1)
+    per_mode = per_mode.sort_values(
+        ["total", "n_F", "rank"], ascending=[False, False, True]
+    )
+    winning_mode = per_mode.iloc[0]["mode"]
+
+    mode_rows = combos[combos["mode"] == winning_mode].set_index("coverage")["n"]
+    n_f = int(mode_rows.get("F", 0))
+    n_p = int(mode_rows.get("P", 0))
+    winning_coverage = "F" if n_f >= n_p else "P"
+    return winning_mode, winning_coverage
+
+
+def summarize_frame(group: pd.DataFrame) -> dict:
+    """Compute per-frame catalog stats and the consistent (mode, coverage)."""
+    cons_mode, cons_cov = common_mode_coverage(group)
+    granules = (
+        group.sort_values("start_datetime")[
+            ["granule_id", "date", "mode", "coverage", "polarization", "cycle"]
+        ]
+        .rename(columns={"granule_id": "gid", "coverage": "cov", "polarization": "pol"})
+        .to_dict("records")
+    )
+    return {
+        "gslc_count": int(len(group)),
+        "n_modes": int(group["mode"].nunique()),
+        "n_full": int((group["coverage"] == "F").sum()),
+        "n_partial": int((group["coverage"] == "P").sum()),
+        "cons_mode": cons_mode,
+        "cons_cov": cons_cov,
+        "gslc_modes": sorted(group["mode"].dropna().unique().tolist()),
+        "gslc_pols": sorted(group["polarization"].dropna().unique().tolist()),
+        "granules": granules,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Feature building
+# ---------------------------------------------------------------------------
+def build_frame_data(
+    gdf: gpd.GeoDataFrame,
+    catalog: pd.DataFrame,
+    consistent: dict[str, dict] | None,
+) -> dict:
+    """Assemble the frames ``FeatureCollection`` embedded in the viewer."""
+    stats = {
+        key: summarize_frame(grp)
+        for key, grp in catalog.groupby(["track", "frame", "direction"])
+    }
+
+    features = []
+    for _, row in gdf.iterrows():
+        key = (int(row["track"]), int(row["frame"]), row["direction"])
+        s = stats.get(key)
+        frame_idx = int(row["frame_idx"])
+
+        props = {
+            "id": f"{int(row['track'])}_{int(row['frame'])}",
+            "frame_idx": frame_idx,
+            "track": int(row["track"]),
+            "frame": int(row["frame"]),
+            "passDirection": row["passDirection"],
+            "isCalVal": bool(row["isCalVal"]),
+            "isSNWG": bool(row["isSNWG"]),
+            "isDNC": bool(row["isDNC"]),
+            "gslc_count": s["gslc_count"] if s else 0,
+            "n_modes": s["n_modes"] if s else 0,
+            "n_full": s["n_full"] if s else 0,
+            "n_partial": s["n_partial"] if s else 0,
+            "cons_mode": s["cons_mode"] if s else "none",
+            "cons_cov": s["cons_cov"] if s else "none",
+            "gslc_modes": s["gslc_modes"] if s else [],
+            "gslc_pols": s["gslc_pols"] if s else [],
+            "granules": s["granules"] if s else [],
+        }
+
+        # A published consistent-GSLC catalog wins over the recomputed choice.
+        if consistent is not None:
+            entry = consistent.get(str(frame_idx))
+            if entry is not None:
+                props["cons_mode"] = entry.get("common_mode", props["cons_mode"])
+                props["cons_cov"] = entry.get("common_coverage", props["cons_cov"])
+                props["n_consistent"] = len(entry.get("sensing_time_list", []))
+                props["in_consistent"] = True
+            else:
+                props["n_consistent"] = 0
+                props["in_consistent"] = False
+
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": row["geometry"].__geo_interface__,
+                "properties": props,
+            }
+        )
+
+    return {"type": "FeatureCollection", "features": features}
+
+
+# ---------------------------------------------------------------------------
+# HTML rendering
+# ---------------------------------------------------------------------------
+def render_html(frame_data: dict, meta: dict) -> str:
+    """Render the full self-contained HTML document as a string."""
+    maplibre_css = (VENDOR_DIR / "maplibre-gl.css").read_text()
+    maplibre_js = (VENDOR_DIR / "maplibre-gl.js").read_text()
+
+    data_js = (
+        "const FRAME_DATA = "
+        + json.dumps(frame_data, separators=(",", ":"))
+        + ";\nconst META = "
+        + json.dumps(meta, separators=(",", ":"))
+        + ";"
+    )
+
+    return (
+        '<!DOCTYPE html>\n<html lang="en">\n<head>\n'
+        '<meta charset="UTF-8">\n'
+        f"<title>{meta['title']}</title>\n"
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        f"<style>{maplibre_css}</style>\n"
+        f"<style>{APP_CSS}</style>\n"
+        "</head>\n"
+        f"{BODY_HTML}\n"
+        f"<script>{maplibre_js}</script>\n"
+        f"<script>{data_js}</script>\n"
+        f"<script>{APP_JS}</script>\n"
+        "</body>\n</html>\n"
+    )
+
+
+APP_CSS = r"""
+  :root{
+    --bg:#0f1418; --panel:#161c22; --panel2:#1d252c; --border:#2a333b;
+    --text:#e8edf2; --text-dim:#9aa7b2; --accent:#4da3ff; --accent2:#ff8a4d;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  #app{display:flex;height:100vh;width:100vw;overflow:hidden;}
+  #sidebar{width:340px;min-width:340px;background:var(--panel);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;height:100%;overflow:hidden;}
+  #sidebar-scroll{overflow-y:auto;flex:1;padding:12px 14px 8px 14px;}
+  #map{flex:1;position:relative;}
+  h1{font-size:15px;margin:0;padding:14px 14px 10px 14px;border-bottom:1px solid var(--border);font-weight:600;}
+  h1 small{display:block;font-weight:400;color:var(--text-dim);font-size:11px;margin-top:2px;}
+  .section{margin-bottom:14px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);}
+  .section-head{padding:8px 10px;font-size:12px;font-weight:600;letter-spacing:.3px;color:var(--text-dim);
+    text-transform:uppercase;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;}
+  .section-body{padding:0 10px 10px 10px;font-size:12.5px;}
+  .section.collapsed .section-body{display:none;}
+  .chev{transition:transform .15s;font-size:10px;}
+  .section.collapsed .chev{transform:rotate(-90deg);}
+  label{display:block;margin:6px 0 3px 0;color:var(--text-dim);font-size:11px;}
+  input[type=text], select{
+    width:100%;background:#0f1418;border:1px solid var(--border);color:var(--text);
+    border-radius:5px;padding:5px 7px;font-size:12.5px;
+  }
+  .row{display:flex;gap:6px;}
+  .row > *{flex:1;}
+  .radio-group{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;}
+  .radio-group label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;font-size:12px;}
+  .chip-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;max-height:130px;overflow-y:auto;padding:2px;}
+  .chip{border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;
+    background:#0f1418;color:var(--text-dim);user-select:none;}
+  .chip.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .check-row{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:12px;}
+  .check-row input{width:auto;}
+  .stat-line{color:var(--text-dim);font-size:11px;margin-top:6px;}
+  .btn{background:#0f1418;border:1px solid var(--border);color:var(--text);border-radius:5px;
+    padding:6px 10px;font-size:12px;cursor:pointer;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#08131f;font-weight:600;}
+  .btn.primary:hover{filter:brightness(1.08);color:#08131f;}
+  .btn.small{padding:3px 7px;font-size:11px;}
+  .btn.danger:hover{border-color:#ff5d5d;color:#ff5d5d;}
+  #palette{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center;}
+  .swatch{width:20px;height:20px;border-radius:4px;cursor:pointer;border:2px solid transparent;}
+  .swatch.selected{border-color:#fff;}
+  #custom-color{width:28px;height:22px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;}
+  #selected-list{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;}
+  #selected-list li{display:flex;align-items:center;gap:6px;padding:5px 4px;border-bottom:1px solid var(--border);font-size:11.5px;}
+  #selected-list li:hover{background:#0f1418;}
+  .li-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;cursor:pointer;}
+  .li-label{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .li-label .sub{color:var(--text-dim);}
+  .li-x{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:13px;padding:0 3px;}
+  .li-x:hover{color:#ff5d5d;}
+  .footer-actions{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
+  #top-hint{position:absolute;top:10px;left:10px;background:rgba(15,20,24,.85);color:var(--text-dim);
+    font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);pointer-events:none;z-index:5;}
+  #basemap-ctrl{position:absolute;top:10px;right:10px;background:rgba(15,20,24,.9);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
+  #basemap-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
+  .maplibregl-popup-content{background:#161c22;color:var(--text);font-size:12px;border-radius:6px;padding:8px 10px;}
+  .maplibregl-popup-tip{border-top-color:#161c22 !important;border-bottom-color:#161c22 !important;}
+  .maplibregl-ctrl-attrib{font-size:10px;}
+  .pop-title{font-weight:600;margin-bottom:3px;}
+  .pop-row{color:var(--text-dim);}
+  .granule-list{max-height:220px;overflow-y:auto;margin-top:6px;border-top:1px solid var(--border);padding-top:4px;}
+  .granule-row{font-size:10.5px;color:var(--text-dim);padding:2px 0;border-bottom:1px solid rgba(42,51,59,.5);font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .granule-row .gdate{color:var(--text);}
+  .granule-row .gmode{color:var(--accent2);}
+  .summary-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .stat-tile{flex:1;min-width:70px;background:#0f1418;border:1px solid var(--border);border-radius:6px;padding:6px 8px;}
+  .stat-tile .num{font-size:16px;font-weight:700;color:var(--text);}
+  .stat-tile .cap{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;}
+  .bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11px;}
+  .bar-row .bl{width:64px;color:var(--text-dim);flex-shrink:0;}
+  .bar-track{flex:1;height:10px;background:#0f1418;border-radius:5px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:5px;}
+  .bar-row .bn{width:34px;text-align:right;color:var(--text);flex-shrink:0;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#2a333b;border-radius:4px;}
+  #count-badge{background:var(--accent);color:#08131f;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;}
+"""
+
+
+BODY_HTML = r"""<body>
+<div id="app">
+  <div id="sidebar">
+    <h1>OPERA NISAR-DB Viewer
+      <small>North America &middot; <span id="hdr-count">0</span> frames shown</small>
+    </h1>
+    <div id="sidebar-scroll">
+
+      <div class="section">
+        <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-loc">
+          <label>Track (e.g. "12" or "10-20" or "12,34,56")</label>
+          <input type="text" id="f-track" placeholder="all tracks">
+          <label>Frame</label>
+          <input type="text" id="f-frame" placeholder="all frames">
+          <label>Frame ID (track_frame, e.g. 34_19)</label>
+          <input type="text" id="f-id" placeholder="e.g. 34_19">
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-pass"><span>Pass Direction</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-pass">
+          <div class="radio-group" id="f-pass">
+            <label><input type="radio" name="pass" value="all" checked> All</label>
+            <label><input type="radio" name="pass" value="Ascending"> Ascending</label>
+            <label><input type="radio" name="pass" value="Descending"> Descending</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-style"><span>Frame Color / Opacity</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-style">
+          <label>Color frames by</label>
+          <select id="color-by">
+            <option value="passDirection" selected>Pass Direction (default)</option>
+            <option value="gslc_count">GSLC count in CMR</option>
+            <option value="cons_mode">Consistent mode</option>
+            <option value="cons_cov">Consistent coverage (full/partial)</option>
+            <option value="n_modes">Distinct modes per frame</option>
+            <option value="gslc_modes">GSLC mode (first)</option>
+            <option value="gslc_pols">GSLC polarization (first)</option>
+          </select>
+          <label>Fill opacity (<span id="opacity-val">32</span>%)</label>
+          <input type="range" id="fill-opacity" min="0" max="100" value="32">
+          <button class="btn small" id="btn-reset-style" style="margin-top:8px;">Reset to default</button>
+          <div id="colorby-legend" style="margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-flags"><span>Product / Site Flags</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-flags">
+          <div class="check-row"><input type="checkbox" id="f-calval"><label for="f-calval" style="margin:0;color:var(--text)">CalVal frames only</label></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-gslc"><span>GSLC Mode / Polarization</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-gslc">
+          <label>Mode (click to toggle)</label>
+          <div class="chip-grid" id="chips-gslc-mode"></div>
+          <label>Polarization</label>
+          <div class="chip-grid" id="chips-gslc-pol"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-cons"><span>Consistent Mode Summary</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-cons">
+          <div class="stat-line">Consistent (mode, coverage) chosen per frame for DISP time series, aggregated over the frames currently shown.</div>
+          <div id="cons-summary"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-paint"><span>Paint / Select Frames</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-paint">
+          <div id="palette"></div>
+          <div class="stat-line">Click a frame on the map to open its granule list and add/remove it from your selection with this color.</div>
+          <label style="margin-top:8px;">Import selection (CSV / GeoJSON / consistent-GSLC JSON)</label>
+          <input type="file" id="import-file" accept=".csv,.json,.geojson" style="font-size:11px;color:var(--text-dim);">
+          <div class="stat-line" id="import-status">CSV needs <code>track,frame</code> columns (optional <code>color</code>). GeoJSON matches on <code>track/frame</code> or <code>id</code>. A consistent-GSLC JSON selects every frame in its <code>data</code> block.</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-sel"><span>Selected List <span id="count-badge">0</span></span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-sel">
+          <ul id="selected-list"></ul>
+          <div class="stat-line" id="empty-sel-hint">No frames selected yet.</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="footer-actions">
+      <button class="btn" id="btn-clear-filters">Reset filters</button>
+      <button class="btn danger" id="btn-clear-sel">Clear selection</button>
+      <button class="btn primary" id="btn-export-csv">Export CSV</button>
+      <button class="btn primary" id="btn-export-geojson">Export GeoJSON</button>
+    </div>
+  </div>
+  <div id="map">
+    <div id="top-hint">Hover a frame for a summary &middot; click to list granules &amp; select</div>
+    <div id="basemap-ctrl">
+      <label><input type="radio" name="basemap" value="light" checked> Light</label>
+      <label><input type="radio" name="basemap" value="dark"> Dark</label>
+      <label><input type="radio" name="basemap" value="sat"> Satellite</label>
+    </div>
+  </div>
+</div>
+"""
+
+
+APP_JS = r"""
+(function(){
+  const PALETTE = ["#ff5d5d","#ff8a4d","#ffd24d","#7ee787","#4dd2c9","#4da3ff","#a389ff","#ff6fc7","#ffffff"];
+  let currentColor = PALETTE[0];
+  let applyColorBy = function(){};   // reassigned after map layers exist
+  let refreshSummary = function(){}; // reassigned after DOM ready
+  const selected = new Map();        // id -> {feature, color}
+
+  // ---------- derive filter option lists ----------
+  function uniqSorted(arr){ return Array.from(new Set(arr)).sort(); }
+  const allModesGslc = uniqSorted(FRAME_DATA.features.flatMap(f => f.properties.gslc_modes));
+  const allPolsGslc  = uniqSorted(FRAME_DATA.features.flatMap(f => f.properties.gslc_pols));
+  const activeChips = { gslcMode:new Set(), gslcPol:new Set() };
+
+  // Single-value derived keys for the array-valued mode/pol properties.
+  FRAME_DATA.features.forEach(f=>{
+    const p = f.properties;
+    p._gslcMode = p.gslc_modes.length ? p.gslc_modes[0] : "none";
+    p._gslcPol  = p.gslc_pols.length  ? p.gslc_pols[0]  : "none";
+  });
+
+  // ---------- color-by support ----------
+  const CAT_PALETTE = ["#4da3ff","#ff8a4d","#7ee787","#ff5d5d","#a389ff","#ffd24d","#4dd2c9","#ff6fc7",
+                       "#f0b429","#6ee7b7","#93c5fd","#fca5a5","#c4b5fd","#fda4af","#86efac","#fcd34d"];
+  // Sequential ramp (low -> high) for numeric color-by fields.
+  const SEQ_PALETTE = ["#2c7bb6","#00a6ca","#00ccbc","#90eb9d","#ffff8c","#f9d057","#f29e2e","#e76818","#d7191c"];
+
+  const COLOR_BY_FIELDS = {
+    passDirection: { label:"Pass Direction",      key:"passDirection", kind:"cat" },
+    gslc_count:    { label:"GSLC count in CMR",    key:"gslc_count",    kind:"num" },
+    cons_mode:     { label:"Consistent mode",      key:"cons_mode",     kind:"cat" },
+    cons_cov:      { label:"Consistent coverage",  key:"cons_cov",      kind:"cat" },
+    n_modes:       { label:"Distinct modes",       key:"n_modes",       kind:"num" },
+    gslc_modes:    { label:"GSLC mode",            key:"_gslcMode",     kind:"cat" },
+    gslc_pols:     { label:"GSLC polarization",    key:"_gslcPol",      kind:"cat" }
+  };
+
+  const baseColorMapsCache = {};
+  function baseColorMap(propKey){
+    if (baseColorMapsCache[propKey]) return baseColorMapsCache[propKey];
+    let m;
+    if (propKey === "passDirection") {
+      m = new Map([["Ascending","#4da3ff"],["Descending","#ff8a4d"]]);
+    } else if (propKey === "cons_cov") {
+      m = new Map([["F","#4da3ff"],["P","#ff8a4d"],["none","#555a61"]]);
+    } else {
+      const vals = uniqSorted(FRAME_DATA.features.map(f=>String(f.properties[propKey])));
+      m = new Map();
+      vals.forEach((v,i)=> m.set(v, v==="none" ? "#555a61" : CAT_PALETTE[i % CAT_PALETTE.length]));
+    }
+    baseColorMapsCache[propKey] = m;
+    return m;
+  }
+
+  function numericStops(propKey){
+    const vals = FRAME_DATA.features.map(f=>Number(f.properties[propKey]));
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    return {lo, hi};
+  }
+
+  function colorExpression(fieldName){
+    const info = COLOR_BY_FIELDS[fieldName];
+    if (info.kind === "num") {
+      const {lo, hi} = numericStops(info.key);
+      const expr = ["interpolate", ["linear"], ["to-number", ["get", info.key]]];
+      if (lo === hi) { return SEQ_PALETTE[Math.floor(SEQ_PALETTE.length/2)]; }
+      SEQ_PALETTE.forEach((col,i)=>{
+        const v = lo + (hi - lo) * (i / (SEQ_PALETTE.length - 1));
+        expr.push(v, col);
+      });
+      return expr;
+    }
+    const cmap = baseColorMap(info.key);
+    const expr = ["match", ["to-string", ["get", info.key]]];
+    cmap.forEach((color, val)=>{ expr.push(val, color); });
+    expr.push("#888888");
+    return expr;
+  }
+
+  function renderColorByLegend(fieldName){
+    const info = COLOR_BY_FIELDS[fieldName];
+    const el = document.getElementById("colorby-legend");
+    el.innerHTML = "";
+    if (info.kind === "num") {
+      const {lo, hi} = numericStops(info.key);
+      const grad = SEQ_PALETTE.join(",");
+      el.innerHTML =
+        `<div style="height:12px;border-radius:4px;background:linear-gradient(90deg,${grad});"></div>`+
+        `<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:2px;">`+
+        `<span>${lo}</span><span>${info.label}</span><span>${hi}</span></div>`;
+      return;
+    }
+    baseColorMap(info.key).forEach((color, val)=>{
+      const row = document.createElement("div");
+      row.className = "check-row"; row.style.margin = "2px 0";
+      row.innerHTML = `<div class="li-swatch" style="background:${color};cursor:default;"></div>`+
+                      `<span style="font-size:11px;color:var(--text-dim)">${val}</span>`;
+      el.appendChild(row);
+    });
+  }
+
+  // ---------- filter chips ----------
+  function buildChips(containerId, values, chipSet){
+    const el = document.getElementById(containerId);
+    el.innerHTML = "";
+    values.forEach(v=>{
+      const c = document.createElement("div");
+      c.className = "chip"; c.textContent = v;
+      c.onclick = ()=>{
+        if (chipSet.has(v)) { chipSet.delete(v); c.classList.remove("active"); }
+        else { chipSet.add(v); c.classList.add("active"); }
+        applyFilters();
+      };
+      el.appendChild(c);
+    });
+  }
+  buildChips("chips-gslc-mode", allModesGslc, activeChips.gslcMode);
+  buildChips("chips-gslc-pol", allPolsGslc, activeChips.gslcPol);
+
+  // ---------- palette ----------
+  const paletteEl = document.getElementById("palette");
+  function renderPalette(){
+    paletteEl.innerHTML = "";
+    PALETTE.forEach(col=>{
+      const sw = document.createElement("div");
+      sw.className = "swatch" + (col===currentColor ? " selected" : "");
+      sw.style.background = col;
+      sw.onclick = ()=>{ currentColor = col; renderPalette(); };
+      paletteEl.appendChild(sw);
+    });
+    const custom = document.createElement("input");
+    custom.type = "color"; custom.id = "custom-color"; custom.value = currentColor;
+    custom.oninput = (e)=>{ currentColor = e.target.value; renderPalette(); };
+    paletteEl.appendChild(custom);
+  }
+  renderPalette();
+
+  // ---------- collapsible sections ----------
+  document.querySelectorAll(".section-head").forEach(h=>{
+    h.addEventListener("click", ()=>{ h.parentElement.classList.toggle("collapsed"); });
+  });
+
+  // ---------- track/frame text filters ----------
+  function parseIntSet(text){
+    text = text.trim();
+    if (!text) return null;
+    const out = new Set();
+    text.split(",").forEach(part=>{
+      part = part.trim();
+      if (!part) return;
+      if (part.includes("-")) {
+        const [a,b] = part.split("-").map(s=>parseInt(s.trim(),10));
+        if (!isNaN(a) && !isNaN(b)) { for(let i=Math.min(a,b); i<=Math.max(a,b); i++) out.add(i); }
+      } else {
+        const n = parseInt(part,10);
+        if (!isNaN(n)) out.add(n);
+      }
+    });
+    return out;
+  }
+  function matchesArrayFilter(propArr, chipSet){
+    if (chipSet.size === 0) return true;
+    return propArr.some(v => chipSet.has(v));
+  }
+
+  function currentFiltered(){
+    const trackSet = parseIntSet(document.getElementById("f-track").value);
+    const frameSet = parseIntSet(document.getElementById("f-frame").value);
+    const idFilter = document.getElementById("f-id").value.trim().toLowerCase();
+    const passVal = document.querySelector('input[name="pass"]:checked').value;
+    const calval = document.getElementById("f-calval").checked;
+    return FRAME_DATA.features.filter(f=>{
+      const p = f.properties;
+      if (trackSet && !trackSet.has(p.track)) return false;
+      if (frameSet && !frameSet.has(p.frame)) return false;
+      if (idFilter && !p.id.toLowerCase().includes(idFilter)) return false;
+      if (passVal !== "all" && p.passDirection !== passVal) return false;
+      if (calval && !p.isCalVal) return false;
+      if (!matchesArrayFilter(p.gslc_modes, activeChips.gslcMode)) return false;
+      if (!matchesArrayFilter(p.gslc_pols, activeChips.gslcPol)) return false;
+      return true;
+    });
+  }
+
+  function applyFilters(){
+    const filtered = currentFiltered();
+    if (map.getSource("frames")) {
+      map.getSource("frames").setData({type:"FeatureCollection", features: filtered});
+    }
+    document.getElementById("hdr-count").textContent = filtered.length;
+    refreshSummary(filtered);
+  }
+
+  ["f-track","f-frame","f-id"].forEach(id=>document.getElementById(id).addEventListener("input", applyFilters));
+  document.querySelectorAll('input[name="pass"]').forEach(r=>r.addEventListener("change", applyFilters));
+  ["f-calval"].forEach(id=>document.getElementById(id).addEventListener("change", applyFilters));
+
+  document.getElementById("btn-clear-filters").addEventListener("click", ()=>{
+    document.getElementById("f-track").value = "";
+    document.getElementById("f-frame").value = "";
+    document.getElementById("f-id").value = "";
+    document.querySelector('input[name="pass"][value="all"]').checked = true;
+    ["f-calval"].forEach(id=>document.getElementById(id).checked=false);
+    Object.values(activeChips).forEach(s=>s.clear());
+    document.querySelectorAll(".chip.active").forEach(c=>c.classList.remove("active"));
+    applyFilters();
+  });
+
+  // ---------- consistent-mode summary ----------
+  refreshSummary = function(features){
+    const el = document.getElementById("cons-summary");
+    const n = features.length;
+    if (!n) { el.innerHTML = `<div class="stat-line">No frames shown.</div>`; return; }
+    let full=0, partial=0, mixed=0, withGslc=0;
+    const modeCounts = {};
+    features.forEach(f=>{
+      const p = f.properties;
+      if (p.gslc_count > 0) withGslc++;
+      if (p.cons_cov === "F") full++;
+      else if (p.cons_cov === "P") partial++;
+      if (p.n_modes > 1) mixed++;
+      const key = (p.cons_mode && p.cons_mode !== "none") ? p.cons_mode : "none";
+      modeCounts[key] = (modeCounts[key] || 0) + 1;
+    });
+    const modeEntries = Object.entries(modeCounts).sort((a,b)=>b[1]-a[1]);
+    const maxN = Math.max(...modeEntries.map(e=>e[1]));
+    const cmap = baseColorMap("cons_mode");
+
+    let html = `<div class="summary-grid">
+      <div class="stat-tile"><div class="num">${n}</div><div class="cap">frames</div></div>
+      <div class="stat-tile"><div class="num">${modeEntries.filter(e=>e[0]!=="none").length}</div><div class="cap">modes</div></div>
+      <div class="stat-tile"><div class="num">${withGslc}</div><div class="cap">with GSLC</div></div>
+    </div>
+    <div class="summary-grid">
+      <div class="stat-tile"><div class="num">${full}</div><div class="cap">full frame</div></div>
+      <div class="stat-tile"><div class="num">${partial}</div><div class="cap">partial</div></div>
+      <div class="stat-tile"><div class="num">${mixed}</div><div class="cap">multi-mode</div></div>
+    </div>
+    <label style="margin-top:8px;">Frames per consistent mode</label>`;
+    modeEntries.forEach(([mode,cnt])=>{
+      const col = cmap.get(mode) || "#888";
+      const pct = maxN ? (cnt/maxN*100) : 0;
+      html += `<div class="bar-row"><span class="bl">${mode}</span>`+
+              `<span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${col};"></span></span>`+
+              `<span class="bn">${cnt}</span></div>`;
+    });
+    el.innerHTML = html;
+  };
+
+  // ---------- selection list ----------
+  function idToFeature(id){ return FRAME_DATA.features.find(f=>f.properties.id===id); }
+
+  function renderSelectedList(){
+    const ul = document.getElementById("selected-list");
+    ul.innerHTML = "";
+    document.getElementById("count-badge").textContent = selected.size;
+    document.getElementById("empty-sel-hint").style.display = selected.size ? "none" : "block";
+    Array.from(selected.values()).forEach(entry=>{
+      const p = entry.feature.properties;
+      const li = document.createElement("li");
+      const sw = document.createElement("div");
+      sw.className = "li-swatch"; sw.style.background = entry.color;
+      sw.title = "Repaint with current color";
+      sw.onclick = ()=>{ entry.color = currentColor; refreshSelectedSource(); renderSelectedList(); };
+      const lbl = document.createElement("div");
+      lbl.className = "li-label";
+      lbl.innerHTML = `T${p.track}_F${p.frame} <span class="sub">${p.passDirection[0]} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</span>`;
+      lbl.title = "Click to zoom to frame";
+      lbl.onclick = ()=> zoomToFeature(entry.feature);
+      const x = document.createElement("button");
+      x.className = "li-x"; x.textContent = "✕";
+      x.title = "Remove from selection";
+      x.onclick = ()=>{ selected.delete(p.id); refreshSelectedSource(); renderSelectedList(); };
+      li.appendChild(sw); li.appendChild(lbl); li.appendChild(x);
+      ul.appendChild(li);
+    });
+  }
+
+  function refreshSelectedSource(){
+    const feats = Array.from(selected.values()).map(e=>{
+      const clone = JSON.parse(JSON.stringify(e.feature));
+      clone.properties.__color = e.color;
+      return clone;
+    });
+    if (map.getSource("selected")) {
+      map.getSource("selected").setData({type:"FeatureCollection", features: feats});
+    }
+  }
+
+  function zoomToFeature(feature){
+    const coords = [];
+    const geom = feature.geometry;
+    const rings = geom.type === "MultiPolygon" ? geom.coordinates.flat() : geom.coordinates;
+    rings.forEach(ring=>ring.forEach(c=>coords.push(c)));
+    const lons = coords.map(c=>c[0]), lats = coords.map(c=>c[1]);
+    map.fitBounds([[Math.min(...lons), Math.min(...lats)],[Math.max(...lons), Math.max(...lats)]], {padding:60, duration:600});
+  }
+
+  function toggleSelectFrame(feature){
+    const id = feature.properties.id;
+    if (selected.has(id)) selected.delete(id);
+    else selected.set(id, {feature, color: currentColor});
+    refreshSelectedSource(); renderSelectedList();
+  }
+  function selectFrame(feature, color){
+    selected.set(feature.properties.id, {feature, color: color || currentColor});
+  }
+
+  document.getElementById("btn-clear-sel").addEventListener("click", ()=>{
+    selected.clear(); refreshSelectedSource(); renderSelectedList();
+  });
+
+  // ---------- import selection (CSV / GeoJSON / consistent-GSLC JSON) ----------
+  function featureByTrackFrame(track, frame){
+    return FRAME_DATA.features.find(f=>f.properties.track===track && f.properties.frame===frame);
+  }
+  function featureByIdx(idx){
+    return FRAME_DATA.features.find(f=>f.properties.frame_idx===idx);
+  }
+
+  function importCsv(text){
+    const lines = text.split(/\r?\n/).filter(l=>l.trim().length);
+    if (!lines.length) return 0;
+    const header = lines[0].split(",").map(s=>s.trim().replace(/^"|"$/g,"").toLowerCase());
+    const ti = header.indexOf("track"), fi = header.indexOf("frame"), ci = header.indexOf("color");
+    if (ti < 0 || fi < 0) throw new Error("CSV needs 'track' and 'frame' columns");
+    let added = 0;
+    for (let i=1; i<lines.length; i++){
+      const cells = lines[i].split(",").map(s=>s.trim().replace(/^"|"$/g,""));
+      const feat = featureByTrackFrame(parseInt(cells[ti],10), parseInt(cells[fi],10));
+      if (feat){ selectFrame(feat, ci>=0 && cells[ci] ? cells[ci] : currentColor); added++; }
+    }
+    return added;
+  }
+
+  function importGeojson(obj){
+    let added = 0;
+    (obj.features || []).forEach(f=>{
+      const p = f.properties || {};
+      let feat = null;
+      if (p.track !== undefined && p.frame !== undefined) feat = featureByTrackFrame(Number(p.track), Number(p.frame));
+      else if (p.id) feat = idToFeature(String(p.id));
+      if (feat){ selectFrame(feat, p.color || currentColor); added++; }
+    });
+    return added;
+  }
+
+  function importConsistent(obj){
+    // consistent-GSLC catalog: { data: { "<frame_idx>": {...} }, metadata: {...} }
+    const data = obj.data || obj;
+    let added = 0;
+    Object.keys(data).forEach(k=>{
+      const feat = featureByIdx(parseInt(k,10));
+      if (feat){ selectFrame(feat, currentColor); added++; }
+    });
+    return added;
+  }
+
+  document.getElementById("import-file").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById("import-status");
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      let added = 0;
+      try {
+        const text = reader.result;
+        if (/\.csv$/i.test(file.name)) {
+          added = importCsv(text);
+        } else {
+          const obj = JSON.parse(text);
+          if (obj.type === "FeatureCollection") added = importGeojson(obj);
+          else added = importConsistent(obj);   // consistent-GSLC catalog
+        }
+        refreshSelectedSource(); renderSelectedList();
+        status.textContent = `Imported ${added} frame(s) from ${file.name}.`;
+      } catch (err) {
+        status.textContent = "Import failed: " + err.message;
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  // ---------- export ----------
+  function downloadBlob(content, filename, mime){
+    const blob = new Blob([content], {type:mime});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+  document.getElementById("btn-export-csv").addEventListener("click", ()=>{
+    const rows = [["track","frame","id","passDirection","color","gslc_count","cons_mode","cons_cov","n_modes","n_full","n_partial","isCalVal","isSNWG","isDNC"]];
+    Array.from(selected.values()).forEach(e=>{
+      const p = e.feature.properties;
+      rows.push([p.track,p.frame,p.id,p.passDirection,e.color,p.gslc_count,p.cons_mode,p.cons_cov,
+        p.n_modes,p.n_full,p.n_partial,p.isCalVal,p.isSNWG,p.isDNC]);
+    });
+    const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+    downloadBlob(csv, "nisar_selected_frames.csv", "text/csv");
+  });
+  document.getElementById("btn-export-geojson").addEventListener("click", ()=>{
+    const feats = Array.from(selected.values()).map(e=>{
+      const clone = JSON.parse(JSON.stringify(e.feature));
+      clone.properties.color = e.color;
+      delete clone.properties.granules;   // keep the export compact
+      return clone;
+    });
+    downloadBlob(JSON.stringify({type:"FeatureCollection", features: feats}, null, 2), "nisar_selected_frames.geojson", "application/geo+json");
+  });
+
+  // ---------- map ----------
+  const style = {
+    version: 8,
+    sources: {
+      "carto-light": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
+      "carto-dark": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
+      "esri-sat": { type:"raster", tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize:256, attribution:"Esri World Imagery" }
+    },
+    layers: [
+      { id:"bm-light", type:"raster", source:"carto-light", layout:{visibility:"visible"} },
+      { id:"bm-dark", type:"raster", source:"carto-dark", layout:{visibility:"none"} },
+      { id:"bm-sat", type:"raster", source:"esri-sat", layout:{visibility:"none"} }
+    ]
+  };
+
+  const map = new maplibregl.Map({
+    container: "map",
+    style: style,
+    center: [-100, 40],
+    zoom: 1.4,
+    projection: {type: "globe"},   // global projection is the default at start
+    attributionControl: true
+  });
+  map.addControl(new maplibregl.NavigationControl(), "bottom-right");
+  map.addControl(new maplibregl.GlobeControl(), "bottom-right");
+
+  document.querySelectorAll('input[name="basemap"]').forEach(r=>{
+    r.addEventListener("change", ()=>{
+      const v = r.value;
+      map.setLayoutProperty("bm-light","visibility", v==="light"?"visible":"none");
+      map.setLayoutProperty("bm-dark","visibility", v==="dark"?"visible":"none");
+      map.setLayoutProperty("bm-sat","visibility", v==="sat"?"visible":"none");
+    });
+  });
+
+  function granulePopupHtml(p){
+    const granules = JSON.parse(typeof p.granules === "string" ? p.granules : JSON.stringify(p.granules));
+    const isSel = selected.has(p.id);
+    let rows = granules.map(g=>
+      `<div class="granule-row"><span class="gdate">${g.date}</span> `+
+      `<span class="gmode">${g.mode}_${g.cov}</span> ${g.pol} c${g.cycle}<br>${g.gid}</div>`
+    ).join("");
+    if (!rows) rows = `<div class="granule-row">No GSLC granules in CMR for this frame.</div>`;
+    return `
+      <div class="pop-title">Track ${p.track} / Frame ${p.frame} (${p.id})</div>
+      <div class="pop-row">Pass: ${p.passDirection} &middot; consistent: ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
+      <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
+      <button class="btn small primary" id="pop-select" style="margin-top:6px;">${isSel ? "Remove from selection" : "Add to selection"}</button>
+      <div class="granule-list">${rows}</div>`;
+  }
+
+  map.on("load", ()=>{
+    map.addSource("frames", { type:"geojson", data: FRAME_DATA });
+    map.addLayer({
+      id:"frames-fill", type:"fill", source:"frames",
+      paint:{ "fill-color": colorExpression("passDirection"), "fill-opacity": 0.32 }
+    });
+    map.addLayer({
+      id:"frames-outline", type:"line", source:"frames",
+      paint:{ "line-color": colorExpression("passDirection"), "line-width": 1, "line-opacity":0.7 }
+    });
+
+    map.addSource("selected", { type:"geojson", data:{type:"FeatureCollection", features:[]} });
+    map.addLayer({
+      id:"selected-fill", type:"fill", source:"selected",
+      paint:{ "fill-color": ["get","__color"], "fill-opacity": 0.45 }
+    });
+    map.addLayer({
+      id:"selected-outline", type:"line", source:"selected",
+      paint:{ "line-color": ["get","__color"], "line-width": 3 }
+    });
+
+    // ---------- color-by / opacity ----------
+    applyColorBy = function(){
+      const field = document.getElementById("color-by").value;
+      const colorExpr = colorExpression(field);
+      map.setPaintProperty("frames-fill", "fill-color", colorExpr);
+      map.setPaintProperty("frames-outline", "line-color", colorExpr);
+      const globalOpacity = Number(document.getElementById("fill-opacity").value) / 100;
+      map.setPaintProperty("frames-fill", "fill-opacity", globalOpacity);
+      renderColorByLegend(field);
+    };
+    document.getElementById("color-by").addEventListener("change", applyColorBy);
+    document.getElementById("fill-opacity").addEventListener("input", (e)=>{
+      document.getElementById("opacity-val").textContent = e.target.value;
+      applyColorBy();
+    });
+    document.getElementById("btn-reset-style").addEventListener("click", ()=>{
+      document.getElementById("color-by").value = "passDirection";
+      document.getElementById("fill-opacity").value = 32;
+      document.getElementById("opacity-val").textContent = 32;
+      applyColorBy();
+    });
+    applyColorBy();
+    applyFilters();
+
+    // hover summary
+    const popup = new maplibregl.Popup({ closeButton:false, closeOnClick:false });
+    map.on("mousemove", "frames-fill", (e)=>{
+      map.getCanvas().style.cursor = "pointer";
+      const p = e.features[0].properties;
+      popup.setLngLat(e.lngLat).setHTML(`
+        <div class="pop-title">Track ${p.track} / Frame ${p.frame}</div>
+        <div class="pop-row">Pass: ${p.passDirection} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
+        <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s)</div>
+        <div class="pop-row" style="color:var(--accent)">click to list granules &amp; select</div>
+      `).addTo(map);
+    });
+    map.on("mouseleave", "frames-fill", ()=>{ map.getCanvas().style.cursor = ""; popup.remove(); });
+
+    // click -> granule list popup with a select toggle
+    const clickPopup = new maplibregl.Popup({ closeButton:true, closeOnClick:false, maxWidth:"340px" });
+    map.on("click", "frames-fill", (e)=>{
+      const feature = idToFeature(e.features[0].properties.id);
+      if (!feature) return;
+      popup.remove();
+      clickPopup.setLngLat(e.lngLat).setHTML(granulePopupHtml(feature.properties)).addTo(map);
+      const btn = document.getElementById("pop-select");
+      if (btn) btn.addEventListener("click", ()=>{
+        toggleSelectFrame(feature);
+        btn.textContent = selected.has(feature.properties.id) ? "Remove from selection" : "Add to selection";
+      });
+    });
+  });
+
+  renderSelectedList();
+})();
+"""
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+def main(argv: list[str] | None = None) -> None:
+    """Command-line entry point for building the scope viewer."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--frames-gpkg",
+        type=Path,
+        default=Path("notebooks/opera-nisar-disp-frames.gpkg"),
+        help="OPERA NISAR-DISP frames GeoPackage.",
+    )
+    parser.add_argument(
+        "--gslc-db",
+        type=Path,
+        default=Path("notebooks/gslc_catalog.duckdb"),
+        help="GSLC catalog DuckDB store (table 'products').",
+    )
+    parser.add_argument(
+        "--consistent-json",
+        type=Path,
+        default=None,
+        help="Optional consistent-GSLC catalog JSON/.json.zip to drive the "
+        "consistent mode/coverage fields (from 'nisar-db create-consistent').",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("scripts/nisar_scope_viewer.html"),
+        help="Output HTML path.",
+    )
+    parser.add_argument(
+        "--title",
+        default="OPERA NISAR-DB Viewer",
+        help="Document title.",
+    )
+    args = parser.parse_args(argv)
+
+    print(f"Loading frames from {args.frames_gpkg}")
+    gdf = load_frames(args.frames_gpkg)
+    print(f"  {len(gdf)} frames")
+
+    print(f"Loading GSLC catalog from {args.gslc_db}")
+    catalog = load_gslc_catalog(args.gslc_db)
+    print(f"  {len(catalog)} GSLC granules")
+
+    consistent = None
+    if args.consistent_json is not None:
+        print(f"Loading consistent-GSLC catalog from {args.consistent_json}")
+        consistent = load_consistent_json(args.consistent_json)
+        print(f"  {len(consistent)} frames in consistent catalog")
+
+    frame_data = build_frame_data(gdf, catalog, consistent)
+    n_with = sum(1 for f in frame_data["features"] if f["properties"]["gslc_count"] > 0)
+
+    meta = {
+        "title": args.title,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "n_frames": len(frame_data["features"]),
+        "n_frames_with_gslc": n_with,
+        "n_granules": int(len(catalog)),
+        "consistent_source": str(args.consistent_json) if consistent else "computed",
+    }
+
+    html = render_html(frame_data, meta)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(html)
+    size_mb = args.output.stat().st_size / 1e6
+    print(
+        f"Wrote {args.output} ({size_mb:.1f} MB); {n_with}/{meta['n_frames']} frames have GSLC"
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Create a frame_to_bound JSON file for NISAR frames in North America.
 
 Analogous to burst_db's frame_to_burst, but for NISAR (frame-based, no burst IDs).
@@ -12,23 +11,14 @@ Usage:
 
 from __future__ import annotations
 
-import json
-import zipfile
 from datetime import datetime
 from pathlib import Path
 
 import click
 import geopandas as gpd
 
-
-def get_opera_na_shape():
-    """Read the OPERA North America geometry as a shapely multipolygon."""
-    url = (
-        "https://raw.githubusercontent.com/"
-        "nasa/opera-sds-pcm/develop/geo/data/north_america_opera_expanded.geojson"
-    )
-    na_gpd = gpd.read_file(url)
-    return na_gpd.geometry.union_all()
+from nisar_db.geodb import filter_frames_to_na
+from nisar_db.io_json import write_zipped_json
 
 
 def build_frame_to_bound(
@@ -43,10 +33,7 @@ def build_frame_to_bound(
     nisar_df = gpd.read_file(nisar_gpkg_path)
 
     # Filter to frames intersecting North America
-    opera_na = get_opera_na_shape()
-    nisar_df = nisar_df[
-        nisar_df.geometry.intersects(opera_na) | nisar_df.geometry.touches(opera_na)
-    ]
+    nisar_df = filter_frames_to_na(nisar_df)
 
     click.echo(f"Found {len(nisar_df)} NISAR frames intersecting North America.")
 
@@ -75,16 +62,6 @@ def build_frame_to_bound(
     return {"data": data_dict, "metadata": metadata}, nisar_df
 
 
-def write_zipped_json(json_path: str, dict_out: dict, level: int = 6):
-    """Write a JSON dictionary to a compressed .json.zip file."""
-    json_zip_path = str(json_path) + ".zip"
-    with zipfile.ZipFile(
-        json_zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=level
-    ) as zf:
-        zf.writestr(str(Path(json_path).name), json.dumps(dict_out))
-    return json_zip_path
-
-
 @click.command(context_settings={"show_default": True})
 @click.option(
     "--nisar-gpkg",
@@ -110,20 +87,15 @@ def main(nisar_gpkg: str, output: str):
     n_frames = len(result["data"])
     click.echo(f"Writing {n_frames} NISAR frame entries.")
 
-    # Write plain JSON
-    with open(output, "w") as f:
-        json.dump(result, f, indent=2)
-    click.echo(f"Written to {output}")
-
-    # Write compressed zip
+    # Write plain JSON alongside the compressed .json.zip
     zip_path = write_zipped_json(output, result)
+    click.echo(f"Written to {output}")
     click.echo(f"Written to {zip_path}")
 
     # Write filtered GeoPackage with actual frame polygons
     # Store the original index as "frame_idx" so search.py can look up by JSON key
     filtered_gdf = filtered_gdf.copy()
     filtered_gdf["frame_idx"] = filtered_gdf.index
-    output_stem = Path(output).stem.replace(".json", "")
     output_name = "opera-nisar-disp-frames"
     gpkg_path = Path(output).parent / f"{output_name}.gpkg"
     filtered_gdf.to_file(gpkg_path, driver="GPKG")
