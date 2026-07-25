@@ -21,17 +21,48 @@ nisar-db create-consistent       Create the consistent-GSLC JSON for NISAR frame
 nisar-db create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
 nisar-db create-blackout-dates   Create the NISAR blackout-dates JSON.
 nisar-db append-blackout-dates   Manually append blackout windows for one frame.
+nisar-db create-reference-dates  Create the NISAR reference-dates JSON.
+nisar-db label-processing-mode   Add historical/forward processing-mode labels.
 nisar-db download                Download NISAR granules/URLs from CMR.
+nisar-db download-frame-db       Download the global NISAR TrackFrame database.
 nisar-db search                  Search for NISAR products.
 ```
+
+## The DISP-NISAR release assets (`make all`)
+
+Distinct from the daily product catalogs above: this is the frame-database side,
+the NISAR counterpart of what `burst_db` releases for DISP-S1. The chain is
+
+```
+TrackFrame gpkg ──create-frame-to-bound──> frame-to-bounds JSON
+                                          + opera-nisar-disp-frames.gpkg
+                                          + frame-geometries-simple.geojson.zip (--geojson)
+
+snow-analysis GeoJSON ──create-blackout-dates──> blackout-dates JSON
+                                                     │
+GSLC file list ──create-catalog──> gslc_catalog.csv  │
+                                          │          │
+                                          └──create-consistent──> consistent-GSLC JSON
+                                             (twice: with and without --blackout-file)
+                                                     │
+                     ┌───────────────────────────────┴───────────────────┐
+        label-processing-mode                                  create-reference-dates
+   …-with-processing-mode-{date}.json                   …-reference-dates-{date}.json
+```
+
+[Makefile](../../Makefile) `all` builds every step; [release.yml](../../.github/workflows/release.yml)
+runs the same chain on a `v*` tag and attaches the results. Blackout windows are
+climatological, so the workflow only rebuilds them when a snow analysis is
+supplied and otherwise carries the previous release's file forward.
 
 ## How the CLI is wired (important before editing)
 
 `cli_app` in [cli.py](../../src/nisar_db/cli.py) mixes two styles:
 
 - **Native click commands** reused directly as subcommands: `create-frame-to-bound`,
-  `create-catalog`, `create-consistent`, `append-blackout-dates`, and `search`. Their options are defined on
-  each module's `main`.
+  `create-catalog`, `create-consistent`, `append-blackout-dates`,
+  `create-reference-dates`, `label-processing-mode`, and `search`. Their options are
+  defined on each module's `main`.
 - **Argparse pass-through commands**: `create-nisar-catalog`, `create-blackout-dates`,
   `download`. These forward all args to an argparse `main()` via `_run_argparse_main`,
   which rewrites `sys.argv` and calls the module. To see their real options, run the
@@ -71,10 +102,12 @@ Both builders share one pipeline in
 |---|---|---|
 | `create-nisar-catalog` | CMR (network); `--output-dir`, `--gslc-db`, `--gunw-db`, `--max-results`, `--gslc`/`--gunw`/`--all` | `<db>.duckdb` + JSON files in `--output-dir` |
 | `create-catalog` | `--input` GSLC file list `.txt`; optional `--na-only`, `--nisar-gpkg` | `--output` CSV |
-| `create-frame-to-bound` | `--nisar-gpkg` (NISAR_TrackFrame_L_*.gpkg) | `--output` JSON + `.json.zip`; `opera-nisar-disp-frames.gpkg` |
-| `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames | `--output` consistent JSON |
+| `create-frame-to-bound` | `--nisar-gpkg` (NISAR_TrackFrame_L_*.gpkg; downloaded when omitted) | `--output` JSON + `.json.zip`; `opera-nisar-disp-frames.gpkg`; `--geojson` simplified `.geojson[.zip]` |
+| `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames; optional `--blackout-file` | `--output` consistent JSON |
 | `create-blackout-dates` | `--input-file` snow/monthly GeoJSON, or `--manual` | `--output-file` blackout JSON |
 | `append-blackout-dates` | `--json-file` existing blackout JSON, `--frame`, repeatable `--period START END` | same file (or `--output`) + `.json.zip` |
+| `create-reference-dates` | `--consistent-json` and/or `--blackout-file`; `--interval`, `--min-acquisitions` | `--output` reference-dates JSON + `.json.zip` |
+| `label-processing-mode` | `--consistent-json`, optional `--previous-json`; `--batch-size`, `--gap-threshold-years` | `--output` labelled JSON + `.json.zip` |
 
 ### GSLC JSON outputs
 - `gslc_tracks.json` — track → list of pass directions
@@ -130,6 +163,15 @@ when changing entry points.
   [catalog/_common.py](../../src/nisar_db/catalog/_common.py).
 - **Blackout logic** → [catalog/create_blackout_dates.py](../../src/nisar_db/catalog/create_blackout_dates.py)
   (three modes: snow-analysis default, `--monthly`, `--manual`).
+- **Reference-epoch reset rule** → [reference_dates.py](../../src/nisar_db/reference_dates.py):
+  `pick_month_based_on_snow` for the month-based rule, `_generate_by_consistent`
+  for the interval-based one, `EVENT_DATES_BY_FRAME` for earthquake resets. The
+  JSON writer stays in [blackout.py](../../src/nisar_db/blackout.py).
+- **Batch size / gap threshold for processing modes** →
+  [processing_mode.py](../../src/nisar_db/processing_mode.py). What counts as a
+  release-to-release change is `find_frames_with_changed_mode`, which compares
+  `(common_mode, common_coverage)` -- the NISAR equivalent of burst_db diffing
+  `burst_id_list`, since NISAR frames have no burst membership to change.
 
 ## Gotchas
 

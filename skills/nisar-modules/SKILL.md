@@ -37,10 +37,12 @@ src/nisar_db/
 ├── nisar_catalog.py       # dispatcher for GSLC/GUNW builders (create-nisar-catalog)
 ├── gslc_catalog.py        # parse a GSLC file list -> structured CSV (create-catalog)
 ├── consistent_gslc.py     # consistent-GSLC-per-frame JSON (create-consistent)
-├── blackout.py            # per-frame blackout / reference-date filtering
-├── frame_to_bound.py      # NISAR frame -> bbox JSON (create-frame-to-bound)
+├── blackout.py            # per-frame blackout / reference-date filtering + writers
+├── reference_dates.py     # derive reset epochs (create-reference-dates)
+├── processing_mode.py     # historical/forward labels (label-processing-mode)
+├── frame_to_bound.py      # NISAR frame -> bbox JSON + simplified GeoJSON
 ├── filenames.py           # GSLCFilename / GUNWFilename parsers + NISARCollection
-├── geodb.py               # OPERA NA polygon + frame<->geometry joins
+├── geodb.py               # TrackFrame gpkg fetch + OPERA NA polygon + geometry joins
 ├── modes.py               # acquisition-mode constants + dominant_value vote
 ├── io_json.py             # write_zipped_json / write_catalog_json
 ├── logging_setup.py       # configure_logging for CLI entry points
@@ -114,9 +116,23 @@ src/nisar_db/
   `create_blackout_dates_json`, `create_reference_dates_json`;
   manual editing via `append_blackout_period`, `append_blackout_dates_json`,
   `load_blackout_json` (CLI `append-blackout-dates`).
-- **[frame_to_bound.py](../../src/nisar_db/frame_to_bound.py)** — `build_frame_to_bound`.
-- **[geodb.py](../../src/nisar_db/geodb.py)** — `get_opera_na_shape` (OPERA NA
-  polygon), `filter_frames_to_na`, `convert_to_gdf`.
+- **[reference_dates.py](../../src/nisar_db/reference_dates.py)** —
+  `calculate_reference_dates` (interval-based from the consistent JSON, or
+  month-based from a blackout file), `build_desired_month_map_from_blackout`,
+  `pick_month_based_on_snow`, `load_consistent_json`, `EVENT_DATES_BY_FRAME`
+  (CLI `create-reference-dates`). Writes via `blackout.create_reference_dates_json`.
+- **[processing_mode.py](../../src/nisar_db/processing_mode.py)** —
+  `assign_processing_modes` (historical/forward/no_run per sensing time),
+  `add_processing_modes`, `identify_time_groups`, `get_processing_mode_summary`,
+  `find_frames_with_changed_mode` (release-to-release reconciliation)
+  (CLI `label-processing-mode`).
+- **[frame_to_bound.py](../../src/nisar_db/frame_to_bound.py)** —
+  `build_frame_to_bound`, `write_frame_geometries_geojson` (simplified, zipped
+  frame polygons behind `--geojson`).
+- **[geodb.py](../../src/nisar_db/geodb.py)** — `get_trackframe_db` /
+  `load_trackframe_db` (fetch the global TrackFrame GeoPackage from CMR),
+  `get_opera_na_shape` (OPERA NA polygon), `filter_frames_to_na`,
+  `convert_to_gdf`.
 - **[modes.py](../../src/nisar_db/modes.py)** — `dominant_value` + mode-family constants.
 
 ### Filenames / IO / util / downloads
@@ -142,7 +158,11 @@ src/nisar_db/
 | List/search an S3 bucket by profile | `search/s3.py` `search_s3_products` |
 | Build a reusable index of an S3 bucket | `s3_catalog.py` `build_s3_catalog` / `query_catalog` |
 | Attach frame geometry to a catalog | `s3_catalog.py` `catalog_to_gdf`; `geodb.py` |
+| Get the global TrackFrame GeoPackage | `geodb.py` `get_trackframe_db` (CLI `download-frame-db`) |
 | CMR → DuckDB + JSON catalog | `catalog/` + `nisar_catalog.py` |
+| Decide when a frame's reference epoch resets | `reference_dates.py` `calculate_reference_dates` |
+| Label batches historical/forward, diff two releases | `processing_mode.py` |
+| Simplified frame polygons for a web map | `frame_to_bound.py` `write_frame_geometries_geojson` |
 | CLI command wiring | `cli.py`; per-command `main()` in the target module |
 | Collection short names / provider | `filenames.py` `NISARCollection` |
 
