@@ -16,7 +16,7 @@
         <link rel="prev" href="../background/reference-dates.html">
       
       
-        <link rel="next" href="../frame-viewer.html">
+        <link rel="next" href="snow-analysis.html">
       
       
         
@@ -679,6 +679,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="snow-analysis.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derive blackout dates from snow cover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -982,7 +1010,9 @@ dominant mode → majority coverage → one acquisition per date.</p>
 each frame. <strong>This is the consistent-mode database.</strong></p>
 <h3 id="optional-apply-a-blackout-filter">Optional: apply a blackout filter<a class="headerlink" href="#optional-apply-a-blackout-filter" title="Permanent link">&para;</a></h3>
 <p>To remove seasonally unusable acquisitions (e.g. snow winters), pass a
-<a href="../background/blackout-dates.html">blackout-dates JSON</a>. First build it:</p>
+<a href="../background/blackout-dates.html">blackout-dates JSON</a>. First build it — the
+<code>snow_analysis.geojson</code> input comes from
+<a href="snow-analysis.html">Derive blackout dates from snow cover</a>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nisar-db<span class="w"> </span>create-blackout-dates<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--input-file<span class="w"> </span>snow_analysis.geojson<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--output-file<span class="w"> </span>nisar-blackout-dates.json

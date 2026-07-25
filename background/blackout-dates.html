@@ -607,6 +607,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/snow-analysis.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derive blackout dates from snow cover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -868,9 +896,13 @@ window to an existing JSON instead:</p>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Snow analysis is upstream</p>
-<p>The snow-cover analysis that produces the input GeoJSON lives outside this
-package (it mirrors <code>burst_db</code>'s <code>snow-analysis/</code>). <code>nisar_db</code> only turns
-that analysis into per-frame yearly windows.</p>
+<p>The snow-cover analysis that produces the input GeoJSON lives outside the
+package, in <code>scripts/snow-analysis/</code> (it mirrors <code>burst_db</code>'s
+<code>snow-analysis/</code>): it pulls NOAA GEFS snow and temperature fields, flags
+snowed-in weeks per frame, and collapses them into the <code>start_*</code>/<code>end_*</code>
+columns read here. <code>nisar_db</code> only turns that analysis into per-frame yearly
+windows. See
+<strong><a href="../tutorials/snow-analysis.html">Tutorial: derive blackout dates from snow cover</a></strong>.</p>
 </div>
 <h2 id="how-the-filter-is-applied">How the filter is applied<a class="headerlink" href="#how-the-filter-is-applied" title="Permanent link">&para;</a></h2>
 <p>Blackout is enforced at the moment the consistent stack is built. When
