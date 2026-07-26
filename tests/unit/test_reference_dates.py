@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from nisar_db.reference_dates import (
     build_desired_month_map_from_blackout,
     calculate_reference_dates,
+    find_blacked_out_references,
     load_consistent_json,
     pick_month_based_on_snow,
 )
@@ -103,31 +104,95 @@ class TestIntervalBased:
         assert len(refs["5827"]) == 1
 
 
-class TestMonthBased:
-    def test_one_date_per_year_on_the_chosen_month(self) -> None:
-        refs = calculate_reference_dates(
-            desired_month_by_frame={"5827": 7}, start_year=2025, end_year=2028
-        )
-        assert refs["5827"] == [
-            "2025-07-01T00:00:00",
-            "2026-07-01T00:00:00",
-            "2027-07-01T00:00:00",
-        ]
+class TestFindBlackedOutReferences:
+    """The stack is filtered upstream; this only catches when it was not."""
 
-    def test_month_map_wins_over_consistent_json(self, consistent_json: Path) -> None:
+    def test_clean_when_no_reference_is_blacked_out(self) -> None:
+        refs = {"5827": ["2025-07-05T00:00:00"]}
+        blackout = {"5827": [["2025-11-01T00:00:00", "2026-05-31T23:59:59"]]}
+        assert find_blacked_out_references(refs, blackout) == {}
+
+    def test_reports_a_reference_inside_a_window(self) -> None:
+        refs = {"5827": ["2025-07-05T00:00:00", "2026-01-12T00:00:00"]}
+        blackout = {"5827": [["2025-11-01T00:00:00", "2026-05-31T23:59:59"]]}
+        assert find_blacked_out_references(refs, blackout) == {
+            "5827": ["2026-01-12T00:00:00"]
+        }
+
+    def test_ignores_frames_with_no_blackout(self) -> None:
+        refs = {"5830": ["2026-01-12T00:00:00"]}
+        blackout = {"5827": [["2025-11-01T00:00:00", "2026-05-31T23:59:59"]]}
+        assert find_blacked_out_references(refs, blackout) == {}
+
+
+class TestMonthBased:
+    def test_every_date_is_a_real_acquisition(self, consistent_json: Path) -> None:
+        refs = calculate_reference_dates(
+            consistent_json_file=consistent_json, desired_month_by_frame={"5827": 7}
+        )
+        assert set(refs["5827"]) <= set(_times(60))
+
+    def test_one_date_per_year_starting_in_the_chosen_month(
+        self, consistent_json: Path
+    ) -> None:
+        refs = calculate_reference_dates(
+            consistent_json_file=consistent_json, desired_month_by_frame={"5827": 7}
+        )
+        # 60 acquisitions 12 days apart span 2025-01-05 to 2026-12-21.
+        assert [d[:7] for d in refs["5827"]] == ["2025-07", "2026-07"]
+        assert all(
+            datetime.strptime(d, "%Y-%m-%dT%H:%M:%S") >= datetime(int(d[:4]), 7, 1)
+            for d in refs["5827"]
+        )
+
+    def test_no_dates_past_the_end_of_the_archive(self, consistent_json: Path) -> None:
+        refs = calculate_reference_dates(
+            consistent_json_file=consistent_json, desired_month_by_frame={"5827": 7}
+        )
+        last_acquisition = datetime.strptime(_times(60)[-1], "%Y-%m-%dT%H:%M:%S")
+        assert all(
+            datetime.strptime(d, "%Y-%m-%dT%H:%M:%S") <= last_acquisition
+            for d in refs["5827"]
+        )
+
+    def test_frame_ending_before_its_anchor_month_is_dropped(
+        self, consistent_json: Path
+    ) -> None:
+        # 5830's 10 acquisitions end in April 2025, before any July anchor.
         refs = calculate_reference_dates(
             consistent_json_file=consistent_json,
-            desired_month_by_frame={"999": 9},
-            start_year=2025,
-            end_year=2026,
+            desired_month_by_frame={"5827": 7, "5830": 7},
         )
-        assert list(refs) == ["999"]
+        assert list(refs) == ["5827"]
+
+    def test_frame_without_acquisitions_is_dropped(self, consistent_json: Path) -> None:
+        refs = calculate_reference_dates(
+            consistent_json_file=consistent_json,
+            desired_month_by_frame={"5827": 7, "999": 9},
+        )
+        assert list(refs) == ["5827"]
+
+    def test_anchors_before_the_first_acquisition_collapse(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "late.json"
+        path.write_text(
+            json.dumps({"data": {"1": {"sensing_time_list": ["2027-08-02T00:00:00"]}}})
+        )
+        refs = calculate_reference_dates(
+            consistent_json_file=path, desired_month_by_frame={"1": 7}
+        )
+        assert refs["1"] == ["2027-08-02T00:00:00"]
 
 
 class TestErrors:
-    def test_requires_one_input(self) -> None:
-        with pytest.raises(ValueError, match="neither was given"):
+    def test_requires_consistent_json(self) -> None:
+        with pytest.raises(ValueError, match="--consistent-json"):
             calculate_reference_dates()
+
+    def test_month_map_alone_is_not_enough(self) -> None:
+        with pytest.raises(ValueError, match="--consistent-json"):
+            calculate_reference_dates(desired_month_by_frame={"5827": 7})
 
 
 class TestLoadConsistentJson:
@@ -158,9 +223,43 @@ class TestCli:
         assert (tmp_path / "refs.json.zip").exists()
         written = json.loads(output.read_text())
         assert written["metadata"]["strategy"] == "month-based"
-        assert written["data"]["5827"][0].endswith("-07-01T00:00:00")
+        assert set(written["data"]["5827"]) <= set(_times(60))
+
+    def test_unfiltered_stack_is_rejected(
+        self, blackout_json: Path, tmp_path: Path
+    ) -> None:
+        # A stack built without --blackout-file still holds winter acquisitions,
+        # so 5827's September anchor lands inside its blackout window.
+        stack = tmp_path / "unfiltered.json"
+        stack.write_text(
+            json.dumps(
+                {"data": {"5829": {"sensing_time_list": ["2025-12-15T00:00:00"]}}}
+            )
+        )
+        result = CliRunner().invoke(
+            create_reference_dates,
+            [
+                "--consistent-json",
+                str(stack),
+                "--blackout-file",
+                str(blackout_json),
+                "--output",
+                str(tmp_path / "refs.json"),
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "inside a blackout window" in result.output
+        assert "make-consistent-gslc --blackout-file" in result.output
 
     def test_no_input_is_a_usage_error(self) -> None:
         result = CliRunner().invoke(create_reference_dates, [])
         assert result.exit_code != 0
-        assert "neither was given" in result.output
+        assert "--consistent-json is required" in result.output
+
+    def test_blackout_alone_is_a_usage_error(self, blackout_json: Path) -> None:
+        result = CliRunner().invoke(
+            create_reference_dates, ["--blackout-file", str(blackout_json)]
+        )
+        assert result.exit_code != 0
+        assert "--consistent-json is required" in result.output
