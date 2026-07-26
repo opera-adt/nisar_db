@@ -75,24 +75,52 @@ dropped before selection (`consistent_gslc.py`).
 
 ## The selection logic
 
-For each `(track, frame)` group the winner is chosen in strict priority order.
-This is `_common_mode_coverage` and `select_consistent_acquisitions` in
+For each `(track, frame)` group, **every mode present first settles its own
+coverage**, then the modes compete for the frame. This is
+`_common_mode_coverage` and `select_consistent_acquisitions` in
 `consistent_gslc.py`.
 
-### 1. Dominant mode (standard families win)
+### 0. Coverage per mode (full beats partial)
 
-Count acquisitions per full 4-character `mode`. Standard-family rows
-(`40`, `20`) vote first; only if the frame has **no** standard-family
-acquisitions at all does the overall most-frequent mode win. Among candidates,
-the mode with the most acquisitions wins.
+For each `mode`, compare its count of full-frame (`F`) vs partial (`P`)
+acquisitions. If there are at least as many `F` as `P`, that mode's coverage is
+`F`; otherwise `P`. **Ties go to `F`** — full coverage is preferred.
 
-### 2. Coverage within that mode (full beats partial)
+### 1. Winning mode: coverage first
 
-Within the winning mode, compare the count of full-frame (`F`) vs partial (`P`)
-acquisitions. If there are at least as many `F` as `P`, pick `F`; otherwise `P`.
-**Ties go to `F`** — full coverage is preferred.
+A mode that resolved to `F` beats one that resolved to `P`. A DISP stack needs
+full-frame acquisitions, so coverage outranks the mode code itself: a frame with
+`2005_F` and `4005_P` settles on **`2005_F`**.
 
-### 3. One acquisition per calendar date
+**Unless the frame is mostly partial.** Preferring `F` costs temporal coverage
+when full-frame acquisitions are the rare ones — track 42 / frame 164 is
+`4005_P ×4` plus a single `2005_F`, and picking the full one cuts the stack from
+four epochs to one. So when partial acquisitions exceed
+`PARTIAL_DOMINANCE_THRESHOLD` (**0.66**) of the frame, the preference flips and
+`P` ranks first. The threshold is a judgement call, not a derived quantity;
+it lives next to `_common_mode_coverage` in `consistent_gslc.py` (and is
+mirrored in `generate_scope_viewer.py`).
+
+### 2. Then acquisition count
+
+Among modes with the same coverage, the longer series wins: the number of
+acquisitions in the selected `(mode, coverage)` combo. Standard modes are the
+only candidates unless the frame has **no** standard-family acquisitions at all,
+in which case non-standard modes compete among themselves.
+
+### 3. Then mode priority
+
+Modes that are level on coverage *and* count are settled by `MODE_PRIORITY`:
+`4005` beats `2005`. This is a pure tie-break — it never costs a frame
+acquisitions, it only decides which of two equally long series to keep.
+
+!!! note "Why `MODE_PRIORITY` is a tuple, not a set"
+    The tie-break used to fall out of set iteration, so the winner depended on
+    the interpreter's hash seed and the same catalog could yield two different
+    consistent databases on two different runs. An explicit order makes the
+    choice reproducible.
+
+### 4. One acquisition per calendar date
 
 If the winning `(mode, coverage)` appears more than once on the same calendar
 date, keep only the **earliest** sensing time. This removes intra-day
@@ -106,21 +134,25 @@ Real patterns from NISAR data (`count` of acquisitions per `mode_coverage`):
 |---|---|---|
 | `4005_F ×5`, `4005_P ×2` | **`4005_F`** | one mode; F majority |
 | `4005_P ×7`, `4005_F ×1` | **`4005_P`** | one mode; P majority |
-| `2005_F ×4`, `4005_P ×4` | **`4005_P`** | `4005` beats `2005` in step 1 |
-| `4005_P ×3`, `2005_F ×3` | **`4005_P`** | `4005` wins step 1; tie in step 2 → but only P exists for 4005 |
+| `2005_F ×4`, `4005_F ×4` | **`4005_F`** | both `F` and level on count; `4005` wins the tie-break (track 163 / frame 11) |
+| `2005_F ×4`, `4005_P ×4` | **`2005_F`** | 50% partial; `F` beats `P` before anything else applies |
+| `4005_P ×4`, `2005_F ×1` | **`4005_P`** | 80% partial — above the threshold, so `P` wins (track 42 / frame 164) |
+| `2005_P ×4`, `4005_P ×1` | **`2005_P`** | both `P`; the longer series wins (track 29 / frame 96) |
+| `2005_F ×9`, `4005_F ×2` | **`2005_F`** | both `F`; the count outranks mode priority |
 
 ```mermaid
 flowchart TD
     S["All GSLC acquisitions<br/>for one (track, frame)"] --> M{"Standard-family<br/>acquisitions present?"}
-    M -- yes --> M1["Vote among 40 / 20 modes"]
-    M -- no --> M2["Vote among all modes"]
-    M1 --> W["Winning mode<br/>(most acquisitions)"]
-    M2 --> W
-    W --> C{"n_F ≥ n_P<br/>within winning mode?"}
-    C -- yes --> CF["coverage = F"]
-    C -- no --> CP["coverage = P"]
-    CF --> D["Keep rows matching (mode, coverage)"]
-    CP --> D
+    M -- yes --> M1["Candidates: 40 / 20 modes"]
+    M -- no --> M2["Candidates: all modes"]
+    M1 --> P["Per candidate mode:<br/>coverage = F if n_F ≥ n_P else P"]
+    M2 --> P
+    P --> T{"partial share ><br/>0.66 of the frame?"}
+    T -- no --> RF["Preferred coverage = F"]
+    T -- yes --> RP["Preferred coverage = P"]
+    RF --> R["Rank modes:<br/>1. preferred coverage first<br/>2. acquisition count<br/>3. MODE_PRIORITY (4005, 2005)"]
+    RP --> R
+    R --> D["Keep rows matching the winning (mode, coverage)"]
     D --> E["Deduplicate: earliest sensing_time<br/>per calendar date"]
     E --> O["Consistent stack for this frame"]
 ```

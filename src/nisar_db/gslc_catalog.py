@@ -31,7 +31,7 @@ import click
 import pandas as pd
 
 from nisar_db.filenames import GSLCFilename
-from nisar_db.modes import STANDARD_FAMILIES, dominant_value
+from nisar_db.modes import FAMILY_PRIORITY, dominant_value
 
 # Columns that contain zero-padded numeric strings (e.g. "0005", "003").
 # Written with explicit quoting so pandas doesn't drop leading zeros on re-read.
@@ -99,7 +99,7 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
     # frame has no standard-family acquisitions at all.
     common_mode = (
         df.groupby(["track", "frame"])["mode_family"]
-        .agg(lambda grp: dominant_value(grp, STANDARD_FAMILIES))
+        .agg(lambda grp: dominant_value(grp, FAMILY_PRIORITY))
         .rename("common_mode")
         .reset_index()
     )

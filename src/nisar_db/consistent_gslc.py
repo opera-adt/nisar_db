@@ -5,23 +5,35 @@ but for NISAR which is frame-based (no sub-frame burst IDs).
 
 Selection logic (in priority order)
 -------------------------------------
-1. **Common mode** — for each (track, frame), find the dominant ``mode``
-   (full 4-character code, e.g. ``"4005"`` or ``"2005"``).
-   Priority: standard families ``{"4005", "2005"}`` first; fall back to
-   overall most-frequent if the frame has no standard-family acquisitions.
+Each candidate ``mode`` first settles its own coverage by majority (``F`` when
+``n_F >= n_P``, else ``P``), then the modes compete:
 
-2. **Coverage** — within the winning mode, prefer full-frame (``F``) over
-   partial (``P``).  If the frame has *more* acquisitions of ``<mode>_F``
-   than ``<mode>_P``, select ``F``; otherwise ``P``.
-   Ties go to ``F``.
+1. **Coverage** — a mode that resolves to full-frame (``F``) beats one that
+   resolves to partial (``P``).  Full coverage is what a DISP stack needs, so
+   it outranks the mode code itself.
+
+   The exception is a frame that is *mostly* observed partially: once partial
+   acquisitions exceed :data:`PARTIAL_DOMINANCE_THRESHOLD` of the frame, the
+   preference flips to ``P``, because the partial series is then the one with
+   real temporal coverage.
+
+2. **Count** — among modes with the same coverage, the longer series wins:
+   the number of acquisitions in the selected ``(mode, coverage)`` combo.
+   Non-standard (engineering / test) modes only compete when the frame has no
+   standard acquisitions at all.
+
+3. **Mode** — the remaining tie-break, for modes that are level on coverage
+   *and* count, is ``"4005"`` over ``"2005"``.
 
    Examples (from real NISAR data):
      - ``4005_F x5, 4005_P x2``  ->  winner ``4005_F``
-     - ``4005_P x7, 4005_F x1``  ->  winner ``4005_P``
-     - ``2005_F x4, 4005_P x4``  ->  winner ``4005_P``  (4005 beats 2005 first)
-     - ``4005_P x3, 2005_F x3``  ->  winner ``4005_P``  (4005 beats 2005, tie->P)
+     - ``4005_P x7, 4005_F x1``  ->  winner ``4005_P``  (only mode; P majority)
+     - ``2005_F x4, 4005_F x4``  ->  winner ``4005_F``  (F, level counts: 4005)
+     - ``2005_F x4, 4005_P x4``  ->  winner ``2005_F``  (50% partial; F beats P)
+     - ``4005_P x4, 2005_F x1``  ->  winner ``4005_P``  (80% partial; P wins)
+     - ``2005_P x4, 4005_P x1``  ->  winner ``2005_P``  (both P; count decides)
 
-3. **Deduplication** — if the winning ``(mode, coverage)`` combo appears
+4. **Deduplication** — if the winning ``(mode, coverage)`` combo appears
    multiple times on the same calendar date, keep only the earliest
    sensing time.
 
@@ -82,7 +94,7 @@ from .blackout import (
     create_reference_dates_json,  # re-exported for back-compat
 )
 from .io_json import write_zipped_json
-from .modes import STANDARD_MODES
+from .modes import MODE_PRIORITY, STANDARD_MODES, value_rank
 
 __all__ = [
     "apply_blackout",
@@ -98,15 +110,30 @@ __all__ = [
 # Core selection logic
 # ---------------------------------------------------------------------------
 
+# Share of a frame's *candidate* acquisitions (the standard modes, or all modes
+# when the frame has none) that must be partial before partial coverage outranks
+# full. Preferring ``F`` costs temporal coverage whenever the frame is mostly
+# observed partially -- a frame seen as ``4005_P`` five times and ``2005_F`` once
+# would yield a one-epoch stack. Above this share the partial series is the
+# longer one and wins instead. The value is a judgement call, not a derived
+# quantity.
+PARTIAL_DOMINANCE_THRESHOLD = 0.66
+
 
 def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
     """Return (common_mode, common_coverage) for a single (track, frame) group.
 
-    Priority:
-      1. Standard modes ("4005", "2005") beat non-standard.
-      2. Most frequent mode wins (total count across F+P).
-      3. On a mode-count tie: the mode with more F acquisitions wins.
-      4. On a full tie: F beats P (i.e. prefer full-frame).
+    Every mode present first settles its own coverage by majority (``F`` when
+    ``n_F >= n_P``, else ``P``); the modes then compete on, in order:
+
+      1. coverage — full-frame (``F``) beats partial (``P``), unless partial
+         acquisitions make up more than :data:`PARTIAL_DOMINANCE_THRESHOLD` of
+         the candidates, in which case the preference flips,
+      2. count — acquisitions in the selected ``(mode, coverage)`` combo, with
+         non-standard modes competing only when the frame has no standard
+         acquisitions at all,
+      3. mode — :data:`~nisar_db.modes.MODE_PRIORITY` (``"4005"`` then
+         ``"2005"``) settles modes that are level on coverage and count.
 
     Parameters
     ----------
@@ -120,46 +147,39 @@ def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
         e.g. ("4005", "F")
 
     """
-    combos = grp.groupby(["mode", "coverage"]).size().reset_index(name="n")
+    counts = (
+        grp.groupby(["mode", "coverage"])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(columns=["F", "P"], fill_value=0)
+    )
 
-    # Separate standard vs non-standard mode rows
-    standard_rows = combos[combos["mode"].isin(STANDARD_MODES)]
-    candidate_rows = standard_rows if not standard_rows.empty else combos
+    standard = counts[counts.index.isin(STANDARD_MODES)]
+    candidates = standard if not standard.empty else counts
 
-    # Build per-mode summary: total count + F count (for tiebreaking)
-    mode_summary = (
-        candidate_rows.groupby("mode")
-        .apply(
-            lambda m: pd.Series(
-                {
-                    "total": m["n"].sum(),
-                    "n_F": m.loc[m["coverage"] == "F", "n"].sum(),
-                }
+    partial_share = candidates["P"].sum() / candidates.to_numpy().sum()
+    preferred_coverage = "P" if partial_share > PARTIAL_DOMINANCE_THRESHOLD else "F"
+
+    ranked = pd.DataFrame(
+        {
+            "mode": candidates.index,
+            "coverage": (
+                candidates["F"].ge(candidates["P"]).map({True: "F", False: "P"})
             ),
-            include_groups=False,
-        )
-        .reset_index()
+            # The majority coverage is by definition the larger of the two counts.
+            "n_selected": candidates[["F", "P"]].max(axis=1),
+        }
     )
+    ranked["coverage_rank"] = (ranked["coverage"] != preferred_coverage).astype(int)
+    ranked["mode_rank"] = [value_rank(m, MODE_PRIORITY) for m in ranked["mode"]]
 
-    # Rank standard modes above non-standard for final tiebreak
-    _MODE_RANK = {m: i for i, m in enumerate(STANDARD_MODES)}
-    mode_summary["rank"] = mode_summary["mode"].map(
-        lambda m: _MODE_RANK.get(m, len(STANDARD_MODES))
-    )
+    winner = ranked.sort_values(
+        ["coverage_rank", "n_selected", "mode_rank"],
+        ascending=[True, False, True],
+        kind="stable",
+    ).iloc[0]
 
-    # Sort: most total → most F → standard-mode rank (lower=better)
-    mode_summary = mode_summary.sort_values(
-        ["total", "n_F", "rank"], ascending=[False, False, True]
-    )
-    winning_mode = mode_summary.iloc[0]["mode"]
-    winning_n_F = mode_summary.iloc[0]["n_F"]
-    winning_total = mode_summary.iloc[0]["total"]
-    winning_n_P = winning_total - winning_n_F
-
-    # Within winning mode, pick coverage: F beats P on tie
-    winning_coverage = "F" if winning_n_F >= winning_n_P else "P"
-
-    return winning_mode, winning_coverage
+    return str(winner["mode"]), str(winner["coverage"])
 
 
 def select_consistent_acquisitions(df: pd.DataFrame) -> pd.DataFrame:
@@ -392,8 +412,9 @@ def main(
 
     \b
     Selection logic:
-      1. Dominant mode per frame  (standard "4005"/"2005" preferred)
-      2. Majority coverage within that mode (F beats P on tie)
+      1. Majority coverage per mode (F beats P on tie)
+      2. Winning mode: full-frame beats partial (reversed on frames more than
+         66% partial), then acquisition count, then "4005" beats "2005"
       3. One acquisition per calendar date (earliest sensing time)
     """  # noqa: D301
     make_consistent_gslc_json(
