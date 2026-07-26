@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 # CMR link "rel" values → catalog URL columns.
 _DATA_REL = "http://esipfed.org/ns/fedsearch/1.1/data#"
+_S3_REL = "http://esipfed.org/ns/fedsearch/1.1/s3#"
 _BROWSE_REL = "http://esipfed.org/ns/fedsearch/1.1/browse#"
 _METADATA_REL = "http://esipfed.org/ns/fedsearch/1.1/metadata#"
 
@@ -47,17 +48,34 @@ def create_database(db_path: str, table: str, schema: str) -> duckdb.DuckDBPyCon
 
 
 def extract_urls(links) -> dict:
-    """Map a granule's CMR links to url / s3_url / browse_url / metadata_url."""
+    """Map a granule's CMR links to url / s3_url / browse_url / metadata_url.
+
+    The first link of each kind wins. CMR lists a granule's own links first and
+    appends collection-level ones that reuse the same ``rel`` -- the ASF and
+    Earthdata search pages both arrive as ``data#`` -- so letting later links
+    overwrite stores the search page instead of the granule.
+    """
     urls: dict = {}
     for link in links or []:
         rel = link.get("rel", "")
         href = link.get("href", "")
-        if rel == _DATA_REL:
-            urls["s3_url" if href.startswith("s3://") else "url"] = href
+        if not href:
+            continue
+
+        # ASF publishes the direct-access path under its own ``s3#`` rel; older
+        # granules carry it as a ``data#`` link with an s3:// href.
+        if rel == _S3_REL or (rel == _DATA_REL and href.startswith("s3://")):
+            key = "s3_url"
+        elif rel == _DATA_REL:
+            key = "url"
         elif rel == _BROWSE_REL:
-            urls["browse_url"] = href
+            key = "browse_url"
         elif rel == _METADATA_REL:
-            urls["metadata_url"] = href
+            key = "metadata_url"
+        else:
+            continue
+
+        urls.setdefault(key, href)
     return urls
 
 
@@ -87,12 +105,19 @@ def extract_metadata(
             logger.warning(f"Could not extract metadata from {name}: {e}")
             continue
 
+        fields = filename_obj.to_dataframe().iloc[0].to_dict()
+        # ``to_dataframe`` renders the timestamps for display; the catalog
+        # columns are TIMESTAMP, so put the parsed datetimes back.
+        fields.update(
+            {k: v for k, v in vars(filename_obj).items() if isinstance(v, datetime)}
+        )
+
         rows.append(
             {
                 "id": name.replace(".h5", ""),  # filename without extension as ID
                 "granule_id": row["granule_id"],
                 **extract_urls(row.get("links", [])),
-                **filename_obj.to_dataframe().iloc[0].to_dict(),
+                **fields,
                 "inserted_at": datetime.now(timezone.utc),
             }
         )
@@ -104,14 +129,32 @@ def extract_metadata(
 
 def update_database(
     conn: duckdb.DuckDBPyConnection,
-    metadata_df: pd.DataFrame,  # noqa: ARG001  # read by duckdb replacement scan
+    metadata_df: pd.DataFrame,
     table: str,
     logger: logging.Logger,
 ) -> None:
-    """Insert/replace ``metadata_df`` rows into ``table`` and log the row count."""
+    """Insert/replace ``metadata_df`` rows into ``table``, matching by column name.
+
+    The frame's column order comes from the filename dataclass, not from the
+    table, so a positional ``SELECT *`` would insert each value into whichever
+    column happens to sit at that index. Columns the granules carry no value
+    for -- ``s3_url`` when CMR lists no direct-access link, say -- are inserted
+    as NULL.
+    """
     logger.info("Updating database with metadata...")
-    # duckdb resolves ``metadata_df`` from this frame's locals via replacement scan.
-    conn.execute(f"INSERT OR REPLACE INTO {table} SELECT * FROM metadata_df")
+    columns = [row[0] for row in conn.execute(f"DESCRIBE {table}").fetchall()]
+
+    extra = [c for c in metadata_df.columns if c not in columns]
+    if extra:
+        logger.debug(f"Columns not in {table}, not stored: {extra}")
+
+    # duckdb resolves ``aligned`` from this frame's locals via replacement scan.
+    aligned = metadata_df.reindex(columns=columns)  # noqa: F841
+    column_list = ", ".join(columns)
+    conn.execute(
+        f"INSERT OR REPLACE INTO {table} ({column_list}) "
+        f"SELECT {column_list} FROM aligned"
+    )
     conn.commit()
 
     count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
