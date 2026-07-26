@@ -611,6 +611,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shortcut-borrow-the-disp-s1-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shortcut — borrow the DISP-S1 windows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -757,6 +768,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shortcut-borrow-the-disp-s1-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shortcut — borrow the DISP-S1 windows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -867,11 +889,36 @@ not in the package: they pull a weather archive and a plotting stack that
     D --&gt;|nisar-db create-blackout-dates| E["nisar-blackout-dates.json"]
     E --&gt;|nisar-db create-consistent --blackout-file| F["consistent-GSLC JSON"]
     F --&gt;|summarize_blackout_difference.py| G["cost report + figures"]</code></pre>
+<h2 id="shortcut-borrow-the-disp-s1-windows">Shortcut — borrow the DISP-S1 windows<a class="headerlink" href="#shortcut-borrow-the-disp-s1-windows" title="Permanent link">&para;</a></h2>
+<p>Steps 1 and 2 download a weather archive and re-derive the seasons. If all you
+need is a table to feed Step 3, <code>burst_db</code> already published the same analysis
+for DISP-S1 frames, and snow onset and thaw are properties of the ground rather
+than of the sensor:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/snow-analysis/transfer_disp_s1_windows.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--disp-s1-table<span class="w"> </span>https://raw.githubusercontent.com/opera-adt/burst_db/main/snow-analysis/opera-region4-snow-analysis.geojson<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--frames-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--outfile<span class="w"> </span>nisar-snow-analysis-from-disp-s1.geojson
+</code></pre></div>
+<p>Each NISAR frame takes the area-weighted mean of the windows of every DISP-S1
+frame that overlaps it, averaged in water-year offsets so a
+November-to-April window never wraps through the calendar boundary. The output
+is Step 2's schema, so Step 3 reads it unchanged — plus <code>n_donors</code>,
+<code>donor_coverage</code> and <code>winter_coverage</code> for QC, and minus <code>n_seasons</code>, which a
+collapsed window table cannot recover.</p>
+<p>Two limits worth knowing before you rely on it:</p>
+<ul>
+<li><strong>Coverage.</strong> DISP-S1's table covers a fixed frame set; NISAR frames outside
+  it get no window at all. On the current release that is 344 of 1295 frames,
+  none above 37 deg N.</li>
+<li><strong>Resolution.</strong> Windows are smoothed over the donors of a frame — the spread
+  of donor start dates within one NISAR frame runs about a week.</li>
+</ul>
+<p>Where either matters, run the real thing from Step 1.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>
 <p><code>nisar_db</code> installed, plus the analysis-only extras:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>scripts/snow-analysis/requirements.txt
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>scripts/snow-analysis/requirements.txt
 </code></pre></div>
 </li>
 <li>
@@ -884,10 +931,10 @@ not in the package: they pull a weather archive and a plotting stack that
 <p>Subset the two fields the filter needs over North America and rechunk them
 time-major, so the per-frame timelines in Step 2 read a handful of chunks
 instead of the whole cube.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>scripts/snow-analysis/fetch_gefs.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--email<span class="w"> </span>you@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--start<span class="w"> </span><span class="m">2020</span>-01-01<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--outfile<span class="w"> </span>noaa_gefs.zarr
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>scripts/snow-analysis/fetch_gefs.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--email<span class="w"> </span>you@example.com<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--start<span class="w"> </span><span class="m">2020</span>-01-01<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--outfile<span class="w"> </span>noaa_gefs.zarr
 </code></pre></div>
 <p>The source is the public Dynamical.org mirror of the NOAA GEFS analysis, which
 asks for a contact address in the query string. The default bounding box
@@ -931,10 +978,10 @@ its in-frame pixels are flagged. Bad weeks are grouped into water years
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>python<span class="w"> </span>scripts/snow-analysis/derive_blackout_windows.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--gefs-zarr<span class="w"> </span>noaa_gefs.zarr<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--frames-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--outfile<span class="w"> </span>nisar-snow-analysis.geojson
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python<span class="w"> </span>scripts/snow-analysis/derive_blackout_windows.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--gefs-zarr<span class="w"> </span>noaa_gefs.zarr<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--frames-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--outfile<span class="w"> </span>nisar-snow-analysis.geojson
 </code></pre></div>
 <p>Produces one row per frame: <code>frame_idx</code>, <code>track</code>, <code>frame</code>, <code>n_seasons</code>, the
 thresholds used, <code>start_*</code>/<code>end_*</code>/<code>blackout_duration_*</code> per strategy, and
@@ -953,57 +1000,57 @@ because the builder reads <code>frame_id</code>; the resulting JSON is keyed by
 <p><code>create-blackout-dates</code> takes the <strong>median</strong> window unless it runs longer than
 <code>--max-default-duration</code> days, in which case it falls back to the <strong>aggressive</strong>
 one, then repeats that month/day window for every year in range.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>nisar-db<span class="w"> </span>create-blackout-dates<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--input-file<span class="w"> </span>nisar-snow-analysis.geojson<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--max-default-duration<span class="w"> </span><span class="m">180</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--start-year<span class="w"> </span><span class="m">2025</span><span class="w"> </span>--end-year<span class="w"> </span><span class="m">2030</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--output-file<span class="w"> </span>nisar-blackout-dates.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-blackout-dates<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--input-file<span class="w"> </span>nisar-snow-analysis.geojson<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--max-default-duration<span class="w"> </span><span class="m">180</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--start-year<span class="w"> </span><span class="m">2025</span><span class="w"> </span>--end-year<span class="w"> </span><span class="m">2030</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--output-file<span class="w"> </span>nisar-blackout-dates.json
 </code></pre></div>
 <p>See <a href="../background/blackout-dates.html">Background: blackout dates</a> for the JSON
 shape and the two other input modes (<code>--monthly</code>, <code>--manual</code>).</p>
 <h2 id="step-4-check-what-it-cost">Step 4 — Check what it cost<a class="headerlink" href="#step-4-check-what-it-cost" title="Permanent link">&para;</a></h2>
 <p>Build the consistent-mode database twice, with and without the filter — as in
 <code>burst_db</code>, both are worth keeping — then compare:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--output<span class="w"> </span>consistent-gslc-no-blackout.json
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span>--output<span class="w"> </span>consistent-gslc.json
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>python<span class="w"> </span>scripts/snow-analysis/summarize_blackout_difference.py<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">  </span>--all<span class="w"> </span>consistent-gslc-no-blackout.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">  </span>--filtered<span class="w"> </span>consistent-gslc.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">  </span>--frames-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">  </span>--group-by<span class="w"> </span>latitude<span class="w"> </span>--outdir<span class="w"> </span>figures/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--output<span class="w"> </span>consistent-gslc-no-blackout.json
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>nisar-db<span class="w"> </span>create-consistent<span class="w"> </span>--catalog<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--nisar-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span>--output<span class="w"> </span>consistent-gslc.json
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>python<span class="w"> </span>scripts/snow-analysis/summarize_blackout_difference.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span>--all<span class="w"> </span>consistent-gslc-no-blackout.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span>--filtered<span class="w"> </span>consistent-gslc.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="w">  </span>--frames-gpkg<span class="w"> </span>opera-nisar-disp-frames.gpkg<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="w">  </span>--group-by<span class="w"> </span>latitude<span class="w"> </span>--outdir<span class="w"> </span>figures/
 </code></pre></div>
 <p>Prints acquisitions kept and lost per group, how many frames still clear
 <code>--min-stack</code> (15 by default), and how many lost every acquisition:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>     NISAR consistent GSLC - after blackout filter (by latitude)
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>┏━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━┓
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>┃ Latitude ┃ # Frames ┃ Acqs kept ┃ Acqs lost ┃ % lost ┃ Frames &gt;=15 ┃
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>┡━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━┩
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>│ &lt;40N     │       82 │     1,473 │     1,316 │   47.2 │          43 │
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>│ 40-50N   │       45 │       705 │       711 │   50.2 │          18 │
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>...
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>     NISAR consistent GSLC - after blackout filter (by latitude)
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>┏━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━┓
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>┃ Latitude ┃ # Frames ┃ Acqs kept ┃ Acqs lost ┃ % lost ┃ Frames &gt;=15 ┃
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>┡━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━┩
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>│ &lt;40N     │       82 │     1,473 │     1,316 │   47.2 │          43 │
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>│ 40-50N   │       45 │       705 │       711 │   50.2 │          18 │
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>...
 </code></pre></div>
 <p><code>--group-by</code> also takes <code>mode</code> (mode+coverage, the default) and <code>track</code>; only
 <code>mode</code> works without <code>--frames-gpkg</code>. Add <code>--no-plots</code> for the table alone, or
 drop <code>--outdir</code> to show the figures interactively.</p>
 <h2 id="tuning-the-thresholds">Tuning the thresholds<a class="headerlink" href="#tuning-the-thresholds" title="Permanent link">&para;</a></h2>
 <p><code>snow_month_filter.py</code> holds the logic if you want to work interactively:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">snow_month_filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">aggregate_weather</span><span class="p">,</span> <span class="n">bad_period_mask</span><span class="p">,</span> <span class="n">plot_frame_timeline</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">ds</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">open_zarr</span><span class="p">(</span><span class="s2">&quot;noaa_gefs.zarr&quot;</span><span class="p">,</span> <span class="n">consolidated</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">agg</span> <span class="o">=</span> <span class="n">aggregate_weather</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">win</span><span class="o">=</span><span class="s2">&quot;1W&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">mask</span> <span class="o">=</span> <span class="n">bad_period_mask</span><span class="p">(</span><span class="n">agg</span><span class="p">,</span> <span class="n">snow_threshold</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">freezing_threshold</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;opera-nisar-disp-frames.gpkg&quot;</span><span class="p">)</span>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">plot_frame_timeline</span><span class="p">(</span><span class="mi">6187</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">frames</span><span class="p">)</span>   <span class="c1"># red = blacked out</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">xarray</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">xr</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">snow_month_filter</span><span class="w"> </span><span class="kn">import</span> <span class="n">aggregate_weather</span><span class="p">,</span> <span class="n">bad_period_mask</span><span class="p">,</span> <span class="n">plot_frame_timeline</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">ds</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">open_zarr</span><span class="p">(</span><span class="s2">&quot;noaa_gefs.zarr&quot;</span><span class="p">,</span> <span class="n">consolidated</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">agg</span> <span class="o">=</span> <span class="n">aggregate_weather</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">win</span><span class="o">=</span><span class="s2">&quot;1W&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">compute</span><span class="p">()</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">mask</span> <span class="o">=</span> <span class="n">bad_period_mask</span><span class="p">(</span><span class="n">agg</span><span class="p">,</span> <span class="n">snow_threshold</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">freezing_threshold</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">&quot;opera-nisar-disp-frames.gpkg&quot;</span><span class="p">)</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">plot_frame_timeline</span><span class="p">(</span><span class="mi">6187</span><span class="p">,</span> <span class="n">mask</span><span class="p">,</span> <span class="n">frames</span><span class="p">)</span>   <span class="c1"># red = blacked out</span>
 </code></pre></div>
 <p>Knobs worth sweeping, in rough order of impact:</p>
 <table>
