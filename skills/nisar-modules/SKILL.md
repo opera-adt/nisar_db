@@ -117,8 +117,10 @@ src/nisar_db/
   manual editing via `append_blackout_period`, `append_blackout_dates_json`,
   `load_blackout_json` (CLI `append-blackout-dates`).
 - **[reference_dates.py](../../src/nisar_db/reference_dates.py)** —
-  `calculate_reference_dates` (interval-based from the consistent JSON, or
-  month-based from a blackout file), `build_desired_month_map_from_blackout`,
+  `calculate_reference_dates` (interval-based, or month-based when a blackout
+  file supplies the anchor months; both need the consistent JSON and emit only
+  dates present in it), `find_blacked_out_references` (guard against an
+  unfiltered stack), `build_desired_month_map_from_blackout`,
   `pick_month_based_on_snow`, `load_consistent_json`, `EVENT_DATES_BY_FRAME`
   (CLI `create-reference-dates`). Writes via `blackout.create_reference_dates_json`.
 - **[processing_mode.py](../../src/nisar_db/processing_mode.py)** —

@@ -108,7 +108,7 @@ Both builders share one pipeline in
 | `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames; optional `--blackout-file` | `--output` consistent JSON |
 | `create-blackout-dates` | `--input-file` snow/monthly GeoJSON, or `--manual` | `--output-file` blackout JSON |
 | `append-blackout-dates` | `--json-file` existing blackout JSON, `--frame`, repeatable `--period START END` | same file (or `--output`) + `.json.zip` |
-| `create-reference-dates` | `--consistent-json` and/or `--blackout-file`; `--interval`, `--min-acquisitions` | `--output` reference-dates JSON + `.json.zip` |
+| `create-reference-dates` | `--consistent-json` (required), optional `--blackout-file` (switches to month-based, and rejects an unfiltered stack); `--interval`, `--min-acquisitions` | `--output` reference-dates JSON + `.json.zip` |
 | `label-processing-mode` | `--consistent-json`, optional `--previous-json`; `--batch-size`, `--gap-threshold-years` | `--output` labelled JSON + `.json.zip` |
 
 ### GSLC JSON outputs
@@ -167,8 +167,12 @@ when changing entry points.
   (three modes: snow-analysis default, `--monthly`, `--manual`).
 - **Reference-epoch reset rule** → [reference_dates.py](../../src/nisar_db/reference_dates.py):
   `pick_month_based_on_snow` for the month-based rule, `_generate_by_consistent`
-  for the interval-based one, `EVENT_DATES_BY_FRAME` for earthquake resets. The
-  JSON writer stays in [blackout.py](../../src/nisar_db/blackout.py).
+  for the interval-based one, `EVENT_DATES_BY_FRAME` for earthquake resets. Both
+  rules emit sensing times present in the consistent-GSLC JSON --
+  `_snap_to_yearly_anchors` moves each month anchor onto a real acquisition.
+  Blackout filtering is *not* done here: it belongs to `make-consistent-gslc
+  --blackout-file`, and `find_blacked_out_references` only verifies it happened.
+  The JSON writer stays in [blackout.py](../../src/nisar_db/blackout.py).
 - **Batch size / gap threshold for processing modes** →
   [processing_mode.py](../../src/nisar_db/processing_mode.py). What counts as a
   release-to-release change is `find_frames_with_changed_mode`, which compares

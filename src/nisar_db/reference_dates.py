@@ -9,10 +9,22 @@ supported, mirroring the DISP-S1 workflow:
    one.  Frames listed in :data:`EVENT_DATES_BY_FRAME` also reset on the given
    event date (e.g. a large earthquake), whether or not the interval has
    elapsed.
-2. **Month-based** — when a blackout-dates JSON is supplied, ignore the
-   acquisition history and reset on the 1st of a snow-free month chosen from
-   how heavily the frame is blacked out.  A frame that spends half the year
-   under snow cannot carry a winter reference epoch.
+2. **Month-based** — when a blackout-dates JSON is supplied, reset on a
+   snow-free month chosen from how heavily the frame is blacked out.  A frame
+   that spends half the year under snow cannot carry a winter reference epoch.
+
+Both strategies emit *acquisition* sensing times taken from the consistent-GSLC
+JSON: a reference date always names an epoch the frame actually has data for.
+The month-based rule therefore snaps each yearly anchor forward to the first
+acquisition on or after it and stops at the end of the archive, rather than
+projecting a calendar into years with no acquisitions.
+
+Blacked-out acquisitions are kept out of reference dates by keeping them out of
+the *stack*: :func:`nisar_db.consistent_gslc.make_consistent_gslc_json` applies
+``--blackout-file`` when it builds the consistent-GSLC JSON, exactly as
+``burst_db`` does.  This module only reads that stack; when a blackout file is
+passed it re-checks the result via :func:`find_blacked_out_references` and fails
+loudly if the stack it was given had not been filtered.
 
 The dates are written by :func:`nisar_db.blackout.create_reference_dates_json`
 as ``opera-nisar-disp-reference-dates-{date}.json[.zip]``.
@@ -29,18 +41,20 @@ from __future__ import annotations
 
 import json
 import logging
+from bisect import bisect_left
 from datetime import datetime
 from pathlib import Path
 
 import click
 
-from .blackout import create_reference_dates_json
+from .blackout import create_reference_dates_json, is_excluded, load_blackout_json
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "build_desired_month_map_from_blackout",
     "calculate_reference_dates",
+    "find_blacked_out_references",
     "pick_month_based_on_snow",
 ]
 
@@ -118,19 +132,106 @@ def build_desired_month_map_from_blackout(
     }
 
 
-def _generate_month_based_dates(
-    desired_month_by_frame: dict[str, int],
-    start_year: int,
-    end_year: int,
+def _sensing_times(frame_data: dict) -> list[datetime]:
+    """Return a frame's acquisition times, sorted, so they can be bisected."""
+    return sorted(
+        datetime.strptime(t, _TIME_FMT) for t in frame_data["sensing_time_list"]
+    )
+
+
+def find_blacked_out_references(
+    reference_dates: dict[str, list[str]],
+    blackout_periods: dict[str, list[list[str]]],
 ) -> dict[str, list[str]]:
-    """Emit one reference date per year on the 1st of each frame's month."""
-    return {
-        str(frame_idx): [
-            datetime(year, month, 1).strftime(_TIME_FMT)
-            for year in range(start_year, end_year)
+    """Return any reference dates that fall inside a frame's blackout window.
+
+    Non-empty output means the consistent-GSLC JSON was built without
+    ``--blackout-file``: the blackout filter belongs there, so a stack that
+    still contains blacked-out acquisitions can hand one to a reference epoch.
+
+    Parameters
+    ----------
+    reference_dates : dict
+        ``{frame_idx: ["YYYY-MM-DDTHH:MM:SS", ...]}``.
+    blackout_periods : dict
+        ``{frame_idx: [[start, end], ...]}`` from the blackout-dates JSON.
+
+    Returns
+    -------
+    dict
+        The offending dates, keyed by ``frame_idx``; empty when the stack was
+        filtered as expected.
+
+    """
+    offenders = {}
+    for frame_idx, dates in reference_dates.items():
+        blacked_out = [
+            d
+            for d in dates
+            if is_excluded(
+                frame_idx, datetime.strptime(d, _TIME_FMT).date(), blackout_periods
+            )
         ]
-        for frame_idx, month in desired_month_by_frame.items()
-    }
+        if blacked_out:
+            offenders[frame_idx] = blacked_out
+    return offenders
+
+
+def _snap_to_yearly_anchors(
+    sensing_times: list[datetime], month: int
+) -> list[datetime]:
+    """Return the acquisitions that open a new epoch on `month` each year.
+
+    Each 1st-of-`month` anchor between the frame's first and last acquisition is
+    moved forward to the first acquisition on or after it, so every returned
+    date exists in the frame's stack.  Anchors that land on the same
+    acquisition -- a frame whose only data arrives after several anchors have
+    passed -- collapse to one reference.
+    """
+    references: list[datetime] = []
+    for year in range(sensing_times[0].year, sensing_times[-1].year + 1):
+        idx = bisect_left(sensing_times, datetime(year, month, 1))
+        if idx == len(sensing_times):
+            break
+        acquisition = sensing_times[idx]
+        if not references or acquisition != references[-1]:
+            references.append(acquisition)
+    return references
+
+
+def _generate_month_based_dates(
+    consistent_json_file: str | Path,
+    desired_month_by_frame: dict[str, int],
+) -> dict[str, list[str]]:
+    """Reset each frame on the acquisition opening its snow-free month."""
+    consistent_data = load_consistent_json(consistent_json_file)
+
+    reference_dates: dict[str, list[str]] = {}
+    n_no_acquisitions = 0
+    n_never_reaches_month = 0
+    for frame_idx, month in desired_month_by_frame.items():
+        frame_data = consistent_data.get(str(frame_idx))
+        sensing_times = _sensing_times(frame_data) if frame_data else []
+        if not sensing_times:
+            n_no_acquisitions += 1
+            continue
+
+        references = _snap_to_yearly_anchors(sensing_times, month)
+        if not references:
+            # The archive ends before the frame's first anchor month, so it
+            # keeps its default reference until more data arrives.
+            n_never_reaches_month += 1
+            continue
+        reference_dates[str(frame_idx)] = [d.strftime(_TIME_FMT) for d in references]
+
+    logger.info(
+        "Month-based references for %d frames (%d with no consistent "
+        "acquisitions, %d whose archive ends before their anchor month)",
+        len(reference_dates),
+        n_no_acquisitions,
+        n_never_reaches_month,
+    )
+    return reference_dates
 
 
 def _generate_by_consistent(
@@ -144,9 +245,9 @@ def _generate_by_consistent(
 
     reference_dates: dict[str, list[str]] = {}
     for frame_idx, frame_data in consistent_data.items():
-        sensing_times = [
-            datetime.strptime(t, _TIME_FMT) for t in frame_data["sensing_time_list"]
-        ]
+        sensing_times = _sensing_times(frame_data)
+        if not sensing_times:
+            continue
         event_dates = {
             datetime.strptime(d, "%Y-%m-%d").date()
             for d in EVENT_DATES_BY_FRAME.get(str(frame_idx), [])
@@ -194,26 +295,28 @@ def calculate_reference_dates(
     desired_month_by_frame: dict[str, int] | None = None,
     interval_years: float = 1.0,
     min_acquisitions_per_batch: int = 15,
-    start_year: int = 2025,
-    end_year: int = 2035,
 ) -> dict[str, list[str]]:
     """Return the reference-epoch reset dates for every NISAR frame.
 
+    Every returned date is one of the frame's own sensing times, so a reference
+    epoch always names an acquisition the processor will actually have.  Build
+    the consistent-GSLC JSON with ``--blackout-file`` to keep blacked-out
+    acquisitions out of that stack, and hence out of these dates.
+
     Parameters
     ----------
-    consistent_json_file : str or Path, optional
-        Consistent-GSLC JSON to read acquisition histories from.  Required
-        unless `desired_month_by_frame` is given.
+    consistent_json_file : str or Path
+        Consistent-GSLC JSON to read acquisition histories from.  Required by
+        both strategies.
     desired_month_by_frame : dict, optional
         ``{frame_idx: month}``.  When non-empty, the month-based strategy is
-        used and `consistent_json_file` is ignored.
+        used: each frame resets on the first acquisition on or after the 1st of
+        `month`, once per year, for as long as the frame has data.  Frames
+        absent from the consistent-GSLC JSON are dropped.
     interval_years : float
         Nominal spacing between reference epochs (interval-based strategy).
     min_acquisitions_per_batch : int
         Minimum acquisitions that must accumulate before a new epoch opens.
-    start_year, end_year : int
-        Year range covered by the month-based strategy.  NISAR science
-        operations began in 2025.
 
     Returns
     -------
@@ -223,24 +326,24 @@ def calculate_reference_dates(
     Raises
     ------
     ValueError
-        If neither a consistent-GSLC JSON nor a month map is supplied.
+        If no consistent-GSLC JSON is supplied.
 
     Example
     -------
-    >>> calculate_reference_dates(desired_month_by_frame={"5827": 7})
-    {'5827': ['2025-07-01T00:00:00', ...]}
+    >>> calculate_reference_dates(  # doctest: +SKIP
+    ...     "consistent-gslc.json", desired_month_by_frame={"5827": 7}
+    ... )
+    {'5827': ['2025-07-08T01:23:45', ...]}
 
     """
-    if desired_month_by_frame:
-        return _generate_month_based_dates(
-            desired_month_by_frame, start_year=start_year, end_year=end_year
-        )
     if not consistent_json_file:
         raise ValueError(
-            "Pass --consistent-json (acquisition-based) or --blackout-file "
-            "(month-based); neither was given, so there is nothing to derive "
-            "reference dates from."
+            "Pass --consistent-json: reference dates are acquisition times taken "
+            "from the consistent-GSLC JSON, so there is nothing to derive them "
+            "from without it."
         )
+    if desired_month_by_frame:
+        return _generate_month_based_dates(consistent_json_file, desired_month_by_frame)
     return _generate_by_consistent(
         consistent_json_file,
         interval_years=interval_years,
@@ -254,7 +357,7 @@ def calculate_reference_dates(
     "consistent_json_file",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     default=None,
-    help="Consistent-GSLC JSON to derive reference epochs from.",
+    help="Consistent-GSLC JSON supplying the acquisition times to reset on.",
 )
 @click.option(
     "--blackout-file",
@@ -288,10 +391,10 @@ def main(
     min_acquisitions: int,
 ) -> None:
     """Create the NISAR reference-dates JSON."""
-    if not (consistent_json_file or blackout_file):
+    if not consistent_json_file:
         raise click.UsageError(
-            "Pass --consistent-json (interval-based) or --blackout-file "
-            "(month-based); neither was given."
+            "--consistent-json is required: reference dates are acquisition "
+            "times read from it."
         )
 
     desired_month_by_frame = None
@@ -308,6 +411,20 @@ def main(
         interval_years=interval,
         min_acquisitions_per_batch=min_acquisitions,
     )
+
+    if blackout_file:
+        offenders = find_blacked_out_references(
+            reference_dates, load_blackout_json(blackout_file)["blackout_dates"]
+        )
+        if offenders:
+            sample = list(offenders.items())[:5]
+            raise click.ClickException(
+                f"{len(offenders)} frames got a reference date inside a blackout "
+                f"window, e.g. {sample}. The blackout filter belongs to the "
+                f"consistent-GSLC stack -- rebuild it with "
+                f"'nisar-db make-consistent-gslc --blackout-file {blackout_file}' "
+                f"and derive the reference dates from that."
+            )
 
     create_reference_dates_json(
         reference_dates,
