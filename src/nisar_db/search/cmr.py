@@ -35,6 +35,37 @@ _UMM_SEARCH_URL = "https://cmr.earthdata.nasa.gov/search/granules.umm_json"
 _JSON_SEARCH_URL = "https://cmr.earthdata.nasa.gov/search/granules.json"
 
 
+def _extract_items(response_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return the granule list from a CMR response body.
+
+    Handles both response shapes: UMM-JSON (``items``) and the echo10 atom-JSON
+    used by ``granules.json`` (``feed.entry``).
+    """
+    if "items" in response_json:
+        return response_json["items"]
+    return response_json.get("feed", {}).get("entry", [])
+
+
+def _extract_total_hits(response: requests.Response) -> int:
+    """Return the total granule count for a CMR search, or 0 if not reported.
+
+    ``CMR-Hits`` is set on every CMR search response and is the only place the
+    total appears for the atom-JSON (``granules.json``) format, whose body
+    carries no hit count -- reading the header rather than the body is what
+    keeps a granule search from stopping short of the full archive.
+    """
+    return int(response.headers.get("CMR-Hits", 0))
+
+
+def _fetch_page(
+    url: str, params: Dict[str, Any], page_num: int
+) -> List[Dict[str, Any]]:
+    """Fetch a single page of CMR results."""
+    response = requests.get(url, params={**params, "page_num": page_num}, timeout=30)
+    response.raise_for_status()
+    return _extract_items(response.json())
+
+
 def fetch_cmr_pages(
     url: str,
     params: Dict[str, Any],
@@ -61,174 +92,73 @@ def fetch_cmr_pages(
     List[Dict[str, Any]]
         List of items from all pages.
 
+    Raises
+    ------
+    requests.HTTPError
+        If any page request fails. A dropped page silently truncates the
+        archive, so page errors are never swallowed.
+
     """
-    # First determine how many pages we need to fetch
-    params_copy = params.copy()
-    params_copy["page_num"] = 1
+    page_size = params.get("page_size", 10)
 
-    try:
-        logger.debug("Fetching page 1 to determine total pages")
-        response = requests.get(url, params=params_copy, timeout=30)
-        response.raise_for_status()
-        response_json = response.json()
+    logger.debug("Fetching page 1 to determine total pages")
+    response = requests.get(url, params={**params, "page_num": 1}, timeout=30)
+    response.raise_for_status()
 
-        # Determine total hits and pages
-        total_hits = 0
-        page_size = params.get("page_size", 10)
+    first_page_items = _extract_items(response.json())
+    total_hits = _extract_total_hits(response)
+    if not total_hits:
+        # No count reported: the first short page is the only end-of-results signal.
+        total_hits = len(first_page_items)
 
-        # Handle UMM JSON format
-        if "items" in response_json:
-            first_page_items = response_json["items"]
-            # Check for CMR-Hits header which gives total results
-            if "CMR-Hits" in response.headers:
-                total_hits = int(response.headers["CMR-Hits"])
-        # Handle atom format
-        elif "feed" in response_json and "entry" in response_json["feed"]:
-            first_page_items = response_json["feed"]["entry"]
-            # Some feed formats include a total element
-            if "hits" in response_json.get("feed", {}):
-                total_hits = int(response_json["feed"]["hits"])
-        else:
-            first_page_items = []
+    total_pages = (total_hits + page_size - 1) // page_size
+    logger.debug(f"Total pages: {total_pages} (from {total_hits} hits)")
 
-        # If we couldn't determine total hits, make a conservative estimate
-        if total_hits == 0 and first_page_items:
-            # Just assume there might be more pages if we got a full page
-            if len(first_page_items) >= page_size:
-                total_hits = page_size * 5  # Conservative estimate
-            else:
-                total_hits = len(first_page_items)
+    if total_pages <= 1 or len(first_page_items) < page_size:
+        return first_page_items
 
-        total_pages = (total_hits + page_size - 1) // page_size
-        logger.debug(f"Estimated total pages: {total_pages} (from {total_hits} hits)")
+    all_items = first_page_items.copy()
+    remaining = range(2, total_pages + 1)
 
-        # No need for parallel fetching if only one page
-        if total_pages <= 1:
-            return first_page_items
+    # Never use more than 4 workers, and no more than there are pages left.
+    max_workers = min(max_workers, len(remaining), 4)
 
-        # Adjust max_workers to not exceed total pages and be reasonable
-        max_workers = min(
-            max_workers, total_pages - 1, 4
-        )  # Never use more than 4 workers
+    # For small numbers of pages, sequential is simpler and less risky
+    if total_pages <= 3 or max_workers <= 1:
+        for page_num in remaining:
+            logger.debug(f"Fetching page {page_num}/{total_pages} sequentially")
+            if rate_limit_delay > 0:
+                time.sleep(rate_limit_delay)
 
-        all_items = first_page_items.copy()  # Start with items from first page
+            items = _fetch_page(url, params, page_num)
+            all_items.extend(items)
 
-        # For small numbers of pages, sequential is simpler and less risky
-        if total_pages <= 3 or max_workers <= 1:
-            # Sequential fetching for remaining pages
-            for page_num in range(2, total_pages + 1):
-                logger.debug(f"Fetching page {page_num}/{total_pages} sequentially")
-                params_copy["page_num"] = page_num
-
-                # Add rate limiting delay
-                if rate_limit_delay > 0:
-                    time.sleep(rate_limit_delay)
-
-                response = requests.get(url, params=params_copy, timeout=30)
-                response.raise_for_status()
-                response_json = response.json()
-
-                # Extract items based on format
-                if "items" in response_json:
-                    items = response_json["items"]
-                elif "feed" in response_json and "entry" in response_json["feed"]:
-                    items = response_json["feed"]["entry"]
-                else:
-                    items = []
-
-                all_items.extend(items)
-
-                # Check if we've reached the end
-                if not items or len(items) < page_size:
-                    break
-        else:
-            # Parallel fetching for remaining pages using ThreadPoolExecutor
-            def fetch_page(page_num):
-                """Fetch a single page of CMR results."""
-                logger.debug(f"Fetching page {page_num}/{total_pages} in parallel")
-                params_page = params.copy()
-                params_page["page_num"] = page_num
-
-                # Add rate limiting delay based on thread ID to spread out requests
-                if rate_limit_delay > 0:
-                    time.sleep(rate_limit_delay * ((page_num - 2) % max_workers))
-
-                try:
-                    response = requests.get(url, params=params_page, timeout=30)
-                    response.raise_for_status()
-                    response_json = response.json()
-
-                    # Extract items based on format
-                    if "items" in response_json:
-                        return response_json["items"]
-                    elif "feed" in response_json and "entry" in response_json["feed"]:
-                        return response_json["feed"]["entry"]
-                    else:
-                        return []
-                except Exception:
-                    logger.exception(f"Error fetching page {page_num}")
-                    return []
-
-            # Fetch remaining pages in parallel
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all page fetches
-                future_to_page = {
-                    executor.submit(fetch_page, page_num): page_num
-                    for page_num in range(2, total_pages + 1)
-                }
-
-                # Collect results as they complete
-                for future in as_completed(future_to_page):
-                    page_items = future.result()
-                    all_items.extend(page_items)
-
-                    # Check if we got fewer items than expected
-                    if not page_items or len(page_items) < page_size:
-                        logger.debug("Received fewer items than page size")
-
-        return all_items  # noqa: TRY300  # success path of a large try block
-
-    except Exception:
-        logger.exception("Error determining total pages")
-        # Fall back to sequential fetching with unknown total
-        logger.debug("Falling back to sequential fetching")
-
-        all_items = []
-        page_num = 1
-
-        while True:
-            try:
-                params["page_num"] = page_num
-
-                # Add rate limiting delay
-                if page_num > 1 and rate_limit_delay > 0:
-                    time.sleep(rate_limit_delay)
-
-                response = requests.get(url, params=params, timeout=30)
-                response.raise_for_status()
-                response_json = response.json()
-
-                # Handle UMM JSON format
-                if "items" in response_json:
-                    items = response_json["items"]
-                # Handle atom format
-                elif "feed" in response_json and "entry" in response_json["feed"]:
-                    items = response_json["feed"]["entry"]
-                else:
-                    items = []
-
-                all_items.extend(items)
-
-                # Check if we've reached the end
-                if not items or len(items) < params.get("page_size", 10):
-                    break
-
-                page_num += 1
-            except Exception:
-                logger.exception(f"Error fetching page {page_num}")
+            if len(items) < page_size:
                 break
-
         return all_items
+
+    def fetch_page(page_num: int) -> List[Dict[str, Any]]:
+        """Fetch one page, staggering the start to spread out requests."""
+        logger.debug(f"Fetching page {page_num}/{total_pages} in parallel")
+        if rate_limit_delay > 0:
+            time.sleep(rate_limit_delay * ((page_num - 2) % max_workers))
+        return _fetch_page(url, params, page_num)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(fetch_page, page_num) for page_num in remaining]
+        for future in as_completed(futures):
+            all_items.extend(future.result())
+
+    # Over-fetching is normal -- ASF ingests granules while the pages are being
+    # walked -- but coming up short means a page was dropped.
+    if len(all_items) < total_hits:
+        logger.warning(
+            "Fetched only %d of the %d granules CMR reported.",
+            len(all_items),
+            total_hits,
+        )
+
+    return all_items
 
 
 def _build_search_params(
@@ -250,6 +180,10 @@ def _build_search_params(
         "short_name": short_name,  # str or list; a list is sent as repeated params (OR)
         "provider": provider,
         "page_size": page_size,
+        # Paging is not a snapshot: without a stable sort, granules ingested
+        # mid-query shift rows across page boundaries and get duplicated or
+        # missed. Sorting by start_date appends new ingests past the last page.
+        "sort_key": "start_date",
     }
 
     if bbox is not None:
