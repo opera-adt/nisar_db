@@ -479,6 +479,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#every-reference-date-is-a-real-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every reference date is a real acquisition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-json-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -746,6 +757,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#every-reference-date-is-a-real-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every reference date is a real acquisition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-json-shape" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -851,55 +873,91 @@ long temporal-baseline interferograms."</em> NISAR follows the same convention.<
 </tr>
 </tbody>
 </table>
+<h2 id="every-reference-date-is-a-real-acquisition">Every reference date is a real acquisition<a class="headerlink" href="#every-reference-date-is-a-real-acquisition" title="Permanent link">&para;</a></h2>
+<p>Both rules emit sensing times drawn from the <a href="consistent-mode.html">consistent-GSLC
+stack</a>: a reference date always names an acquisition the
+frame actually has. The processor snaps a reset to the first acquisition on or
+after the requested date anyway (<code>_compute_reference_dates</code> in <code>disp_s1</code>), so a
+date with no data behind it is silently skipped -- which makes it invisible when
+a frame's reference never resets as intended. Emitting acquisition times keeps
+the database self-checking: the list <em>is</em> the set of epochs the processor will
+use, and it stops at the end of the archive instead of projecting a calendar
+into years that have no acquisitions.</p>
+<p>Consequently <code>--consistent-json</code> is required for both rules, and a frame with no
+consistent acquisitions is dropped rather than given dates it cannot honour.</p>
+<p>This is also what keeps blacked-out dates out of the reference list, and it is
+why there is no blackout filter in <code>reference_dates.py</code>. The blackout is applied
+once, upstream, when the consistent-GSLC stack is built:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nisar-db<span class="w"> </span>make-consistent-gslc<span class="w"> </span>...<span class="w"> </span>--blackout-file<span class="w"> </span>nisar-blackout-dates.json
+</code></pre></div>
+<p>A stack built that way contains no blacked-out acquisitions, so no rule reading
+it can pick one -- and, just as importantly, a blacked-out acquisition cannot
+count towards the <code>--min-acquisitions</code> that opens the next epoch. <code>burst_db</code>
+draws the line in the same place (<code>create_cslc_burst_catalog.py</code> filters; its
+<code>reference_dates.py</code> does not). Check <code>metadata.blackout_file</code> in the consistent
+JSON to confirm which stack you have; if it is <code>null</code>, the blackout was never
+applied.</p>
+<p>As a backstop, passing <code>--blackout-file</code> to <code>create-reference-dates</code> re-checks
+the result with <code>find_blacked_out_references</code> and fails if any reference date
+landed in a window -- the symptom of deriving dates from an unfiltered stack.</p>
 <h2 id="the-json-shape">The JSON shape<a class="headerlink" href="#the-json-shape" title="Permanent link">&para;</a></h2>
 <p>Per-frame, keyed by <code>frame_idx</code>; each value lists the reset dates in order:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">&quot;generation_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-24T12:00:00&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Per-frame NISAR reference date changes. Each date marks a reset of the InSAR reference epoch (e.g. after a major earthquake or a data gap).&quot;</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">&quot;5827&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2026-01-15&quot;</span><span class="p">],</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="nt">&quot;5830&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2025-12-01&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2026-06-01&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;metadata&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">&quot;generation_time&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-07-24T12:00:00&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Per-frame NISAR reference date changes. Each date marks a reset of the InSAR reference epoch (e.g. after a major earthquake or a data gap).&quot;</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p">},</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">&quot;5827&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2026-07-08T06:31:00&quot;</span><span class="p">],</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">&quot;5830&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;2025-09-14T06:31:02&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;2026-09-08T06:31:01&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="producing-it">Producing it<a class="headerlink" href="#producing-it" title="Permanent link">&para;</a></h2>
 <p><code>nisar-db create-reference-dates</code> derives the dates and writes the JSON plus its
 <code>.json.zip</code>. Which of the two rules applies depends on whether a blackout file
 is supplied:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Month-based: anchor each frame on a snow-free month</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nisar-db<span class="w"> </span>create-reference-dates<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--blackout-file<span class="w"> </span>opera-nisar-disp-blackout-dates-2026-07-25.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-reference-dates-2026-07-25.json
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Interval-based: follow each frame&#39;s own acquisition history</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>nisar-db<span class="w"> </span>create-reference-dates<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span>--interval<span class="w"> </span><span class="m">1</span>.0<span class="w"> </span>--min-acquisitions<span class="w"> </span><span class="m">15</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Month-based: anchor each frame on a snow-free month</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>nisar-db<span class="w"> </span>create-reference-dates<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--blackout-file<span class="w"> </span>opera-nisar-disp-blackout-dates-2026-07-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-reference-dates-2026-07-25.json
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c1"># Interval-based: follow each frame&#39;s own acquisition history</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>nisar-db<span class="w"> </span>create-reference-dates<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span>--interval<span class="w"> </span><span class="m">1</span>.0<span class="w"> </span>--min-acquisitions<span class="w"> </span><span class="m">15</span>
 </code></pre></div>
+<p>In both cases the consistent JSON should already be blackout-filtered; see
+above.</p>
 <p>The month-based rule maps a frame's blackout count onto a reference month --
 none to November, up to five windows to September, more than that to July --
 because a frame that spends half the year under snow cannot carry a winter
-reference. The interval-based rule opens a new epoch once <code>--interval</code> years
+reference. It then takes, once per year, the first acquisition on or after the
+1st of that month; years whose anchor falls past the last acquisition contribute
+nothing. The interval-based rule opens a new epoch once <code>--interval</code> years
 have passed <em>and</em> <code>--min-acquisitions</code> acquisitions have accumulated, so sparse
 frames keep a single reference rather than a string of unusably short batches.
 Frames listed in <code>EVENT_DATES_BY_FRAME</code> reset on their event date regardless.</p>
+<p>Note the month-based rule has no <code>--min-acquisitions</code> equivalent: it resets every
+year the frame has data past its anchor month, however few acquisitions came in
+between.</p>
 <pre class="mermaid"><code>flowchart LR
-    A["Consistent-mode stack&lt;br/&gt;(per frame, sorted dates)"] --&gt; B["reset rule&lt;br/&gt;batch length / event dates"]
-    F["Blackout dates"] -.-&gt;|month-based| B
-    B --&gt; C["{frame_idx: [reset dates]}"]
+    F["Blackout dates"] --&gt; H["make-consistent-gslc&lt;br/&gt;--blackout-file"]
+    H --&gt; A["Consistent-mode stack&lt;br/&gt;(per frame, sorted dates)"]
+    A --&gt; B["reset rule&lt;br/&gt;batch length / events&lt;br/&gt;or snow-free month anchor"]
+    B --&gt; G["snap to first acquisition&lt;br/&gt;on or after the reset"]
+    G --&gt; C["{frame_idx: [reset dates]}"]
     C --&gt; D["create_reference_dates_json"]
     D --&gt; E["opera-nisar-disp-reference-dates-*.json"]</code></pre>
 <p>The writer is also usable directly when the dates come from elsewhere:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nisar_db.blackout</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_reference_dates_json</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">refs</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">&quot;5827&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2026-01-15&quot;</span><span class="p">],</span>           <span class="c1"># reference reset after a data gap</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="s2">&quot;5830&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2025-12-01&quot;</span><span class="p">,</span> <span class="s2">&quot;2026-06-01&quot;</span><span class="p">],</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">}</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">create_reference_dates_json</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;nisar-reference-dates.json&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">nisar_db.blackout</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_reference_dates_json</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">refs</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;5827&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2026-01-15&quot;</span><span class="p">],</span>           <span class="c1"># reference reset after a data gap</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">&quot;5830&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2025-12-01&quot;</span><span class="p">,</span> <span class="s2">&quot;2026-06-01&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">}</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">create_reference_dates_json</span><span class="p">(</span><span class="n">refs</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s2">&quot;nisar-reference-dates.json&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="how-the-processor-uses-it">How the processor uses it<a class="headerlink" href="#how-the-processor-uses-it" title="Permanent link">&para;</a></h2>
 <p>The three databases work together and are all keyed by the same <code>frame_idx</code>:</p>
