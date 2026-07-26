@@ -1073,8 +1073,10 @@ mirrored in <code>generate_scope_viewer.py</code>).</p>
 <h3 id="2-then-acquisition-count">2. Then acquisition count<a class="headerlink" href="#2-then-acquisition-count" title="Permanent link">&para;</a></h3>
 <p>Among modes with the same coverage, the longer series wins: the number of
 acquisitions in the selected <code>(mode, coverage)</code> combo. Standard modes are the
-only candidates unless the frame has <strong>no</strong> standard-family acquisitions at all,
-in which case non-standard modes compete among themselves.</p>
+only candidates: a frame with <strong>no</strong> standard acquisitions at all has no
+consistent stack to offer and is dropped from the output entirely. Pass
+<code>--keep-nonstandard-modes</code> to keep such frames instead, letting their
+non-standard modes compete among themselves.</p>
 <h3 id="3-then-mode-priority">3. Then mode priority<a class="headerlink" href="#3-then-mode-priority" title="Permanent link">&para;</a></h3>
 <p>Modes that are level on coverage <em>and</em> count are settled by <code>MODE_PRIORITY</code>:
 <code>4005</code> beats <code>2005</code>. This is a pure tie-break — it never costs a frame
@@ -1136,12 +1138,18 @@ duplicates so the stack has exactly one epoch per date.</p>
 <td><strong><code>2005_F</code></strong></td>
 <td>both <code>F</code>; the count outranks mode priority</td>
 </tr>
+<tr>
+<td><code>0505_F ×3</code></td>
+<td><em>(frame dropped)</em></td>
+<td>no standard mode; would be <code>0505_F</code> with <code>--keep-nonstandard-modes</code> (track 1 / frame 52)</td>
+</tr>
 </tbody>
 </table>
 <pre class="mermaid"><code>flowchart TD
-    S["All GSLC acquisitions&lt;br/&gt;for one (track, frame)"] --&gt; M{"Standard-family&lt;br/&gt;acquisitions present?"}
-    M -- yes --&gt; M1["Candidates: 40 / 20 modes"]
-    M -- no --&gt; M2["Candidates: all modes"]
+    S["All GSLC acquisitions&lt;br/&gt;for one (track, frame)"] --&gt; M{"Standard-mode&lt;br/&gt;acquisitions present?"}
+    M -- yes --&gt; M1["Candidates: 4005 / 2005"]
+    M -- "no (default)" --&gt; X["Frame dropped&lt;br/&gt;(no consistent stack)"]
+    M -- "no (--keep-nonstandard-modes)" --&gt; M2["Candidates: all modes"]
     M1 --&gt; P["Per candidate mode:&lt;br/&gt;coverage = F if n_F ≥ n_P else P"]
     M2 --&gt; P
     P --&gt; T{"partial share &gt;&lt;br/&gt;0.66 of the frame?"}
@@ -1188,7 +1196,7 @@ written (see <a href="blackout-dates.html">Blackout dates</a>).</p>
       L["GSLC file list (.txt)"]
       G["NISAR_TrackFrame_L_*.gpkg"]
     end
-    L --&gt; CAT["create-catalog&lt;br/&gt;gslc_catalog.csv"]
+    L --&gt; CAT["create-gslc-csv&lt;br/&gt;gslc_catalog.csv"]
     G --&gt; FTB["create-frame-to-bound&lt;br/&gt;opera-nisar-disp-frames.gpkg"]
     CAT --&gt; CON["create-consistent"]
     FTB --&gt; CON
