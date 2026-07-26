@@ -19,7 +19,7 @@ def get_trackframe_db(
 
     The TrackFrame database is a public CMR granule, so no credentials beyond a
     standard Earthdata Login ``.netrc`` entry are needed. It is the
-    ``--nisar-gpkg`` input to ``create-frame-to-bound``, ``create-catalog`` and
+    ``--nisar-gpkg`` input to ``create-frame-to-bound``, ``create-gslc-csv`` and
     ``create-consistent``.
 
     Parameters

@@ -94,7 +94,7 @@ jobs:
 
       - name: Build the consistent-mode database
         run: |
-          nisar-db create-catalog \
+          nisar-db create-gslc-csv \
             --input gslc_files.txt \
             --output gslc_catalog.csv \
             --na-only --nisar-gpkg NISAR_TrackFrame_L_*.gpkg

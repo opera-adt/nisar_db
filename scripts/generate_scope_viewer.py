@@ -144,11 +144,11 @@ def load_gslc_catalog(db_path: Path) -> pd.DataFrame:
 
 
 def load_gslc_catalog_csv(csv_path: Path) -> pd.DataFrame:
-    """Read the GSLC catalog CSV written by ``nisar-db create-catalog``.
+    """Read the GSLC catalog CSV written by ``nisar-db create-gslc-csv``.
 
     The CSV route is what the CMR-sourced pipeline produces: a bucket scan
     (`build-s3-catalog`) yields the DuckDB store, but CMR gives granule names,
-    which `create-catalog` parses into the same per-granule fields under
+    which `create-gslc-csv` parses into the same per-granule fields under
     slightly different names.
     """
     df = pd.read_csv(csv_path, dtype={"mode": str, "cycle": str, "crid": str})
@@ -2005,7 +2005,7 @@ def main(argv: list[str] | None = None) -> None:
         "--gslc-catalog",
         type=Path,
         default=None,
-        help="GSLC catalog CSV from 'nisar-db create-catalog'; use instead of "
+        help="GSLC catalog CSV from 'nisar-db create-gslc-csv'; use instead of "
         "--gslc-db when the granules came from CMR rather than a bucket scan.",
     )
     parser.add_argument(

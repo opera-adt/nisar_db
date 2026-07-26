@@ -88,7 +88,7 @@ $(REFERENCE_DATES): $(CONSISTENT_GSLC) $(BLACKOUT_FILE)
 
 # Create GSLC catalog from file list
 gslc_catalog.csv: gslc_files.txt $(NISAR_GPKG)
-	nisar-db create-catalog --input gslc_files.txt --output $@ --nisar-gpkg $(NISAR_GPKG) --na-only
+	nisar-db create-gslc-csv --input gslc_files.txt --output $@ --nisar-gpkg $(NISAR_GPKG) --na-only
 
 # Clean up intermediate files
 clean:
