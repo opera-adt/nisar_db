@@ -17,7 +17,7 @@ It is intentionally a design sibling of ``scripts/nisar_frame_viewer_v1.html``
 (same look and controls) with these deliberate differences:
 
 * globe (global) projection is the default at start,
-* frames can be colored by GSLC count, duplicate count, or consistent
+* frames can be colored by GSLC acquisition count, duplicate count, or consistent
   mode / coverage,
 * hovering a frame shows a dismissable summary and clicking it opens the
   granule list, a per-frame granule CSV export, and a plot of observation mode
@@ -755,7 +755,7 @@ BODY_HTML = r"""<body>
           <label>Color frames by</label>
           <select id="color-by">
             <option value="passDirection">Pass Direction</option>
-            <option value="gslc_count" selected>GSLC count in CMR (default)</option>
+            <option value="gslc_count" selected>GSLC acquisitions in CMR (default)</option>
             <option value="n_duplicate">Duplicate granules (same date &amp; mode)</option>
             <option value="cons_mode">Consistent mode</option>
             <option value="cons_cov">Consistent coverage (full/partial)</option>
@@ -918,7 +918,7 @@ APP_JS = r"""
 
   const COLOR_BY_FIELDS = {
     passDirection: { label:"Pass Direction",      key:"passDirection", kind:"cat" },
-    gslc_count:    { label:"GSLC count in CMR",    key:"gslc_count_sel", kind:"num" },
+    gslc_count:    { label:"GSLC acquisitions in CMR", key:"gslc_count_sel", kind:"num" },
     n_duplicate:   { label:"Duplicate granules",   key:"n_duplicate",   kind:"num" },
     cons_mode:     { label:"Consistent mode",      key:"cons_mode",     kind:"cat" },
     cons_cov:      { label:"Consistent coverage",  key:"cons_cov",      kind:"cat" },
@@ -1180,28 +1180,30 @@ APP_JS = r"""
   }
 
   // ---------- GSLC count under the current mode / polarization chips ----------
-  const MODE_POL_BY_FRAME = new Map(
+  // Counted the same way ``n_unique`` is on the Python side: one acquisition
+  // split into several granules is one entry, so the ramp agrees with the
+  // timeline chart and with the popup's "Unique acquisitions" row.
+  const GRANULE_KEYS_BY_FRAME = new Map(
     FRAME_DATA.features.map(f=>{
       const granules = Array.isArray(f.properties.granules) ? f.properties.granules : [];
-      return [f.properties.id, granules.map(g=>[g.mode, g.pol])];
+      return [f.properties.id, granules.map(g=>[g.mode, g.pol, `${g.date}|${g.mode}|${g.cov}`])];
     })
   );
 
   function selectedGslcCount(id){
-    const rows = MODE_POL_BY_FRAME.get(id) || [];
+    const rows = GRANULE_KEYS_BY_FRAME.get(id) || [];
     const modes = activeChips.gslcMode, pols = activeChips.gslcPol;
-    if (!modes.size && !pols.size) return rows.length;
-    let n = 0;
-    for (const [mode, pol] of rows) {
+    const seen = new Set();
+    for (const [mode, pol, key] of rows) {
       if (modes.size && !modes.has(mode)) continue;
       if (pols.size && !pols.has(pol)) continue;
-      n++;
+      seen.add(key);
     }
-    return n;
+    return seen.size;
   }
 
-  // Colouring by "GSLC count in CMR" reads this, so the ramp answers "how many
-  // granules of the kind I selected", not "how many of any kind".
+  // Colouring by "GSLC acquisitions in CMR" reads this, so the ramp answers "how
+  // many acquisitions of the kind I selected", not "how many of any kind".
   function updateSelectedGslcCounts(){
     FRAME_DATA.features.forEach(f=>{
       f.properties.gslc_count_sel = selectedGslcCount(f.properties.id);
@@ -1649,7 +1651,7 @@ APP_JS = r"""
     return `
       <div class="pop-title">Frame ${p.frame_idx} &middot; Track ${p.track} / Frame ${p.frame}</div>
       <div class="pop-row">Pass: ${p.passDirection} &middot; consistent: ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
-      <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
+      <div class="pop-row">GSLC granules in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
       ${duplicateRow(p)}
       ${blackoutDetailBlock(p)}
       <div class="pop-actions">
@@ -1899,7 +1901,7 @@ APP_JS = r"""
       popup.setLngLat(e.lngLat).setHTML(`
         <div class="pop-title">Frame ${p.frame_idx} &middot; Track ${p.track} / Frame ${p.frame}</div>
         <div class="pop-row">Pass: ${p.passDirection} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
-        <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s)</div>
+        <div class="pop-row">GSLC granules in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s)</div>
         ${duplicateRow(p)}
         ${blackoutHoverLine(p)}
         ${referenceHoverLine(p)}
