@@ -2044,7 +2044,12 @@ def main(argv: list[str] | None = None) -> None:
         "catalog_kind": "cmr" if args.gslc_catalog is not None else "bucket-scan",
         "n_frames": len(frame_data["features"]),
         "n_frames_with_gslc": n_with,
-        "n_granules": int(len(catalog)),
+        # Granules actually drawn: the catalog can span the globe, the map does
+        # not, and reporting the raw row count overstates the page's contents.
+        "n_granules": sum(
+            len(f["properties"]["granules"]) for f in frame_data["features"]
+        ),
+        "n_catalog_rows": int(len(catalog)),
         "consistent_source": str(args.consistent_json) if consistent else "computed",
         "has_blackout": blackout is not None,
         "has_reference": reference is not None,
