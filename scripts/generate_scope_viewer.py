@@ -813,7 +813,7 @@ BODY_HTML = r"""<body>
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
       <label><input type="radio" name="basemap" value="sat"> Satellite</label>
-      <label><input type="radio" name="basemap" value="sat2"> Satellite2</label>
+      <label><input type="radio" name="basemap" value="sat2"> Satellite-H</label>
       <button id="theme-toggle" title="Switch to the light theme">&#9788;</button>
     </div>
     <div id="chart-modal" hidden>
