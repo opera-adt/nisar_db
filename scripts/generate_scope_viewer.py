@@ -215,35 +215,50 @@ def load_period_json(path: Path, *keys: str) -> dict[str, list]:
 def common_mode_coverage(group: pd.DataFrame) -> tuple[str, str]:
     """Return the ``(common_mode, common_coverage)`` for one frame's granules.
 
-    Priority, identical to :func:`nisar_db.consistent_gslc._common_mode_coverage`:
+    Priority, identical to :func:`nisar_db.consistent_gslc._common_mode_coverage`.
+    Each mode settles its own coverage by majority (``F`` when ``n_F >= n_P``),
+    then the modes compete on:
 
-    1. standard science modes (``4005``/``2005``) vote before others,
-    2. the most frequent mode wins (total F+P count),
-    3. on a mode-count tie, the mode with more full-frame (``F``) acquisitions
-       wins, and
-    4. within the winning mode, ``F`` beats ``P`` on a tie.
+    1. coverage — full-frame (``F``) beats partial (``P``), reversed when more
+       than :data:`PARTIAL_DOMINANCE_THRESHOLD` of the candidates are partial,
+    2. the acquisition count of the selected ``(mode, coverage)`` combo, with
+       non-standard modes competing only when the frame has no standard
+       acquisitions, and
+    3. mode — :data:`MODE_PRIORITY` (``4005`` then ``2005``) settles modes level
+       on coverage and count.
     """
-    combos = group.groupby(["mode", "coverage"]).size().reset_index(name="n")
-    standard = combos[combos["mode"].isin(STANDARD_MODES)]
-    candidates = standard if not standard.empty else combos
-
-    per_mode = (
-        candidates.assign(n_F=lambda d: d["n"].where(d["coverage"] == "F", 0))
-        .groupby("mode")
-        .agg(total=("n", "sum"), n_F=("n_F", "sum"))
-        .reset_index()
+    counts = (
+        group.groupby(["mode", "coverage"])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(columns=["F", "P"], fill_value=0)
     )
-    per_mode["rank"] = per_mode["mode"].apply(lambda m: 0 if m in STANDARD_MODES else 1)
-    per_mode = per_mode.sort_values(
-        ["total", "n_F", "rank"], ascending=[False, False, True]
-    )
-    winning_mode = per_mode.iloc[0]["mode"]
+    standard = counts[counts.index.isin(STANDARD_MODES)]
+    candidates = standard if not standard.empty else counts
 
-    mode_rows = combos[combos["mode"] == winning_mode].set_index("coverage")["n"]
-    n_f = int(mode_rows.get("F", 0))
-    n_p = int(mode_rows.get("P", 0))
-    winning_coverage = "F" if n_f >= n_p else "P"
-    return winning_mode, winning_coverage
+    partial_share = candidates["P"].sum() / candidates.to_numpy().sum()
+    preferred_coverage = "P" if partial_share > PARTIAL_DOMINANCE_THRESHOLD else "F"
+
+    ranked = pd.DataFrame(
+        {
+            "mode": candidates.index,
+            "coverage": (
+                candidates["F"].ge(candidates["P"]).map({True: "F", False: "P"})
+            ),
+            "n_selected": candidates[["F", "P"]].max(axis=1),
+        }
+    )
+    ranked["coverage_rank"] = (ranked["coverage"] != preferred_coverage).astype(int)
+    ranked["mode_rank"] = [
+        MODE_PRIORITY.index(m) if m in MODE_PRIORITY else len(MODE_PRIORITY)
+        for m in ranked["mode"]
+    ]
+    winner = ranked.sort_values(
+        ["coverage_rank", "n_selected", "mode_rank"],
+        ascending=[True, False, True],
+        kind="stable",
+    ).iloc[0]
+    return str(winner["mode"]), str(winner["coverage"])
 
 
 def summarize_frame(group: pd.DataFrame) -> dict:
