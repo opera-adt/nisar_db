@@ -1050,7 +1050,7 @@ the current directory by default):</p>
 <p>Turn the raw file list into a structured CSV with the <code>mode</code>, <code>coverage</code>,
 <code>track</code>, <code>frame</code>, and <code>sensing_time</code> columns the selection needs. Restrict to
 North America with <code>--na-only</code>.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-catalog<span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>nisar-db<span class="w"> </span>create-gslc-csv<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--input<span class="w"> </span>gslc_files.txt<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>--output<span class="w"> </span>gslc_catalog.csv<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--na-only<span class="w"> </span><span class="se">\</span>
@@ -1161,7 +1161,7 @@ per calendar date — exactly the stack DISP-NISAR will process.</p>
 <h2 id="recap">Recap<a class="headerlink" href="#recap" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>flowchart TD
     G["NISAR_TrackFrame_L_*.gpkg"] --&gt;|Step 1| FTB["create-frame-to-bound&lt;br/&gt;→ opera-nisar-disp-frames.gpkg"]
-    L["gslc_files.txt"] --&gt;|Step 2| CAT["create-catalog&lt;br/&gt;→ gslc_catalog.csv"]
+    L["gslc_files.txt"] --&gt;|Step 2| CAT["create-gslc-csv&lt;br/&gt;→ gslc_catalog.csv"]
     FTB --&gt;|Step 3| CON["create-consistent"]
     CAT --&gt;|Step 3| CON
     BL["create-blackout-dates"] --&gt; CON
