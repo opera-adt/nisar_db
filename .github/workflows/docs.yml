@@ -41,6 +41,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # The frame viewer is regenerated from CMR by the Update frame viewer
+      # workflow; the copy under docs/ only backs local `mkdocs serve` and goes
+      # stale between refreshes. gh-deploy republishes the whole site, so
+      # without this a docs edit would roll the live page back to whatever CMR
+      # snapshot was last committed. Carry the published copy forward instead.
+      - name: Keep the published frame viewer
+        run: |
+          git fetch --no-tags origin +refs/heads/gh-pages:refs/remotes/origin/gh-pages || true
+          published=origin/gh-pages:assets/opera_nisar_db_viewer.html
+          if git cat-file -e "$published" 2>/dev/null; then
+            git show "$published" > docs/assets/opera_nisar_db_viewer.html
+            echo "Reusing the viewer already published on gh-pages."
+          else
+            echo "No viewer on gh-pages yet; deploying the committed copy."
+          fi
+
       # Pages is configured to serve from the gh-pages branch (build_type: legacy),
       # so publish by pushing the built site there rather than via the Pages
       # Actions artifact flow.
