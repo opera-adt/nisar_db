@@ -33,6 +33,37 @@ flowchart LR
     F -->|summarize_blackout_difference.py| G["cost report + figures"]
 ```
 
+## Shortcut — borrow the DISP-S1 windows
+
+Steps 1 and 2 download a weather archive and re-derive the seasons. If all you
+need is a table to feed Step 3, `burst_db` already published the same analysis
+for DISP-S1 frames, and snow onset and thaw are properties of the ground rather
+than of the sensor:
+
+```bash
+python scripts/snow-analysis/transfer_disp_s1_windows.py \
+  --disp-s1-table https://raw.githubusercontent.com/opera-adt/burst_db/main/snow-analysis/opera-region4-snow-analysis.geojson \
+  --frames-gpkg opera-nisar-disp-frames.gpkg \
+  --outfile nisar-snow-analysis-from-disp-s1.geojson
+```
+
+Each NISAR frame takes the area-weighted mean of the windows of every DISP-S1
+frame that overlaps it, averaged in water-year offsets so a
+November-to-April window never wraps through the calendar boundary. The output
+is Step 2's schema, so Step 3 reads it unchanged — plus `n_donors`,
+`donor_coverage` and `winter_coverage` for QC, and minus `n_seasons`, which a
+collapsed window table cannot recover.
+
+Two limits worth knowing before you rely on it:
+
+- **Coverage.** DISP-S1's table covers a fixed frame set; NISAR frames outside
+  it get no window at all. On the current release that is 344 of 1295 frames,
+  none above 37 deg N.
+- **Resolution.** Windows are smoothed over the donors of a frame — the spread
+  of donor start dates within one NISAR frame runs about a week.
+
+Where either matters, run the real thing from Step 1.
+
 ## Prerequisites
 
 - `nisar_db` installed, plus the analysis-only extras:
