@@ -105,8 +105,10 @@ mirrored in `generate_scope_viewer.py`).
 
 Among modes with the same coverage, the longer series wins: the number of
 acquisitions in the selected `(mode, coverage)` combo. Standard modes are the
-only candidates unless the frame has **no** standard-family acquisitions at all,
-in which case non-standard modes compete among themselves.
+only candidates: a frame with **no** standard acquisitions at all has no
+consistent stack to offer and is dropped from the output entirely. Pass
+`--keep-nonstandard-modes` to keep such frames instead, letting their
+non-standard modes compete among themselves.
 
 ### 3. Then mode priority
 
@@ -139,12 +141,14 @@ Real patterns from NISAR data (`count` of acquisitions per `mode_coverage`):
 | `4005_P ×4`, `2005_F ×1` | **`4005_P`** | 80% partial — above the threshold, so `P` wins (track 42 / frame 164) |
 | `2005_P ×4`, `4005_P ×1` | **`2005_P`** | both `P`; the longer series wins (track 29 / frame 96) |
 | `2005_F ×9`, `4005_F ×2` | **`2005_F`** | both `F`; the count outranks mode priority |
+| `0505_F ×3` | *(frame dropped)* | no standard mode; would be `0505_F` with `--keep-nonstandard-modes` (track 1 / frame 52) |
 
 ```mermaid
 flowchart TD
-    S["All GSLC acquisitions<br/>for one (track, frame)"] --> M{"Standard-family<br/>acquisitions present?"}
-    M -- yes --> M1["Candidates: 40 / 20 modes"]
-    M -- no --> M2["Candidates: all modes"]
+    S["All GSLC acquisitions<br/>for one (track, frame)"] --> M{"Standard-mode<br/>acquisitions present?"}
+    M -- yes --> M1["Candidates: 4005 / 2005"]
+    M -- "no (default)" --> X["Frame dropped<br/>(no consistent stack)"]
+    M -- "no (--keep-nonstandard-modes)" --> M2["Candidates: all modes"]
     M1 --> P["Per candidate mode:<br/>coverage = F if n_F ≥ n_P else P"]
     M2 --> P
     P --> T{"partial share ><br/>0.66 of the frame?"}
@@ -199,7 +203,7 @@ flowchart LR
       L["GSLC file list (.txt)"]
       G["NISAR_TrackFrame_L_*.gpkg"]
     end
-    L --> CAT["create-catalog<br/>gslc_catalog.csv"]
+    L --> CAT["create-gslc-csv<br/>gslc_catalog.csv"]
     G --> FTB["create-frame-to-bound<br/>opera-nisar-disp-frames.gpkg"]
     CAT --> CON["create-consistent"]
     FTB --> CON

@@ -67,7 +67,8 @@ def consistent_catalog_df() -> pd.DataFrame:
 
     Frame (128, 129): standard mode 4005 dominates (2xF, 1xP) plus a 2005 F and
     a same-date duplicate -> keeps the two 4005 F dates. Frame (200, 300): only
-    the non-standard mode 7700 (1xF, 2xP) -> falls back to 7700 P (two dates).
+    the non-standard mode 7700 (1xF, 2xP) -> dropped, unless
+    ``keep_nonstandard_modes`` is set, which falls back to 7700 P (two dates).
     """
     rows = [
         # (track, frame, mode, coverage, sensing_time)

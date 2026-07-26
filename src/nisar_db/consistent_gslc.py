@@ -19,8 +19,10 @@ Each candidate ``mode`` first settles its own coverage by majority (``F`` when
 
 2. **Count** — among modes with the same coverage, the longer series wins:
    the number of acquisitions in the selected ``(mode, coverage)`` combo.
-   Non-standard (engineering / test) modes only compete when the frame has no
-   standard acquisitions at all.
+   Only the standard modes compete: a frame observed exclusively in
+   non-standard (engineering / test) modes has no consistent stack and is
+   dropped from the output, unless ``keep_nonstandard_modes`` is set, which
+   lets its non-standard modes compete among themselves instead.
 
 3. **Mode** — the remaining tie-break, for modes that are level on coverage
    *and* count, is ``"4005"`` over ``"2005"``.
@@ -120,18 +122,19 @@ __all__ = [
 PARTIAL_DOMINANCE_THRESHOLD = 0.66
 
 
-def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
+def _common_mode_coverage(
+    grp: pd.DataFrame, keep_nonstandard_modes: bool = False
+) -> tuple[str, str] | None:
     """Return (common_mode, common_coverage) for a single (track, frame) group.
 
-    Every mode present first settles its own coverage by majority (``F`` when
-    ``n_F >= n_P``, else ``P``); the modes then compete on, in order:
+    Only the standard modes compete. Every candidate mode first settles its own
+    coverage by majority (``F`` when ``n_F >= n_P``, else ``P``); the modes then
+    compete on, in order:
 
       1. coverage — full-frame (``F``) beats partial (``P``), unless partial
          acquisitions make up more than :data:`PARTIAL_DOMINANCE_THRESHOLD` of
          the candidates, in which case the preference flips,
-      2. count — acquisitions in the selected ``(mode, coverage)`` combo, with
-         non-standard modes competing only when the frame has no standard
-         acquisitions at all,
+      2. count — acquisitions in the selected ``(mode, coverage)`` combo,
       3. mode — :data:`~nisar_db.modes.MODE_PRIORITY` (``"4005"`` then
          ``"2005"``) settles modes that are level on coverage and count.
 
@@ -140,11 +143,16 @@ def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
     grp:
         Subset of the catalog DataFrame for one (track, frame) pair.
         Must have columns ``mode`` and ``coverage``.
+    keep_nonstandard_modes:
+        When the frame has no standard acquisitions at all, let its
+        non-standard modes compete among themselves rather than returning
+        ``None``.
 
     Returns
     -------
-    (mode, coverage) : tuple[str, str]
-        e.g. ("4005", "F")
+    (mode, coverage) : tuple[str, str] or None
+        e.g. ("4005", "F"); ``None`` for a frame with no standard acquisitions
+        (unless ``keep_nonstandard_modes``).
 
     """
     counts = (
@@ -155,6 +163,8 @@ def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
     )
 
     standard = counts[counts.index.isin(STANDARD_MODES)]
+    if standard.empty and not keep_nonstandard_modes:
+        return None
     candidates = standard if not standard.empty else counts
 
     partial_share = candidates["P"].sum() / candidates.to_numpy().sum()
@@ -182,32 +192,37 @@ def _common_mode_coverage(grp: pd.DataFrame) -> tuple[str, str]:
     return str(winner["mode"]), str(winner["coverage"])
 
 
-def select_consistent_acquisitions(df: pd.DataFrame) -> pd.DataFrame:
+def select_consistent_acquisitions(
+    df: pd.DataFrame, keep_nonstandard_modes: bool = False
+) -> pd.DataFrame:
     """Filter catalog to the consistent (mode, coverage) per (track, frame).
 
     Returns a DataFrame with one row per (track, frame, sensing_date),
-    keeping only the earliest sensing time when there are duplicates.
+    keeping only the earliest sensing time when there are duplicates. Frames
+    observed only in non-standard modes are dropped unless
+    ``keep_nonstandard_modes`` is set.
 
     New columns added:
       ``common_mode``      — winning mode code (e.g. "4005")
       ``common_coverage``  — winning coverage ("F" or "P")
     """
-    # Compute (common_mode, common_coverage) per frame
-    result = (
-        df.groupby(["track", "frame"])
-        .apply(_common_mode_coverage, include_groups=False)
-        .reset_index()
-    )
-    result[["common_mode", "common_coverage"]] = pd.DataFrame(
-        result[0].tolist(), index=result.index
-    )
-    result = result.drop(columns=[0])
+    # Compute (common_mode, common_coverage) per frame. Frames whose winner is
+    # ``None`` have no standard-mode stack and are simply left out, so the inner
+    # merge below drops their acquisitions.
+    winners = [
+        (track, frame, *winner)
+        for (track, frame), grp in df.groupby(["track", "frame"])
+        if (winner := _common_mode_coverage(grp, keep_nonstandard_modes)) is not None
+    ]
+    result = pd.DataFrame(
+        winners, columns=["track", "frame", "common_mode", "common_coverage"]
+    ).astype({"track": df["track"].dtype, "frame": df["frame"].dtype})
 
-    # ``create-catalog`` writes its own ``common_mode`` (the 2-char mode *family*),
+    # ``create-gslc-csv`` writes its own ``common_mode`` (the 2-char mode *family*),
     # which would collide with the full 4-char mode computed above and turn the
     # merge into _x/_y suffixes. Ours is authoritative, so drop theirs first.
     df = df.drop(columns=["common_mode", "common_coverage"], errors="ignore")
-    df = df.merge(result, on=["track", "frame"], how="left")
+    df = df.merge(result, on=["track", "frame"], how="inner")
 
     # Keep only rows matching the winning (mode, coverage)
     df = df[
@@ -265,6 +280,7 @@ def make_consistent_gslc_json(
     nisar_gpkg: Path,
     output: Path | None = None,
     blackout_file: Path | None = None,
+    keep_nonstandard_modes: bool = False,
 ) -> Path:
     """Create the consistent-GSLC JSON for all NISAR frames in the catalog.
 
@@ -282,6 +298,10 @@ def make_consistent_gslc_json(
     blackout_file:
         Optional JSON with per-frame blackout periods
         (same schema as burst_db's blackout JSON).
+    keep_nonstandard_modes:
+        Keep frames observed only in non-standard (engineering / test) modes,
+        letting those modes compete among themselves. Off by default, so such
+        frames are absent from the output.
 
     Returns
     -------
@@ -314,8 +334,14 @@ def make_consistent_gslc_json(
     )
 
     # Select consistent (mode, coverage) per frame
-    df = select_consistent_acquisitions(df)
+    n_frames_before = df[["track", "frame"]].drop_duplicates().shape[0]
+    df = select_consistent_acquisitions(
+        df, keep_nonstandard_modes=keep_nonstandard_modes
+    )
+    n_dropped = n_frames_before - df[["track", "frame"]].drop_duplicates().shape[0]
     click.echo(f"  After mode+coverage selection: {len(df):,} acquisitions")
+    if n_dropped:
+        click.echo(f"  Dropped {n_dropped} frames with no standard-mode acquisitions")
     mode_dist = df["common_mode"].value_counts().to_string()
     coverage_dist = df["common_coverage"].value_counts().to_string()
     click.echo(f"  common_mode distribution:\n{mode_dist}")
@@ -402,11 +428,21 @@ def make_consistent_gslc_json(
     default=None,
     help="Optional per-frame blackout-dates JSON to filter out excluded acquisitions.",
 )
+@click.option(
+    "--keep-nonstandard-modes",
+    is_flag=True,
+    default=False,
+    help=(
+        "Keep frames observed only in non-standard modes (not 4005/2005), "
+        "picking a winner among those modes instead of dropping the frame."
+    ),
+)
 def main(
     catalog_csv: Path,
     nisar_gpkg: Path,
     output: Path | None,
     blackout_file: Path | None,
+    keep_nonstandard_modes: bool,
 ):
     """Create the consistent-GSLC JSON for NISAR frames.
 
@@ -415,13 +451,16 @@ def main(
       1. Majority coverage per mode (F beats P on tie)
       2. Winning mode: full-frame beats partial (reversed on frames more than
          66% partial), then acquisition count, then "4005" beats "2005"
-      3. One acquisition per calendar date (earliest sensing time)
+      3. Frames with no 4005/2005 acquisitions are dropped
+         (--keep-nonstandard-modes keeps them)
+      4. One acquisition per calendar date (earliest sensing time)
     """  # noqa: D301
     make_consistent_gslc_json(
         catalog_csv=catalog_csv,
         nisar_gpkg=nisar_gpkg,
         output=output,
         blackout_file=blackout_file,
+        keep_nonstandard_modes=keep_nonstandard_modes,
     )
 
 

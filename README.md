@@ -130,9 +130,9 @@ Commands:
   append-blackout-dates   Manually append blackout windows for a single frame.
   build-s3-catalog        Scan an S3 bucket once and write a queryable catalog.
   create-blackout-dates   Create the NISAR blackout-dates JSON.
-  create-catalog          Parse a NISAR GSLC file list into a structured CSV.
   create-consistent       Create the consistent-GSLC JSON for NISAR frames.
   create-frame-to-bound   Create a frame_to_bound JSON file for NISAR.
+  create-gslc-csv         Parse a NISAR GSLC file list into a structured CSV.
   create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
   create-reference-dates  Create the NISAR reference-dates JSON.
   download                Download NISAR granules/URLs from CMR.
@@ -158,7 +158,7 @@ a GitHub Release by `.github/workflows/release.yml` when a `v*` tag is pushed.
 | `opera-nisar-disp-consistent-gslc-no-blackout.json[.zip]` | `create-consistent` |
 | `opera-nisar-disp-consistent-gslc-with-processing-mode-{date}.json[.zip]` | `label-processing-mode` |
 | `opera-nisar-disp-reference-dates-{date}.json[.zip]` | `create-reference-dates` |
-| `gslc_catalog.csv` | `create-catalog` |
+| `gslc_catalog.csv` | `create-gslc-csv` |
 
 burst_db's burst-level assets (`burst-id-geometries-simple`, `burst-to-frame`,
 `frame-to-burst`) have no counterpart here: NISAR frames are defined by the
@@ -187,16 +187,16 @@ nisar-db create-frame-to-bound --output opera-nisar-disp-frame-to-bounds.json
 
 ## Creating GSLC Catalogs
 
-The `nisar-db create-catalog` CLI will create a structured CSV catalog from a list of NISAR GSLC files.
+The `nisar-db create-gslc-csv` CLI will create a structured CSV catalog from a list of NISAR GSLC files.
 
 ```bash
-nisar-db create-catalog --input nisar_gslc_files.txt --output gslc_catalog.csv
+nisar-db create-gslc-csv --input nisar_gslc_files.txt --output gslc_catalog.csv
 ```
 
 You can filter the catalog to include only frames in North America:
 
 ```bash
-nisar-db create-catalog --input nisar_gslc_files.txt --na-only --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg
+nisar-db create-gslc-csv --input nisar_gslc_files.txt --na-only --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg
 ```
 
 ## Creating Frame-to-Bound JSON Files
@@ -222,7 +222,7 @@ nisar-db create-frame-to-bound \
 
 ## Creating Consistent GSLC Catalogs
 
-For operational processing, a consistent catalog of GSLC files is needed. The `nisar-db create-consistent` command builds this from the GSLC catalog CSV (`create-catalog`) and the filtered frames GeoPackage (`create-frame-to-bound` writes `opera-nisar-disp-frames.gpkg`):
+For operational processing, a consistent catalog of GSLC files is needed. The `nisar-db create-consistent` command builds this from the GSLC catalog CSV (`create-gslc-csv`) and the filtered frames GeoPackage (`create-frame-to-bound` writes `opera-nisar-disp-frames.gpkg`):
 
 ```bash
 nisar-db create-consistent \
@@ -230,6 +230,13 @@ nisar-db create-consistent \
   --nisar-gpkg opera-nisar-disp-frames.gpkg \
   --output consistent_gslc_catalog.json
 ```
+
+Each frame settles on one `(mode, coverage)` combination, chosen among the
+standard science modes (`4005`, `2005`). A frame never observed in a standard
+mode has no consistent stack and is left out of the JSON; pass
+`--keep-nonstandard-modes` to keep it and pick a winner among its non-standard
+modes instead. See [Consistent mode selection](docs/background/consistent-mode.md)
+for the full ranking.
 
 ## Creating NISAR Product JSON Catalogs
 
@@ -505,7 +512,7 @@ pixi run check
 
 # Run main tools
 pixi run create-frame-to-bound --nisar-gpkg NISAR_TrackFrame_L_YYYYMMDD.gpkg --output nisar-frame-to-bounds.json
-pixi run create-catalog --input nisar_gslc_files.txt --output gslc_catalog.csv
+pixi run create-gslc-csv --input nisar_gslc_files.txt --output gslc_catalog.csv
 ```
 
 ## Using Python API
