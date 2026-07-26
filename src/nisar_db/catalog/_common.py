@@ -69,9 +69,9 @@ def extract_metadata(
     Parameters
     ----------
     df : pd.DataFrame
-        CMR search results with ``granule_id``, ``title`` and ``links`` columns.
+        CMR search results with ``granule_id``, ``name`` and ``links`` columns.
     filename_cls : type
-        ``GSLCFilename`` or ``GUNWFilename`` used to parse the granule title.
+        ``GSLCFilename`` or ``GUNWFilename`` used to parse the granule name.
     logger : logging.Logger
         Logger for progress / parse warnings.
 
@@ -80,16 +80,16 @@ def extract_metadata(
 
     rows = []
     for _, row in df.iterrows():
-        title = row["title"]
+        name = row["name"]
         try:
-            filename_obj = filename_cls.from_path(title)
+            filename_obj = filename_cls.from_path(name)
         except Exception as e:
-            logger.warning(f"Could not extract metadata from {title}: {e}")
+            logger.warning(f"Could not extract metadata from {name}: {e}")
             continue
 
         rows.append(
             {
-                "id": title.replace(".h5", ""),  # filename without extension as ID
+                "id": name.replace(".h5", ""),  # filename without extension as ID
                 "granule_id": row["granule_id"],
                 **extract_urls(row.get("links", [])),
                 **filename_obj.to_dataframe().iloc[0].to_dict(),

@@ -68,7 +68,7 @@ def download_products(
                         files = future.result()
                         downloaded_files.extend(files)
                     except Exception:
-                        logger.exception(f"Error downloading {product.title}")
+                        logger.exception(f"Error downloading {product.name}")
                     pbar.update(1)
         else:
             # Sequential download
@@ -81,7 +81,7 @@ def download_products(
                     )
                     downloaded_files.extend(files)
                 except Exception:
-                    logger.exception(f"Error downloading {product.title}")
+                    logger.exception(f"Error downloading {product.name}")
                 pbar.update(1)
 
     return downloaded_files
@@ -106,7 +106,7 @@ def products_to_dataframe(products: List[NISARProduct]) -> pd.DataFrame:
         data.append(
             {
                 "granule_id": product.granule_id,
-                "title": product.title,
+                "name": product.name,
                 "product_type": product.product_type.value,
                 "filename": product.filename,
                 "url": product.url,

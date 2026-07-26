@@ -6,7 +6,7 @@ Two entry points:
   the UMM-G endpoint (used by the ``search`` CLI and downstream tooling).
 - :func:`search_nisar_granules` returns a flat granule DataFrame from the
   echo10 ``granules.json`` endpoint (used by the catalog builders, which parse
-  the granule *title* and CMR link ``rel`` values themselves).
+  the granule *name* and CMR link ``rel`` values themselves).
 """
 
 from __future__ import annotations
@@ -430,8 +430,8 @@ def search_nisar_granules(
 
     Unlike :func:`search_nisar_products` (which returns typed
     :class:`NISARProduct` objects), this returns one row per granule with the
-    raw fields the catalog pipeline needs: ``granule_id``, ``title`` and the
-    CMR ``links`` list (``{"rel": ..., "href": ...}``). The granule *title* is
+    raw fields the catalog pipeline needs: ``granule_id``, ``name`` and the
+    CMR ``links`` list (``{"rel": ..., "href": ...}``). The granule *name* is
     parsed by ``GSLCFilename`` / ``GUNWFilename`` and the links by
     ``nisar_db.catalog._common.extract_urls`` downstream.
 
@@ -455,7 +455,7 @@ def search_nisar_granules(
     Returns
     -------
     pd.DataFrame
-        Columns ``granule_id``, ``title``, ``links``.
+        Columns ``granule_id``, ``name``, ``links``.
 
     """
     params = _build_search_params(short_name, provider)
@@ -473,11 +473,11 @@ def search_nisar_granules(
         rows.append(
             {
                 "granule_id": entry.get("id", ""),
-                "title": entry.get("title", ""),
+                "name": entry.get("title", ""),  # atom "title" is the granule name
                 "links": entry.get("links", []),
             }
         )
 
-    df = pd.DataFrame(rows, columns=["granule_id", "title", "links"])
+    df = pd.DataFrame(rows, columns=["granule_id", "name", "links"])
     logger.info(f"Found {len(df)} granules for {short_name}")
     return df

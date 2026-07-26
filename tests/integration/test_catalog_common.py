@@ -25,18 +25,18 @@ def test_extract_metadata_from_cmr_rows(gslc_name: str) -> None:
         [
             {
                 "granule_id": "G123-ASF",
-                "title": gslc_name + ".h5",
+                "name": gslc_name + ".h5",
                 "links": [
                     {"rel": _DATA_REL, "href": "https://example.com/g.h5"},
                     {"rel": _DATA_REL, "href": "s3://bucket/g.h5"},
                 ],
             },
-            {"granule_id": "G-bad", "title": "not-a-granule", "links": []},
+            {"granule_id": "G-bad", "name": "not-a-granule", "links": []},
         ]
     )
     out = extract_metadata(search_df, GSLCFilename, _LOGGER)
 
-    # The unparseable title is skipped; one good row remains.
+    # The unparseable name is skipped; one good row remains.
     assert len(out) == 1
     row = out.iloc[0]
     assert row["id"] == gslc_name
