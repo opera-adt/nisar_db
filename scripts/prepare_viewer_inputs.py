@@ -126,7 +126,7 @@ def catalog_db_to_csv(db_path: Path, outdir: Path) -> Path:
     """Parse the DuckDB granule list into the catalog CSV ``create-consistent`` reads.
 
     Reuses :func:`nisar_db.gslc_catalog.parse_gslc_list` on the granule S3 URLs so
-    the CSV is byte-for-byte the shape ``nisar-db create-catalog`` produces.
+    the CSV is byte-for-byte the shape ``nisar-db create-gslc-csv`` produces.
     """
     import duckdb
 

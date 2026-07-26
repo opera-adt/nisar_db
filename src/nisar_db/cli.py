@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
 import click
@@ -20,14 +21,46 @@ def cli_app():
     """Create/interact with OPERA's NISAR frame database."""
 
 
+def _deprecated_alias(
+    target: click.Command, *, old_name: str, new_name: str
+) -> click.Command:
+    """Return a hidden clone of ``target`` that warns before running.
+
+    Click resolves subcommands by the key they are registered under, so an
+    alias has to be its own object: registering ``target`` twice would list
+    both names in ``--help`` with no way to hide one.
+    """
+    alias = copy.copy(target)
+    alias.name = old_name
+    alias.hidden = True
+    wrapped = target.callback
+    assert wrapped is not None
+
+    def _warn_then_run(*args, **kwargs):
+        click.echo(
+            f"Warning: '{old_name}' is deprecated; use '{new_name}' instead.", err=True
+        )
+        return wrapped(*args, **kwargs)
+
+    alias.callback = _warn_then_run
+    return alias
+
+
 # Each of these modules defines a fully-decorated click command as ``main``.
 # Reuse them directly as subcommands rather than re-declaring their options.
 cli_app.add_command(create_frame_to_bound_cmd, name="create-frame-to-bound")
-cli_app.add_command(create_catalog_cmd, name="create-catalog")
+cli_app.add_command(create_catalog_cmd, name="create-gslc-csv")
 cli_app.add_command(create_consistent_cmd, name="create-consistent")
 cli_app.add_command(append_blackout_dates_cmd, name="append-blackout-dates")
 cli_app.add_command(create_reference_dates_cmd, name="create-reference-dates")
 cli_app.add_command(label_processing_mode_cmd, name="label-processing-mode")
+
+# ``create-catalog`` was renamed to disambiguate it from ``create-nisar-catalog``.
+cli_app.add_command(
+    _deprecated_alias(
+        create_catalog_cmd, old_name="create-catalog", new_name="create-gslc-csv"
+    )
+)
 
 
 def _run_argparse_main(module_name: str, prog: str, args: tuple[str, ...]) -> None:
@@ -106,7 +139,7 @@ def download_cmd(args):
 def download_frame_db_cmd(output_dir: Path, force: bool, granule_id: str | None):
     """Download the global NISAR TrackFrame database GeoPackage.
 
-    This is the --nisar-gpkg input to create-frame-to-bound, create-catalog and
+    This is the --nisar-gpkg input to create-frame-to-bound, create-gslc-csv and
     create-consistent. It is a public CMR granule; downloading needs Earthdata
     Login credentials in ~/.netrc.
     """

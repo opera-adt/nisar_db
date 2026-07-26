@@ -35,7 +35,7 @@ src/nisar_db/
 │   ├── create_gunw_catalog.py
 │   └── create_blackout_dates.py
 ├── nisar_catalog.py       # dispatcher for GSLC/GUNW builders (create-nisar-catalog)
-├── gslc_catalog.py        # parse a GSLC file list -> structured CSV (create-catalog)
+├── gslc_catalog.py        # parse a GSLC file list -> structured CSV (create-gslc-csv)
 ├── consistent_gslc.py     # consistent-GSLC-per-frame JSON (create-consistent)
 ├── blackout.py            # per-frame blackout / reference-date filtering + writers
 ├── reference_dates.py     # derive reset epochs (create-reference-dates)

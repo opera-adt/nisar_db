@@ -84,7 +84,7 @@ Turn the raw file list into a structured CSV with the `mode`, `coverage`,
 North America with `--na-only`.
 
 ```bash
-nisar-db create-catalog \
+nisar-db create-gslc-csv \
   --input gslc_files.txt \
   --output gslc_catalog.csv \
   --na-only \
@@ -238,7 +238,7 @@ per calendar date — exactly the stack DISP-NISAR will process.
 ```mermaid
 flowchart TD
     G["NISAR_TrackFrame_L_*.gpkg"] -->|Step 1| FTB["create-frame-to-bound<br/>→ opera-nisar-disp-frames.gpkg"]
-    L["gslc_files.txt"] -->|Step 2| CAT["create-catalog<br/>→ gslc_catalog.csv"]
+    L["gslc_files.txt"] -->|Step 2| CAT["create-gslc-csv<br/>→ gslc_catalog.csv"]
     FTB -->|Step 3| CON["create-consistent"]
     CAT -->|Step 3| CON
     BL["create-blackout-dates"] --> CON

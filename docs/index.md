@@ -96,9 +96,9 @@ Commands:
   append-blackout-dates   Manually append blackout windows for a single frame.
   build-s3-catalog        Scan an S3 bucket once and write a queryable catalog.
   create-blackout-dates   Create the NISAR blackout-dates JSON.
-  create-catalog          Parse a NISAR GSLC file list into a structured CSV.
   create-consistent       Create the consistent-GSLC JSON for NISAR frames.
   create-frame-to-bound   Create a frame_to_bound JSON file for NISAR.
+  create-gslc-csv         Parse a NISAR GSLC file list into a structured CSV.
   create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
   create-reference-dates  Create the NISAR reference-dates JSON.
   download                Download NISAR granules/URLs from CMR.
@@ -122,7 +122,7 @@ it to a GitHub Release:
 | `opera-nisar-disp-consistent-gslc-no-blackout.json[.zip]` | `create-consistent` |
 | `opera-nisar-disp-consistent-gslc-with-processing-mode-{date}.json[.zip]` | `label-processing-mode` |
 | `opera-nisar-disp-reference-dates-{date}.json[.zip]` | `create-reference-dates` |
-| `gslc_catalog.csv` | `create-catalog` |
+| `gslc_catalog.csv` | `create-gslc-csv` |
 
 `burst_db`'s burst-level assets (`burst-id-geometries-simple`, `burst-to-frame`,
 `frame-to-burst`) have no counterpart: NISAR frames are defined by the mission
