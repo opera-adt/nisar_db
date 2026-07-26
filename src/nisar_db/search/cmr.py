@@ -297,14 +297,15 @@ def search_nisar_products(
     if isinstance(product_type, str):
         product_type = ProductType(product_type.upper())
 
-    # Determine which collection(s) to search if not provided. Defaults span
-    # both the BETA and PROVISIONAL collections for the product type; CMR ORs
+    # Default to the PROVISIONAL collection for the product type. Pass
+    # ``NISARCollection.GSLC_SHORT_NAMES`` to also search BETA -- CMR ORs
     # multiple ``short_name`` values into a single search.
     if short_name is None:
-        if product_type == ProductType.GSLC:
-            short_name = list(NISARCollection.GSLC_SHORT_NAMES)
-        else:
-            short_name = list(NISARCollection.GUNW_SHORT_NAMES)
+        short_name = (
+            NISARCollection.GSLC_PROVISIONAL_V1_SHORT_NAME
+            if product_type == ProductType.GSLC
+            else NISARCollection.GUNW_PROVISIONAL_V1_SHORT_NAME
+        )
 
     params = _build_search_params(
         short_name,

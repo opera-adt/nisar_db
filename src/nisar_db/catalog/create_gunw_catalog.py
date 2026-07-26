@@ -71,7 +71,7 @@ def search_gunw_products(max_results: int | None = None) -> pd.DataFrame:
     logger.info("Searching for NISAR GUNW products in CMR...")
 
     results = search_nisar_granules(
-        short_name=NISARCollection.GUNW_BETA_V1_SHORT_NAME,
+        short_name=NISARCollection.GUNW_PROVISIONAL_V1_SHORT_NAME,
         provider=NISARCollection.DEFAULT_PROVIDER,
         max_results=max_results,
         output_format="umm_json",
