@@ -616,7 +616,7 @@ APP_CSS = r"""
   #click-ctrl{position:absolute;top:48px;left:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;}
   #click-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
-  #top-hint{position:absolute;top:86px;left:10px;background:var(--scrim);color:var(--text-dim);
+  #top-hint{position:absolute;bottom:24px;left:10px;background:var(--scrim);color:var(--text-dim);
     font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);pointer-events:none;z-index:5;}
   #basemap-ctrl{position:absolute;top:10px;right:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
@@ -1004,8 +1004,11 @@ APP_JS = r"""
   // tracks the cron schedule -- or a manual run -- on its own.
   const queriedAt = META.catalog_queried_at || META.generated_at;
   if (queriedAt) {
+    // A bucket scan and a CMR query are different sources with different
+    // coverage, so the stamp names the one this page was actually built from.
+    const source = {cmr:"CMR queried", "bucket-scan":"Bucket scanned"}[META.catalog_kind] || "Catalog built";
     document.getElementById("hdr-queried").textContent =
-      `CMR queried: ${new Date(queriedAt).toISOString().slice(0,16).replace("T"," ")} UTC`;
+      `${source}: ${new Date(queriedAt).toISOString().slice(0,16).replace("T"," ")} UTC`;
   }
 
   // Reveal the blackout controls only when the viewer was built with blackout data.
@@ -2038,6 +2041,7 @@ def main(argv: list[str] | None = None) -> None:
             ).isoformat(timespec="seconds")
         ),
         "catalog_source": catalog_path.name,
+        "catalog_kind": "cmr" if args.gslc_catalog is not None else "bucket-scan",
         "n_frames": len(frame_data["features"]),
         "n_frames_with_gslc": n_with,
         "n_granules": int(len(catalog)),
