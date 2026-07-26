@@ -446,10 +446,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-dominant-mode-standard-families-win" class="md-nav__link">
+  <a href="#0-coverage-per-mode-full-beats-partial" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Dominant mode (standard families win)
+        0. Coverage per mode (full beats partial)
       
     </span>
   </a>
@@ -457,10 +457,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-coverage-within-that-mode-full-beats-partial" class="md-nav__link">
+  <a href="#1-winning-mode-coverage-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Coverage within that mode (full beats partial)
+        1. Winning mode: coverage first
       
     </span>
   </a>
@@ -468,10 +468,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-one-acquisition-per-calendar-date" class="md-nav__link">
+  <a href="#2-then-acquisition-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. One acquisition per calendar date
+        2. Then acquisition count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-then-mode-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Then mode priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-one-acquisition-per-calendar-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. One acquisition per calendar date
       
     </span>
   </a>
@@ -830,10 +852,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-dominant-mode-standard-families-win" class="md-nav__link">
+  <a href="#0-coverage-per-mode-full-beats-partial" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Dominant mode (standard families win)
+        0. Coverage per mode (full beats partial)
       
     </span>
   </a>
@@ -841,10 +863,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-coverage-within-that-mode-full-beats-partial" class="md-nav__link">
+  <a href="#1-winning-mode-coverage-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Coverage within that mode (full beats partial)
+        1. Winning mode: coverage first
       
     </span>
   </a>
@@ -852,10 +874,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-one-acquisition-per-calendar-date" class="md-nav__link">
+  <a href="#2-then-acquisition-count" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. One acquisition per calendar date
+        2. Then acquisition count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-then-mode-priority" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Then mode priority
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-one-acquisition-per-calendar-date" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. One acquisition per calendar date
       
     </span>
   </a>
@@ -1006,19 +1050,43 @@ filtering applied when frames are built. In both projects the consistent
 database only ever contains frames that OPERA intends to process.</p>
 </div>
 <h2 id="the-selection-logic">The selection logic<a class="headerlink" href="#the-selection-logic" title="Permanent link">&para;</a></h2>
-<p>For each <code>(track, frame)</code> group the winner is chosen in strict priority order.
-This is <code>_common_mode_coverage</code> and <code>select_consistent_acquisitions</code> in
+<p>For each <code>(track, frame)</code> group, <strong>every mode present first settles its own
+coverage</strong>, then the modes compete for the frame. This is
+<code>_common_mode_coverage</code> and <code>select_consistent_acquisitions</code> in
 <code>consistent_gslc.py</code>.</p>
-<h3 id="1-dominant-mode-standard-families-win">1. Dominant mode (standard families win)<a class="headerlink" href="#1-dominant-mode-standard-families-win" title="Permanent link">&para;</a></h3>
-<p>Count acquisitions per full 4-character <code>mode</code>. Standard-family rows
-(<code>40</code>, <code>20</code>) vote first; only if the frame has <strong>no</strong> standard-family
-acquisitions at all does the overall most-frequent mode win. Among candidates,
-the mode with the most acquisitions wins.</p>
-<h3 id="2-coverage-within-that-mode-full-beats-partial">2. Coverage within that mode (full beats partial)<a class="headerlink" href="#2-coverage-within-that-mode-full-beats-partial" title="Permanent link">&para;</a></h3>
-<p>Within the winning mode, compare the count of full-frame (<code>F</code>) vs partial (<code>P</code>)
-acquisitions. If there are at least as many <code>F</code> as <code>P</code>, pick <code>F</code>; otherwise <code>P</code>.
-<strong>Ties go to <code>F</code></strong> — full coverage is preferred.</p>
-<h3 id="3-one-acquisition-per-calendar-date">3. One acquisition per calendar date<a class="headerlink" href="#3-one-acquisition-per-calendar-date" title="Permanent link">&para;</a></h3>
+<h3 id="0-coverage-per-mode-full-beats-partial">0. Coverage per mode (full beats partial)<a class="headerlink" href="#0-coverage-per-mode-full-beats-partial" title="Permanent link">&para;</a></h3>
+<p>For each <code>mode</code>, compare its count of full-frame (<code>F</code>) vs partial (<code>P</code>)
+acquisitions. If there are at least as many <code>F</code> as <code>P</code>, that mode's coverage is
+<code>F</code>; otherwise <code>P</code>. <strong>Ties go to <code>F</code></strong> — full coverage is preferred.</p>
+<h3 id="1-winning-mode-coverage-first">1. Winning mode: coverage first<a class="headerlink" href="#1-winning-mode-coverage-first" title="Permanent link">&para;</a></h3>
+<p>A mode that resolved to <code>F</code> beats one that resolved to <code>P</code>. A DISP stack needs
+full-frame acquisitions, so coverage outranks the mode code itself: a frame with
+<code>2005_F</code> and <code>4005_P</code> settles on <strong><code>2005_F</code></strong>.</p>
+<p><strong>Unless the frame is mostly partial.</strong> Preferring <code>F</code> costs temporal coverage
+when full-frame acquisitions are the rare ones — track 42 / frame 164 is
+<code>4005_P ×4</code> plus a single <code>2005_F</code>, and picking the full one cuts the stack from
+four epochs to one. So when partial acquisitions exceed
+<code>PARTIAL_DOMINANCE_THRESHOLD</code> (<strong>0.66</strong>) of the frame, the preference flips and
+<code>P</code> ranks first. The threshold is a judgement call, not a derived quantity;
+it lives next to <code>_common_mode_coverage</code> in <code>consistent_gslc.py</code> (and is
+mirrored in <code>generate_scope_viewer.py</code>).</p>
+<h3 id="2-then-acquisition-count">2. Then acquisition count<a class="headerlink" href="#2-then-acquisition-count" title="Permanent link">&para;</a></h3>
+<p>Among modes with the same coverage, the longer series wins: the number of
+acquisitions in the selected <code>(mode, coverage)</code> combo. Standard modes are the
+only candidates unless the frame has <strong>no</strong> standard-family acquisitions at all,
+in which case non-standard modes compete among themselves.</p>
+<h3 id="3-then-mode-priority">3. Then mode priority<a class="headerlink" href="#3-then-mode-priority" title="Permanent link">&para;</a></h3>
+<p>Modes that are level on coverage <em>and</em> count are settled by <code>MODE_PRIORITY</code>:
+<code>4005</code> beats <code>2005</code>. This is a pure tie-break — it never costs a frame
+acquisitions, it only decides which of two equally long series to keep.</p>
+<div class="admonition note">
+<p class="admonition-title">Why <code>MODE_PRIORITY</code> is a tuple, not a set</p>
+<p>The tie-break used to fall out of set iteration, so the winner depended on
+the interpreter's hash seed and the same catalog could yield two different
+consistent databases on two different runs. An explicit order makes the
+choice reproducible.</p>
+</div>
+<h3 id="4-one-acquisition-per-calendar-date">4. One acquisition per calendar date<a class="headerlink" href="#4-one-acquisition-per-calendar-date" title="Permanent link">&para;</a></h3>
 <p>If the winning <code>(mode, coverage)</code> appears more than once on the same calendar
 date, keep only the <strong>earliest</strong> sensing time. This removes intra-day
 duplicates so the stack has exactly one epoch per date.</p>
@@ -1044,28 +1112,44 @@ duplicates so the stack has exactly one epoch per date.</p>
 <td>one mode; P majority</td>
 </tr>
 <tr>
-<td><code>2005_F ×4</code>, <code>4005_P ×4</code></td>
-<td><strong><code>4005_P</code></strong></td>
-<td><code>4005</code> beats <code>2005</code> in step 1</td>
+<td><code>2005_F ×4</code>, <code>4005_F ×4</code></td>
+<td><strong><code>4005_F</code></strong></td>
+<td>both <code>F</code> and level on count; <code>4005</code> wins the tie-break (track 163 / frame 11)</td>
 </tr>
 <tr>
-<td><code>4005_P ×3</code>, <code>2005_F ×3</code></td>
+<td><code>2005_F ×4</code>, <code>4005_P ×4</code></td>
+<td><strong><code>2005_F</code></strong></td>
+<td>50% partial; <code>F</code> beats <code>P</code> before anything else applies</td>
+</tr>
+<tr>
+<td><code>4005_P ×4</code>, <code>2005_F ×1</code></td>
 <td><strong><code>4005_P</code></strong></td>
-<td><code>4005</code> wins step 1; tie in step 2 → but only P exists for 4005</td>
+<td>80% partial — above the threshold, so <code>P</code> wins (track 42 / frame 164)</td>
+</tr>
+<tr>
+<td><code>2005_P ×4</code>, <code>4005_P ×1</code></td>
+<td><strong><code>2005_P</code></strong></td>
+<td>both <code>P</code>; the longer series wins (track 29 / frame 96)</td>
+</tr>
+<tr>
+<td><code>2005_F ×9</code>, <code>4005_F ×2</code></td>
+<td><strong><code>2005_F</code></strong></td>
+<td>both <code>F</code>; the count outranks mode priority</td>
 </tr>
 </tbody>
 </table>
 <pre class="mermaid"><code>flowchart TD
     S["All GSLC acquisitions&lt;br/&gt;for one (track, frame)"] --&gt; M{"Standard-family&lt;br/&gt;acquisitions present?"}
-    M -- yes --&gt; M1["Vote among 40 / 20 modes"]
-    M -- no --&gt; M2["Vote among all modes"]
-    M1 --&gt; W["Winning mode&lt;br/&gt;(most acquisitions)"]
-    M2 --&gt; W
-    W --&gt; C{"n_F ≥ n_P&lt;br/&gt;within winning mode?"}
-    C -- yes --&gt; CF["coverage = F"]
-    C -- no --&gt; CP["coverage = P"]
-    CF --&gt; D["Keep rows matching (mode, coverage)"]
-    CP --&gt; D
+    M -- yes --&gt; M1["Candidates: 40 / 20 modes"]
+    M -- no --&gt; M2["Candidates: all modes"]
+    M1 --&gt; P["Per candidate mode:&lt;br/&gt;coverage = F if n_F ≥ n_P else P"]
+    M2 --&gt; P
+    P --&gt; T{"partial share &gt;&lt;br/&gt;0.66 of the frame?"}
+    T -- no --&gt; RF["Preferred coverage = F"]
+    T -- yes --&gt; RP["Preferred coverage = P"]
+    RF --&gt; R["Rank modes:&lt;br/&gt;1. preferred coverage first&lt;br/&gt;2. acquisition count&lt;br/&gt;3. MODE_PRIORITY (4005, 2005)"]
+    RP --&gt; R
+    R --&gt; D["Keep rows matching the winning (mode, coverage)"]
     D --&gt; E["Deduplicate: earliest sensing_time&lt;br/&gt;per calendar date"]
     E --&gt; O["Consistent stack for this frame"]</code></pre>
 <h2 id="output-the-consistent-gslc-json">Output: the consistent-GSLC JSON<a class="headerlink" href="#output-the-consistent-gslc-json" title="Permanent link">&para;</a></h2>
