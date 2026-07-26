@@ -75,7 +75,10 @@
   #pass-ctrl{position:absolute;top:10px;left:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
   #pass-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
-  #top-hint{position:absolute;top:48px;left:10px;background:var(--scrim);color:var(--text-dim);
+  #click-ctrl{position:absolute;top:48px;left:10px;background:var(--scrim);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;}
+  #click-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
+  #top-hint{position:absolute;top:86px;left:10px;background:var(--scrim);color:var(--text-dim);
     font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);pointer-events:none;z-index:5;}
   #basemap-ctrl{position:absolute;top:10px;right:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
@@ -275,6 +278,9 @@
       <label><input type="radio" name="pass" value="all" checked> All</label>
       <label><input type="radio" name="pass" value="Ascending"> Asc</label>
       <label><input type="radio" name="pass" value="Descending"> Desc</label>
+    </div>
+    <div id="click-ctrl">
+      <label><input type="checkbox" id="f-frame-popup" checked> Frame popup</label>
     </div>
     <div id="top-hint">Click a frame to list granules &amp; select &middot; the (i) button toggles hover summaries</div>
     <div id="basemap-ctrl">
@@ -1073,6 +1079,10 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   });
 
   // ---------- light / dark theme ----------
+  document.getElementById("f-frame-popup").addEventListener("change", (e)=>{
+    if (!e.target.checked) document.querySelectorAll(".maplibregl-popup").forEach(el=>el.remove());
+  });
+
   const themeBtn = document.getElementById("theme-toggle");
   themeBtn.addEventListener("click", ()=>{
     const light = document.body.classList.toggle("theme-light");
@@ -1343,6 +1353,8 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
     map.on("mousemove", "frames-fill", (e)=>{
       map.getCanvas().style.cursor = "pointer";
       if (!hoverEnabled) return;
+      if (map.getLayer("gps-points") &&
+          map.queryRenderedFeatures(e.point, {layers:["gps-points"]}).length) { popup.remove(); return; }
       cancelHoverClose();
       const p = e.features[0].properties;
       popup.setLngLat(e.lngLat).setHTML(`
@@ -1413,6 +1425,10 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
     // click -> granule list popup with a select toggle
     const clickPopup = new maplibregl.Popup({ closeButton:true, closeOnClick:false, maxWidth:"340px" });
     map.on("click", "frames-fill", (e)=>{
+      if (!document.getElementById("f-frame-popup").checked) return;
+      // A GPS marker always sits inside some frame; a click on one belongs to it.
+      if (map.getLayer("gps-points") &&
+          map.queryRenderedFeatures(e.point, {layers:["gps-points"]}).length) return;
       const feature = idToFeature(e.features[0].properties.id);
       if (!feature) return;
       cancelHoverClose();
