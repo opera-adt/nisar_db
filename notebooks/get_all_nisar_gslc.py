@@ -268,7 +268,7 @@ def main():
         for product in products:
             data.append({
                 "granule_id": product.granule_id,
-                "title": product.title,
+                "name": product.name,
                 "track": product.track,
                 "frame": product.frame,
                 "direction": product.direction,
@@ -295,7 +295,7 @@ def main():
         # Print a few examples
         logger.info("\nExample products:")
         for i, row in df.head(3).iterrows():
-            logger.info(f"{i+1}. {row['title']}")
+            logger.info(f"{i+1}. {row['name']}")
             logger.info(f"   Track: {row['track']}, Frame: {row['frame']}, Date: {row['date']}")
     else:
         logger.warning("No NISAR GSLC products found!")

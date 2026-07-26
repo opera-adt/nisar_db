@@ -83,12 +83,14 @@ Both builders share one pipeline in
    [search_nisar.py](../../src/nisar_db/search_nisar.py) queries
    `https://cmr.earthdata.nasa.gov/search/granules.umm_json` for the collection
    short name (`NISAR_L2_GSLC_BETA_V1` / `NISAR_L2_GUNW_BETA_V1`), provider `ASF`,
-   paging at `page_size=2000` up to `--max-results` (default 25000).
-2. **Extract metadata** — `extract_metadata` parses each granule `title` with a
+   paging at `page_size=2000`. Every page is fetched before `--max-results`
+   truncates (default `0` = keep everything), so a cap costs the same query
+   time and only drops granules; truncation logs a warning.
+2. **Extract metadata** — `extract_metadata` parses each granule `name` with a
    filename dataclass (`GSLCFilename` / `GUNWFilename` in
    [filenames.py](../../src/nisar_db/filenames.py)) and pulls URLs from CMR links
    (`extract_urls`: data→url/s3_url, browse→browse_url, metadata→metadata_url). A
-   title that fails to parse is logged and skipped, not fatal.
+   name that fails to parse is logged and skipped, not fatal.
 3. **Upsert into DuckDB** — `update_database` does `INSERT OR REPLACE INTO <table>`
    so re-runs are idempotent; `id` (filename without `.h5`) is the primary key.
    Tables: `gslc_products` / `gunw_products`; per-product `_SCHEMA` lives at the top

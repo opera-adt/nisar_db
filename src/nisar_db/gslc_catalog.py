@@ -1,8 +1,8 @@
 """Parse NISAR GSLC file list into a structured catalog CSV.
 
-Reads a text file of S3 paths or local file paths (one per line), parses
-each GSLC filename, and writes a catalog CSV with per-granule fields plus
-derived per-frame columns:
+Reads either a text file of S3/HTTPS/local paths (one per line) or a
+``nisar-db search`` results CSV, parses each GSLC filename, and writes a
+catalog CSV with per-granule fields plus derived per-frame columns:
 
   - mode_family : first two characters of mode ("40", "20", "00", "77", ...)
   - common_mode : dominant standard mode family ("40" or "20") per (track, frame);
@@ -18,6 +18,7 @@ Mode families
 Usage
 -----
     python create_gslc_catalog.py --input nisar_gslc_files.txt
+    python create_gslc_catalog.py --input nisar_search_results.csv
     python create_gslc_catalog.py --input nisar_gslc_files.txt --output gslc_catalog.csv
     python create_gslc_catalog.py --input nisar_gslc_files.txt --na-only
 """
@@ -31,11 +32,56 @@ import click
 import pandas as pd
 
 from nisar_db.filenames import GSLCFilename
-from nisar_db.modes import STANDARD_FAMILIES, dominant_value
+from nisar_db.modes import FAMILY_PRIORITY, dominant_value
 
 # Columns that contain zero-padded numeric strings (e.g. "0005", "003").
 # Written with explicit quoting so pandas doesn't drop leading zeros on re-read.
 _STR_COLS = ["cycle", "mode", "mode_family", "common_mode", "crid", "version"]
+
+# Search-CSV columns holding the granule name, most specific first. A CSV
+# ``granule_id`` is the CMR concept ID ("G4257267728-ASF"), never a filename.
+# ``title`` is what ``name`` was called before the column was renamed.
+_CSV_NAME_COLS = ("filename", "name", "title", "granule_name")
+
+# Search-CSV columns that may hold a data URL; the scheme decides the destination.
+_CSV_URL_COLS = ("url", "https", "https_url", "s3", "s3_url", "s3_path")
+
+
+def _read_entries(input_file: Path) -> list[tuple[str, str, str]]:
+    """Return one ``(granule_name, https_url, s3_path)`` triple per input record.
+
+    Accepts a plain list of paths/granule names (one per line) or a
+    ``nisar-db search`` results CSV, detected by its header row.
+    """
+    lines = [
+        line.strip() for line in input_file.read_text().splitlines() if line.strip()
+    ]
+    if not lines:
+        return []
+
+    header = {c.strip().strip('"') for c in lines[0].split(",")}
+    if not header.intersection(_CSV_NAME_COLS):
+        # Bare list: the name is the last path segment, the line itself the URL.
+        return [
+            (
+                line.split("/")[-1],
+                line if line.startswith("https://") else "",
+                line if line.startswith("s3://") else "",
+            )
+            for line in lines
+        ]
+
+    df = pd.read_csv(input_file, dtype=str).fillna("")
+    name_col = next(c for c in _CSV_NAME_COLS if c in df.columns)
+    url_cols = [c for c in _CSV_URL_COLS if c in df.columns]
+
+    entries: list[tuple[str, str, str]] = []
+    for row in df.itertuples(index=False):
+        urls = [str(getattr(row, c)).strip() for c in url_cols]
+        https = next((u for u in urls if u.startswith("https://")), "")
+        s3 = next((u for u in urls if u.startswith("s3://")), "")
+        entries.append((str(getattr(row, name_col)).strip(), https, s3))
+    return entries
 
 
 def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str]]]:
@@ -44,32 +90,28 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
     Parameters
     ----------
     input_file:
-        Text file with one S3 path, local path, or bare granule ID per line.
+        Text file with one S3 path, local path, or bare granule ID per line, or a
+        ``nisar-db search`` results CSV (``filename``/``name`` plus ``url``).
 
     Returns
     -------
     df:
         One row per granule with parsed fields + derived columns.
     failed:
-        List of (line, error_message) for lines that could not be parsed.
+        List of (granule_name, error_message) for records that could not be parsed.
 
     """
-    lines = [
-        line.strip() for line in input_file.read_text().splitlines() if line.strip()
-    ]
-
     rows: list[dict] = []
     failed: list[tuple[str, str]] = []
 
-    for line in lines:
-        # Extract the stem whether the line is an S3 path, local path, or bare name
-        name = line.split("/")[-1]
+    for name, https_url, s3_path in _read_entries(input_file):
         stem = name.removesuffix(".h5")
         try:
             g = GSLCFilename.from_path(stem)
             rows.append(
                 {
-                    "s3_path": line if line.startswith("s3://") else "",
+                    "url": https_url,
+                    "s3_path": s3_path,
                     "granule_id": stem,
                     "cycle": g.cycle,
                     "track": int(g.relative_orbit),
@@ -85,7 +127,7 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
                 }
             )
         except Exception as exc:
-            failed.append((line, str(exc)))
+            failed.append((name, str(exc)))
 
     df = pd.DataFrame(rows)
     if df.empty:
@@ -99,7 +141,7 @@ def parse_gslc_list(input_file: Path) -> tuple[pd.DataFrame, list[tuple[str, str
     # frame has no standard-family acquisitions at all.
     common_mode = (
         df.groupby(["track", "frame"])["mode_family"]
-        .agg(lambda grp: dominant_value(grp, STANDARD_FAMILIES))
+        .agg(lambda grp: dominant_value(grp, FAMILY_PRIORITY))
         .rename("common_mode")
         .reset_index()
     )

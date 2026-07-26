@@ -11,6 +11,7 @@ import pandas as pd
 from nisar_db.catalog._common import (
     create_database,
     extract_metadata,
+    extract_urls,
     generate_track_frame_json,
     update_database,
 )
@@ -18,6 +19,9 @@ from nisar_db.filenames import GSLCFilename
 
 _LOGGER = logging.getLogger("test.catalog_common")
 _DATA_REL = "http://esipfed.org/ns/fedsearch/1.1/data#"
+_S3_REL = "http://esipfed.org/ns/fedsearch/1.1/s3#"
+_BROWSE_REL = "http://esipfed.org/ns/fedsearch/1.1/browse#"
+_METADATA_REL = "http://esipfed.org/ns/fedsearch/1.1/metadata#"
 
 
 def test_extract_metadata_from_cmr_rows(gslc_name: str) -> None:
@@ -25,18 +29,18 @@ def test_extract_metadata_from_cmr_rows(gslc_name: str) -> None:
         [
             {
                 "granule_id": "G123-ASF",
-                "title": gslc_name + ".h5",
+                "name": gslc_name + ".h5",
                 "links": [
                     {"rel": _DATA_REL, "href": "https://example.com/g.h5"},
                     {"rel": _DATA_REL, "href": "s3://bucket/g.h5"},
                 ],
             },
-            {"granule_id": "G-bad", "title": "not-a-granule", "links": []},
+            {"granule_id": "G-bad", "name": "not-a-granule", "links": []},
         ]
     )
     out = extract_metadata(search_df, GSLCFilename, _LOGGER)
 
-    # The unparseable title is skipped; one good row remains.
+    # The unparseable name is skipped; one good row remains.
     assert len(out) == 1
     row = out.iloc[0]
     assert row["id"] == gslc_name
@@ -44,6 +48,27 @@ def test_extract_metadata_from_cmr_rows(gslc_name: str) -> None:
     assert row["url"] == "https://example.com/g.h5"
     assert row["s3_url"] == "s3://bucket/g.h5"
     assert row["mode"] == "4005"
+
+
+def test_extract_urls_prefers_granule_links_over_collection_links() -> None:
+    """CMR appends collection-level ``data#`` links after the granule's own."""
+    urls = extract_urls(
+        [
+            {"rel": _DATA_REL, "href": "https://example.com/g.h5"},
+            {"rel": _S3_REL, "href": "s3://bucket/g.h5"},
+            {"rel": _BROWSE_REL, "href": "https://example.com/g.png"},
+            {"rel": _BROWSE_REL, "href": "s3://bucket/browse/g.png"},
+            {"rel": _METADATA_REL, "href": "https://example.com/g.h5.iso.xml"},
+            {"rel": _DATA_REL, "href": "https://search.asf.alaska.edu/"},
+            {"rel": _METADATA_REL, "href": "https://nisar.jpl.nasa.gov/"},
+        ]
+    )
+    assert urls == {
+        "url": "https://example.com/g.h5",
+        "s3_url": "s3://bucket/g.h5",
+        "browse_url": "https://example.com/g.png",
+        "metadata_url": "https://example.com/g.h5.iso.xml",
+    }
 
 
 def test_create_update_and_generate_json(tmp_path: Path) -> None:

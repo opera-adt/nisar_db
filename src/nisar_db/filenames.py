@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import ClassVar
 
 import pandas as pd
 
@@ -26,8 +27,9 @@ class NISARCollection:
     GUNW_PROVISIONAL_V1_SHORT_NAME = "NISAR_L2_GUNW_PROVISIONAL_V1"
     GUNW_PR_SHORT_NAME = "NISAR_L2_PR_GUNW"  # Original/alternative GUNW short name
 
-    # Default collections searched per product type. CMR ORs multiple
-    # ``short_name`` values, so a single search spans all listed collections.
+    # Every collection per product type; searches default to PROVISIONAL only.
+    # CMR ORs multiple ``short_name`` values, so passing the whole tuple spans
+    # all listed collections in a single search.
     # GSLC_PROVISIONAL_V1 is concept-id C2854332392-ASF.
     GSLC_SHORT_NAMES = (GSLC_BETA_V1_SHORT_NAME, GSLC_PROVISIONAL_V1_SHORT_NAME)
     GUNW_SHORT_NAMES = (GUNW_BETA_V1_SHORT_NAME, GUNW_PROVISIONAL_V1_SHORT_NAME)
@@ -62,8 +64,8 @@ class GSLCFilename:
     version: str
     path: str
 
-    _NFIELDS_MIN: int = 13
-    _NFIELDS_MAX: int = 18
+    _NFIELDS_MIN: ClassVar[int] = 13
+    _NFIELDS_MAX: ClassVar[int] = 18
 
     @classmethod
     def from_path(cls, path: str) -> "GSLCFilename":
@@ -123,6 +125,8 @@ class GSLCFilename:
         d.pop("path")
         d["start_datetime"] = parts_str(self.start_datetime)
         d["end_datetime"] = parts_str(self.end_datetime)
+        d["track"] = self.track
+        d["frame"] = self.frame
         d["date"] = self.date
         d["scene_id"] = self.scene_id
         d["full_path"] = self.path
@@ -155,8 +159,8 @@ class GUNWFilename:
     version: str
     path: str
 
-    _NFIELDS_MIN: int = 15
-    _NFIELDS_MAX: int = 20
+    _NFIELDS_MIN: ClassVar[int] = 15
+    _NFIELDS_MAX: ClassVar[int] = 20
 
     @classmethod
     def from_path(cls, path: str) -> "GUNWFilename":
@@ -233,8 +237,11 @@ class GUNWFilename:
             "secondary_end_datetime",
         ):
             d[key] = parts_str(getattr(self, key))
+        d["track"] = self.track
+        d["frame"] = self.frame
         d["ref_date"] = self.ref_date
         d["sec_date"] = self.sec_date
+        d["date"] = self.date
         d["scene_id"] = self.scene_id
         d["full_path"] = self.path
         return pd.DataFrame([d])

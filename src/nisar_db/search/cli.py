@@ -129,7 +129,7 @@ def main():
     if products:
         df = products_to_dataframe(products)
         print(
-            df[["title", "track", "frame", "direction", "cycle", "date"]].to_string(
+            df[["name", "track", "frame", "direction", "cycle", "date"]].to_string(
                 index=False
             )
         )

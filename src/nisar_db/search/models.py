@@ -37,7 +37,7 @@ class NISARProduct:
     """NISAR product metadata from CMR search results."""
 
     granule_id: str
-    title: str
+    name: str
     product_type: ProductType
     filename: str
     url: str
@@ -186,7 +186,7 @@ class NISARProduct:
         start_dt, end_dt = self.extract_temporal_from_metadata(self.metadata)
         return {
             "granule_id": self.granule_id,
-            "title": self.title,
+            "name": self.name,
             "product_type": self.product_type.value,
             **self.extract_attributes_from_metadata(self.metadata),
             "bbox": self.extract_bbox_from_metadata(self.metadata),
@@ -202,10 +202,10 @@ class NISARProduct:
         """Create a NISARProduct from a CMR item."""
         umm = item.get("umm", {})
         granule_id = item.get("meta", {}).get("concept-id") or item.get("id", "")
-        title = umm.get("GranuleUR", "")
+        name = umm.get("GranuleUR", "")
 
-        # Determine product type from title
-        product_type = ProductType.GSLC if "GSLC" in title else ProductType.GUNW
+        # Determine product type from name
+        product_type = ProductType.GSLC if "GSLC" in name else ProductType.GUNW
 
         bbox = cls.extract_bbox_from_metadata(umm)
         start_dt, end_dt = cls.extract_temporal_from_metadata(umm)
@@ -218,11 +218,11 @@ class NISARProduct:
             url = urls["https"] or urls["s3"]
 
         # Extract filename from URL
-        filename = url.split("/")[-1] if url else title
+        filename = url.split("/")[-1] if url else name
 
         return cls(
             granule_id=granule_id,
-            title=title,
+            name=name,
             product_type=product_type,
             filename=filename,
             url=url,
@@ -305,7 +305,7 @@ class NISARProduct:
 
         return cls(
             granule_id=stem,
-            title=name,
+            name=name,
             product_type=product_type,
             filename=name,
             url=f"s3://{bucket}/{key}",

@@ -34,8 +34,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # 0 = no cap. CMR is paged eagerly, so a cap saves no time; it only
-  # drops granules (73k GSLC granules exist as of 2026-07).
+  # 0 = no cap, i.e. the whole GSLC archive. CMR is paged eagerly at
+  # page_size=2000: every page is fetched before any cap applies, so a cap
+  # saves no query time and only drops granules. Measured 2026-07: 73,313
+  # granules in 64 s uncapped, versus 57 s to fetch the same pages and discard
+  # 48,313 of them at --max-results 25000.
   MAX_RESULTS: ${{ github.event.inputs.max_results || '0' }}
   VIEWER_HTML: docs/assets/opera_nisar_db_viewer.html
 
