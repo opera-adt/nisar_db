@@ -28,16 +28,26 @@ It opens on the globe projection (the control at the bottom right switches to
 Mercator), with frames coloured by GSLC count in CMR and the science modes
 (`2005`, `4005`) and polarizations (`DHDH`, `QPDH`) preselected under
 **GSLC Mode / Polarization**. The count colouring follows those chips, so the
-ramp always answers "how many granules of the kind I selected". Clicking a frame
-opens the frame panel, where **Show granules** expands the granule list,
-**Export CSV** downloads that frame's granules, and **Show plot** charts
-observation mode against acquisition date.
+ramp always answers "how many granules of the kind I selected". Every swatch in
+the **Frame Color / Opacity** legend is a colour picker — click one to recolour
+that category, and **Reset to default** puts the palette back.
+
+Clicking a frame opens the frame panel: **Show granules** expands the granule
+list, which can be filtered to ascending or descending passes; **Export CSV**
+downloads that frame's granules; and **Show plot** charts observation mode
+against acquisition date, drawing ascending acquisitions as circles and
+descending as diamonds.
 
 The **(i)** button above the globe toggle turns on hover summaries: with it on,
 pointing at a frame pops up its summary, which stays until you move on or close
-it with its `x`. **GSLC Acquisitions Over Time** in the sidebar counts granules
-by acquisition date across the frames currently shown, binning to weeks or
-months as the time span grows.
+it with its `x`. **GSLC Acquisitions Over Time**, at the top of the sidebar,
+counts granules by acquisition date across the frames currently shown — binning
+to weeks or months as the span grows — and takes a start/end date of its own.
+
+Basemaps (light, dark, Esri satellite, Google hybrid as *Satellite2*) and the
+light/dark theme switch sit in the top-right control. **Product / Site Flags**
+carries an optional layer of Nevada Geodetic Laboratory GPS sites, off by
+default; clicking a site opens its position time series.
 
 !!! note "Keeping the CalVal frames current"
     The `isCalVal`, `isSNWG`, and `isDNC` flags behind the **Product / Site

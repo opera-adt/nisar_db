@@ -60,9 +60,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import duckdb
 import geopandas as gpd
@@ -70,8 +73,16 @@ import pandas as pd
 
 # Same standard science modes used by ``nisar_db.consistent_gslc`` /
 # ``nisar_db.modes``; kept local so the generator runs without importing the
-# package (the notebooks env may not have it installed).
-STANDARD_MODES = {"4005", "2005"}
+# package (the notebooks env may not have it installed). Ordered most preferred
+# first -- the order is the tie-break between science modes, so it must match
+# ``nisar_db.modes.MODE_PRIORITY``.
+MODE_PRIORITY = ("4005", "2005")
+STANDARD_MODES = frozenset(MODE_PRIORITY)
+
+# Mirrors ``nisar_db.consistent_gslc.PARTIAL_DOMINANCE_THRESHOLD``: above this
+# share of partial acquisitions a frame prefers partial coverage, because the
+# partial series is the one carrying the temporal coverage.
+PARTIAL_DOMINANCE_THRESHOLD = 0.66
 
 VENDOR_DIR = Path(__file__).resolve().parent / "vendor"
 
@@ -405,7 +416,101 @@ def build_frame_data(
 # ---------------------------------------------------------------------------
 # HTML rendering
 # ---------------------------------------------------------------------------
-def render_html(frame_data: dict, meta: dict) -> str:
+#: Nevada Geodetic Laboratory station map; the page embeds the site table itself.
+NGL_STATION_MAP = "https://geodesy.unr.edu/NGLStationPages/gpsnetmap/GPSNetMap.html"
+
+#: Sites outside North America are dropped: the whole network is ~23k points.
+NA_BBOX = (-170.0, 14.0, -52.0, 75.0)
+
+#: ``["SITE", lat, lon, "REFERENCE_FRAME", n]`` rows of the page's stalatlon array.
+_STATION_ROW = re.compile(
+    r'\["(?P<id>[A-Z0-9_]+)",\s*(?P<lat>-?\d+\.\d+),\s*(?P<lon>-?\d+\.\d+),\s*"(?P<frame>[^"]+)"'
+)
+
+
+def parse_gps_sites(
+    text: str, bbox: tuple[float, float, float, float] = NA_BBOX
+) -> dict:
+    """Turn the NGL station map page into a GeoJSON ``FeatureCollection``.
+
+    Parameters
+    ----------
+    text : str
+        Contents of :data:`NGL_STATION_MAP` (or a local copy of it).
+    bbox : tuple of float
+        ``(west, south, east, north)`` filter, defaulting to North America.
+
+    Returns
+    -------
+    dict
+        Point features carrying ``id`` and ``frame`` (the reference frame, which
+        is also the directory its time-series plot lives in).
+
+    Raises
+    ------
+    ValueError
+        If the page holds no station rows, i.e. its format changed.
+
+    """
+    west, south, east, north = bbox
+    features = []
+    for match in _STATION_ROW.finditer(text):
+        lat = float(match["lat"])
+        # The page carries longitudes shifted below -180; fold them back.
+        lon = float(match["lon"])
+        lon = (lon + 180.0) % 360.0 - 180.0
+        if not (west <= lon <= east and south <= lat <= north):
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [round(lon, 4), round(lat, 4)],
+                },
+                "properties": {"id": match["id"], "frame": match["frame"]},
+            }
+        )
+    if not features:
+        raise ValueError("No GPS stations parsed; the NGL page layout has changed.")
+    return {"type": "FeatureCollection", "features": features}
+
+
+def load_gps_sites(source: str | Path | None) -> dict:
+    """Fetch (or read) the UNR GPS sites, or an empty collection when disabled.
+
+    Parameters
+    ----------
+    source : str or Path or None
+        A URL to the NGL station map, a local copy of that page, or a GeoJSON
+        file. ``None`` builds the viewer without the GPS layer.
+
+    Returns
+    -------
+    dict
+        A GeoJSON ``FeatureCollection``.
+
+    """
+    empty: dict = {"type": "FeatureCollection", "features": []}
+    if source is None:
+        return empty
+    if str(source).startswith(("http://", "https://")):
+        try:
+            with urlopen(str(source), timeout=120) as response:  # noqa: S310
+                text = response.read().decode("utf8", errors="replace")
+        except (URLError, TimeoutError) as exc:
+            # The layer is a convenience: an unreachable NGL should not take the
+            # whole viewer build down with it.
+            print(f"  GPS sites unavailable ({exc}); building without the layer")
+            return empty
+    else:
+        text = Path(source).read_text()
+    if text.lstrip().startswith("{"):
+        return json.loads(text)
+    return parse_gps_sites(text)
+
+
+def render_html(frame_data: dict, meta: dict, gps_sites: dict | None = None) -> str:
     """Render the full self-contained HTML document as a string."""
     maplibre_css = (VENDOR_DIR / "maplibre-gl.css").read_text()
     maplibre_js = (VENDOR_DIR / "maplibre-gl.js").read_text()
@@ -415,6 +520,11 @@ def render_html(frame_data: dict, meta: dict) -> str:
         + json.dumps(frame_data, separators=(",", ":"))
         + ";\nconst META = "
         + json.dumps(meta, separators=(",", ":"))
+        + ";\nconst UNR_GPS_DATA = "
+        + json.dumps(
+            gps_sites or {"type": "FeatureCollection", "features": []},
+            separators=(",", ":"),
+        )
         + ";"
     )
 
@@ -435,9 +545,17 @@ def render_html(frame_data: dict, meta: dict) -> str:
 
 
 APP_CSS = r"""
+  /* OPERA palette: brand darks and blue/green accents for the chrome. Frame
+     colours are data, not chrome, and keep their own palettes further down. */
   :root{
-    --bg:#000000; --panel:#303030; --panel2:#262626; --border:#4a4a4a;
+    --bg:#000000; --panel:#303030; --panel2:#262626; --inset:#1f1f1f; --border:#4a4a4a;
     --text:#f5f5f5; --text-dim:#9db4c6; --accent:#76aedf; --accent2:#aad3c1;
+    --hairline:rgba(245,245,245,.12); --scrim:rgba(0,0,0,.8);
+  }
+  body.theme-light{
+    --bg:#f5f5f5; --panel:#ffffff; --panel2:#f5f5f5; --inset:#ffffff; --border:#d8d8d8;
+    --text:#303030; --text-dim:#467b7b; --accent:#467b7b; --accent2:#6cbab8;
+    --hairline:rgba(48,48,48,.14); --scrim:rgba(255,255,255,.88);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;font-family:Metropolis,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
@@ -458,7 +576,7 @@ APP_CSS = r"""
   .section.collapsed .chev{transform:rotate(-90deg);}
   label{display:block;margin:6px 0 3px 0;color:var(--text-dim);font-size:11px;}
   input[type=text], select{
-    width:100%;background:#1f1f1f;border:1px solid var(--border);color:var(--text);
+    width:100%;background:var(--inset);border:1px solid var(--border);color:var(--text);
     border-radius:5px;padding:5px 7px;font-size:12.5px;
   }
   .row{display:flex;gap:6px;}
@@ -467,12 +585,12 @@ APP_CSS = r"""
   .radio-group label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;font-size:12px;}
   .chip-grid{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;max-height:130px;overflow-y:auto;padding:2px;}
   .chip{border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer;
-    background:#1f1f1f;color:var(--text-dim);user-select:none;}
+    background:var(--inset);color:var(--text-dim);user-select:none;}
   .chip.active{background:var(--accent);border-color:var(--accent);color:#1a1a1a;}
   .check-row{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:12px;}
   .check-row input{width:auto;}
   .stat-line{color:var(--text-dim);font-size:11px;margin-top:6px;}
-  .btn{background:#1f1f1f;border:1px solid var(--border);color:var(--text);border-radius:5px;
+  .btn{background:var(--inset);border:1px solid var(--border);color:var(--text);border-radius:5px;
     padding:6px 10px;font-size:12px;cursor:pointer;}
   .btn:hover{border-color:var(--accent);color:var(--accent);}
   .btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1a1a;font-weight:600;}
@@ -485,38 +603,47 @@ APP_CSS = r"""
   #custom-color{width:28px;height:22px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;}
   #selected-list{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;}
   #selected-list li{display:flex;align-items:center;gap:6px;padding:5px 4px;border-bottom:1px solid var(--border);font-size:11.5px;}
-  #selected-list li:hover{background:#1f1f1f;}
+  #selected-list li:hover{background:var(--inset);}
   .li-swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0;cursor:pointer;}
   .li-label{flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .li-label .sub{color:var(--text-dim);}
   .li-x{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:13px;padding:0 3px;}
   .li-x:hover{color:#ff5d5d;}
   .footer-actions{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
-  #top-hint{position:absolute;top:10px;left:10px;background:rgba(0,0,0,.8);color:var(--text-dim);
+  #top-hint{position:absolute;top:10px;left:10px;background:var(--scrim);color:var(--text-dim);
     font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);pointer-events:none;z-index:5;}
-  #basemap-ctrl{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.85);border:1px solid var(--border);
+  #basemap-ctrl{position:absolute;top:10px;right:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
   #basemap-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
   .maplibregl-ctrl-group button.hover-info-btn{display:flex;align-items:center;justify-content:center;color:#303030;}
   .maplibregl-ctrl-group button.hover-info-btn.active{background:#b2daf7;color:#14425e;}
-  .maplibregl-popup-content{background:#303030;color:var(--text);font-size:12px;border-radius:6px;padding:8px 22px 8px 10px;}
+  .maplibregl-popup-content{background:var(--panel);color:var(--text);font-size:12px;border-radius:6px;padding:8px 22px 8px 10px;}
   .maplibregl-popup-close-button{color:var(--text-dim);font-size:15px;line-height:1;padding:2px 6px;background:none;border:none;}
   .maplibregl-popup-close-button:hover{background:none;color:#ff5d5d;}
   .pop-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
   .btn[disabled]{opacity:.45;cursor:default;}
   .btn[disabled]:hover{border-color:var(--border);color:var(--text);}
-  .maplibregl-popup-tip{border-top-color:#303030 !important;border-bottom-color:#303030 !important;}
+  .maplibregl-popup-tip{border-top-color:var(--panel) !important;border-bottom-color:var(--panel) !important;}
   .maplibregl-ctrl-attrib{font-size:10px;}
   .pop-title{font-weight:600;margin-bottom:3px;}
   .pop-row{color:var(--text-dim);}
   .granule-list{max-height:220px;overflow-y:auto;margin-top:6px;border-top:1px solid var(--border);padding-top:4px;}
-  .granule-row{font-size:10.5px;color:var(--text-dim);padding:2px 0;border-bottom:1px solid rgba(245,245,245,.12);font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .granule-row{font-size:10.5px;color:var(--text-dim);padding:2px 0;border-bottom:1px solid var(--hairline);font-family:ui-monospace,Menlo,Consolas,monospace;}
   .granule-row .gdate{color:var(--text);}
   .granule-row .gmode{color:var(--accent2);}
   .day-bar{fill:var(--accent);}
   .day-bar:hover{fill:#b2daf7;}
   .day-base{stroke:var(--border);stroke-width:1;}
   .day-axis{fill:var(--text-dim);font-size:9.5px;}
+  .date-row{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .date-row input[type=date]{flex:1;background:var(--inset);border:1px solid var(--border);color:var(--text);
+    border-radius:5px;padding:3px 5px;font-size:11px;color-scheme:dark;}
+  body.theme-light .date-row input[type=date]{color-scheme:light;}
+  .legend-color{width:20px;height:14px;padding:0;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;}
+  #theme-toggle{background:none;border:none;color:var(--text);cursor:pointer;font-size:12px;padding:0 2px;}
+  #theme-toggle:hover{color:var(--accent);}
+  .seg{display:flex;gap:4px;margin:6px 0 2px 0;}
+  .seg .chip{flex:1;text-align:center;}
   #chart-modal{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.66);display:flex;align-items:center;justify-content:center;}
   #chart-modal[hidden]{display:none;}
   .chart-card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:8px;
@@ -525,24 +652,24 @@ APP_CSS = r"""
   .chart-sub{color:var(--text-dim);font-size:11px;margin:2px 0 8px 0;}
   .chart-tick{fill:var(--text-dim);font-size:10px;}
   .chart-row-label{fill:var(--text);font-size:10.5px;font-family:ui-monospace,Menlo,Consolas,monospace;}
-  .chart-grid{stroke:#4a4a4a;stroke-width:1;}
+  .chart-grid{stroke:var(--border);stroke-width:1;}
   .chart-dot{stroke:var(--panel);stroke-width:2;cursor:pointer;}
   .chart-dot:hover{stroke:#f5f5f5;}
-  .chart-tip{position:absolute;pointer-events:none;background:#1f1f1f;border:1px solid var(--border);border-radius:5px;
+  .chart-tip{position:absolute;pointer-events:none;background:var(--inset);border:1px solid var(--border);border-radius:5px;
     padding:5px 7px;font-size:11px;color:var(--text);white-space:nowrap;z-index:2;}
   .chart-tip[hidden]{display:none;}
   .chart-tip .tdim{color:var(--text-dim);}
   .summary-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-  .stat-tile{flex:1;min-width:70px;background:#1f1f1f;border:1px solid var(--border);border-radius:6px;padding:6px 8px;}
+  .stat-tile{flex:1;min-width:70px;background:var(--inset);border:1px solid var(--border);border-radius:6px;padding:6px 8px;}
   .stat-tile .num{font-size:16px;font-weight:700;color:var(--text);}
   .stat-tile .cap{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.3px;}
   .bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:11px;}
   .bar-row .bl{width:64px;color:var(--text-dim);flex-shrink:0;}
-  .bar-track{flex:1;height:10px;background:#1f1f1f;border-radius:5px;overflow:hidden;}
+  .bar-track{flex:1;height:10px;background:var(--inset);border-radius:5px;overflow:hidden;}
   .bar-fill{height:100%;border-radius:5px;}
   .bar-row .bn{width:34px;text-align:right;color:var(--text);flex-shrink:0;}
   ::-webkit-scrollbar{width:8px;height:8px;}
-  ::-webkit-scrollbar-thumb{background:#4a4a4a;border-radius:4px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
   #count-badge{background:var(--accent);color:#1a1a1a;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;}
 """
 
@@ -555,6 +682,31 @@ BODY_HTML = r"""<body>
       <small id="hdr-queried">CMR queried: unknown</small>
     </h1>
     <div id="sidebar-scroll">
+
+      <div class="section">
+        <div class="section-head" data-target="sec-daily"><span>GSLC Acquisitions Over Time</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-daily">
+          <div class="stat-line">GSLC granules in CMR over North America, counted by acquisition date across the frames currently shown. Hover a bar for its count.</div>
+          <div class="date-row">
+            <input type="date" id="f-date-start" aria-label="First acquisition date">
+            <span style="color:var(--text-dim);font-size:11px;">to</span>
+            <input type="date" id="f-date-end" aria-label="Last acquisition date">
+            <button class="btn small" id="btn-date-reset" title="Show the full record">All</button>
+          </div>
+          <div id="daily-wrap" style="position:relative;margin-top:6px;">
+            <div id="daily-chart"></div>
+            <div class="chart-tip" id="daily-tip" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head" data-target="sec-cons"><span>Consistent Mode Summary</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-cons">
+          <div class="stat-line">Consistent (mode, coverage) chosen per frame for DISP time series, aggregated over the frames currently shown.</div>
+          <div id="cons-summary"></div>
+        </div>
+      </div>
 
       <div class="section">
         <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
@@ -590,8 +742,8 @@ BODY_HTML = r"""<body>
             <option value="cons_cov">Consistent coverage (full/partial)</option>
             <option value="n_modes">Distinct modes per frame</option>
             <option value="blackout_months" id="opt-blackout" hidden>Blackout duration (months)</option>
-            <option value="gslc_modes">GSLC mode (first)</option>
-            <option value="gslc_pols">GSLC polarization (first)</option>
+            <option value="gslc_modes">GSLC mode (most common)</option>
+            <option value="gslc_pols">GSLC polarization (most common)</option>
           </select>
           <label>Fill opacity (<span id="opacity-val">32</span>%)</label>
           <input type="range" id="fill-opacity" min="0" max="100" value="32">
@@ -604,6 +756,8 @@ BODY_HTML = r"""<body>
         <div class="section-head" data-target="sec-flags"><span>Product / Site Flags</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-flags">
           <div class="check-row"><input type="checkbox" id="f-calval"><label for="f-calval" style="margin:0;color:var(--text)">CalVal frames only</label></div>
+          <div class="check-row" id="row-gps" hidden><input type="checkbox" id="f-gps-show"><label for="f-gps-show" style="margin:0;color:var(--text)">Show UNR GPS sites (<span id="gps-count">0</span>)</label></div>
+          <div class="stat-line" id="gps-hint" hidden>Nevada Geodetic Laboratory sites; click one for its position time series.</div>
         </div>
       </div>
 
@@ -623,25 +777,6 @@ BODY_HTML = r"""<body>
           <div class="check-row"><input type="checkbox" id="f-blackout"><label for="f-blackout" style="margin:0;color:var(--text)">Frames with a blackout window only</label></div>
           <div class="stat-line">Blackout windows repeat yearly (e.g. seasonal snow). Color frames by "Blackout duration (months)" above; hover or click a frame to see the exact blacked-out ranges and any InSAR reference resets.</div>
           <div id="blackout-summary"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-head" data-target="sec-daily"><span>GSLC Acquisitions Over Time</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-daily">
-          <div class="stat-line">GSLC granules in CMR over North America, counted by acquisition date across the frames currently shown. Hover a bar for its count.</div>
-          <div id="daily-wrap" style="position:relative;margin-top:6px;">
-            <div id="daily-chart"></div>
-            <div class="chart-tip" id="daily-tip" hidden></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-head" data-target="sec-cons"><span>Consistent Mode Summary</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-cons">
-          <div class="stat-line">Consistent (mode, coverage) chosen per frame for DISP time series, aggregated over the frames currently shown.</div>
-          <div id="cons-summary"></div>
         </div>
       </div>
 
@@ -678,6 +813,8 @@ BODY_HTML = r"""<body>
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
       <label><input type="radio" name="basemap" value="sat"> Satellite</label>
+      <label><input type="radio" name="basemap" value="sat2"> Satellite2</label>
+      <button id="theme-toggle" title="Switch to the light theme">&#9788;</button>
     </div>
     <div id="chart-modal" hidden>
       <div class="chart-card">
@@ -699,7 +836,7 @@ BODY_HTML = r"""<body>
 
 APP_JS = r"""
 (function(){
-  const PALETTE = ["#76aedf","#b2daf7","#aad3c1","#6cbab8","#467b7b","#303030","#f5f5f5","#ffffff"];
+  const PALETTE = ["#ff5d5d","#ff8a4d","#ffd24d","#7ee787","#4dd2c9","#4da3ff","#a389ff","#ff6fc7","#ffffff"];
   let currentColor = PALETTE[0];
   let applyColorBy = function(){};   // reassigned after map layers exist
   let refreshSummary = function(){}; // reassigned after DOM ready
@@ -707,6 +844,16 @@ APP_JS = r"""
 
   // ---------- derive filter option lists ----------
   function uniqSorted(arr){ return Array.from(new Set(arr)).sort(); }
+  // Frames observed in several modes are labelled by the mode they were actually
+  // acquired in most often, which is what the consistent-mode vote also sees.
+  function mostCommon(values){
+    const counts = new Map();
+    values.forEach(v=>{ if (v != null) counts.set(v, (counts.get(v)||0)+1); });
+    let best = null, bestN = 0;
+    counts.forEach((n, v)=>{ if (n > bestN || (n === bestN && best !== null && v < best)) { best = v; bestN = n; } });
+    return best;
+  }
+
   const allModesGslc = uniqSorted(FRAME_DATA.features.flatMap(f => f.properties.gslc_modes));
   const allPolsGslc  = uniqSorted(FRAME_DATA.features.flatMap(f => f.properties.gslc_pols));
   const activeChips = { gslcMode:new Set(), gslcPol:new Set() };
@@ -714,14 +861,16 @@ APP_JS = r"""
   // Single-value derived keys for the array-valued mode/pol properties.
   FRAME_DATA.features.forEach(f=>{
     const p = f.properties;
-    p._gslcMode = p.gslc_modes.length ? p.gslc_modes[0] : "none";
-    p._gslcPol  = p.gslc_pols.length  ? p.gslc_pols[0]  : "none";
+    const granules = Array.isArray(p.granules) ? p.granules : [];
+    p._gslcMode = mostCommon(granules.map(g=>g.mode)) || (p.gslc_modes[0] || "none");
+    p._gslcPol  = mostCommon(granules.map(g=>g.pol))  || (p.gslc_pols[0]  || "none");
   });
 
   // ---------- color-by support ----------
-  const CAT_PALETTE = ["#3f8fd0","#8ecfae","#2e9d9a","#b2daf7","#7c93a8"];
+  const CAT_PALETTE = ["#4da3ff","#ff8a4d","#7ee787","#ff5d5d","#a389ff","#ffd24d","#4dd2c9","#ff6fc7",
+                       "#f0b429","#6ee7b7","#93c5fd","#fca5a5","#c4b5fd","#fda4af","#86efac","#fcd34d"];
   // Sequential ramp (low -> high) for numeric color-by fields.
-  const SEQ_PALETTE = ["#d7ecfb","#b2daf7","#8cc3ec","#66a9dc","#4189c4","#2a6b9f","#1b4f78","#123c5c","#0b2a41"];
+  const SEQ_PALETTE = ["#2c7bb6","#00a6ca","#00ccbc","#90eb9d","#ffff8c","#f9d057","#f29e2e","#e76818","#d7191c"];
 
   const COLOR_BY_FIELDS = {
     passDirection: { label:"Pass Direction",      key:"passDirection", kind:"cat" },
@@ -739,9 +888,9 @@ APP_JS = r"""
     if (baseColorMapsCache[propKey]) return baseColorMapsCache[propKey];
     let m;
     if (propKey === "passDirection") {
-      m = new Map([["Ascending","#3f8fd0"],["Descending","#8ecfae"]]);
+      m = new Map([["Ascending","#4da3ff"],["Descending","#ff8a4d"]]);
     } else if (propKey === "cons_cov") {
-      m = new Map([["F","#3f8fd0"],["P","#8ecfae"],["none","#6b6b6b"]]);
+      m = new Map([["F","#4da3ff"],["P","#ff8a4d"],["none","#555a61"]]);
     } else {
       const vals = uniqSorted(FRAME_DATA.features.map(f=>String(f.properties[propKey])));
       m = new Map();
@@ -789,11 +938,22 @@ APP_JS = r"""
         `<span>${lo}</span><span>${info.label}</span><span>${hi}</span></div>`;
       return;
     }
-    baseColorMap(info.key).forEach((color, val)=>{
+    const colorMap = baseColorMap(info.key);
+    colorMap.forEach((color, val)=>{
       const row = document.createElement("div");
       row.className = "check-row"; row.style.margin = "2px 0";
-      row.innerHTML = `<div class="li-swatch" style="background:${color};cursor:default;"></div>`+
-                      `<span style="font-size:11px;color:var(--text-dim)">${val}</span>`;
+      const picker = document.createElement("input");
+      picker.type = "color"; picker.className = "legend-color"; picker.value = color;
+      picker.title = `Recolour ${val}`;
+      picker.addEventListener("input", ()=>{
+        colorMap.set(val, picker.value);   // the cached map is what colorExpression reads
+        applyColorBy();
+      });
+      const label = document.createElement("span");
+      label.style.cssText = "font-size:11px;color:var(--text-dim)";
+      label.textContent = val;
+      row.appendChild(picker);
+      row.appendChild(label);
       el.appendChild(row);
     });
   }
@@ -1017,13 +1177,18 @@ APP_JS = r"""
     const tip = document.getElementById("daily-tip");
     tip.hidden = true;
 
+    const from = document.getElementById("f-date-start").value;
+    const to = document.getElementById("f-date-end").value;
     const counts = new Map();
-    features.forEach(f=> (DAY_COUNTS_BY_FRAME.get(f.properties.id)||[]).forEach(([d,n])=>
-      counts.set(d, (counts.get(d)||0) + n)));
+    features.forEach(f=> (DAY_COUNTS_BY_FRAME.get(f.properties.id)||[]).forEach(([d,n])=>{
+      if (from && d < from) return;
+      if (to && d > to) return;
+      counts.set(d, (counts.get(d)||0) + n);
+    }));
     const days = Array.from(counts.keys()).sort();
     dailyBins = [];
     if (!days.length) {
-      el.innerHTML = `<div class="stat-line">No GSLC acquisitions in the frames shown.</div>`;
+      el.innerHTML = `<div class="stat-line">No GSLC acquisitions in the frames shown${from || to ? " for this date range" : ""}.</div>`;
       return;
     }
 
@@ -1083,6 +1248,14 @@ APP_JS = r"""
   });
   document.getElementById("daily-chart").addEventListener("mouseleave", ()=>{
     document.getElementById("daily-tip").hidden = true;
+  });
+
+  ["f-date-start","f-date-end"].forEach(id=>
+    document.getElementById(id).addEventListener("change", ()=> refreshDailyChart(currentFiltered())));
+  document.getElementById("btn-date-reset").addEventListener("click", ()=>{
+    document.getElementById("f-date-start").value = "";
+    document.getElementById("f-date-end").value = "";
+    refreshDailyChart(currentFiltered());
   });
 
   ["f-track","f-frame","f-id"].forEach(id=>document.getElementById(id).addEventListener("input", applyFilters));
@@ -1315,12 +1488,14 @@ APP_JS = r"""
     sources: {
       "carto-light": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
       "carto-dark": { type:"raster", tiles:["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png","https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"], tileSize:256, attribution:"&copy; OpenStreetMap &copy; CARTO" },
-      "esri-sat": { type:"raster", tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize:256, attribution:"Esri World Imagery" }
+      "esri-sat": { type:"raster", tiles:["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize:256, attribution:"Esri World Imagery" },
+      "google-hybrid": { type:"raster", tiles:["https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"], tileSize:256, attribution:"Google" }
     },
     layers: [
       { id:"bm-light", type:"raster", source:"carto-light", layout:{visibility:"visible"} },
       { id:"bm-dark", type:"raster", source:"carto-dark", layout:{visibility:"none"} },
-      { id:"bm-sat", type:"raster", source:"esri-sat", layout:{visibility:"none"} }
+      { id:"bm-sat", type:"raster", source:"esri-sat", layout:{visibility:"none"} },
+      { id:"bm-sat2", type:"raster", source:"google-hybrid", layout:{visibility:"none"} }
     ]
   };
 
@@ -1361,32 +1536,51 @@ APP_JS = r"""
   map.addControl(hoverInfoControl, "bottom-right");
   map.addControl(new maplibregl.GlobeControl(), "bottom-right");
 
+  const BASEMAP_LAYERS = {light:"bm-light", dark:"bm-dark", sat:"bm-sat", sat2:"bm-sat2"};
   document.querySelectorAll('input[name="basemap"]').forEach(r=>{
     r.addEventListener("change", ()=>{
-      const v = r.value;
-      map.setLayoutProperty("bm-light","visibility", v==="light"?"visible":"none");
-      map.setLayoutProperty("bm-dark","visibility", v==="dark"?"visible":"none");
-      map.setLayoutProperty("bm-sat","visibility", v==="sat"?"visible":"none");
+      Object.entries(BASEMAP_LAYERS).forEach(([value, layer])=>
+        map.setLayoutProperty(layer, "visibility", value === r.value ? "visible" : "none"));
     });
   });
 
+  // ---------- light / dark theme ----------
+  const themeBtn = document.getElementById("theme-toggle");
+  themeBtn.addEventListener("click", ()=>{
+    const light = document.body.classList.toggle("theme-light");
+    themeBtn.innerHTML = light ? "&#9789;" : "&#9788;";
+    themeBtn.title = light ? "Switch to the dark theme" : "Switch to the light theme";
+    // The sidebar chart is drawn with the theme colours baked into its markup.
+    applyFilters();
+  });
+
   function parseGranules(p){
-    return JSON.parse(typeof p.granules === "string" ? p.granules : JSON.stringify(p.granules));
+    const granules = JSON.parse(typeof p.granules === "string" ? p.granules : JSON.stringify(p.granules));
+    // NISAR_L2_PR_GSLC_<cycle>_<track>_<D|A>_<frame>_... - the pass direction is
+    // the seventh field of the granule id, and nowhere else in the record.
+    granules.forEach(g=>{ g.dir = String(g.gid || "").split("_")[6] || "?"; });
+    return granules;
   }
 
+  const DIR_LABEL = {A:"Ascending", D:"Descending"};
+
   function granuleCsv(p, granules){
-    const rows = [["frame_id","track","frame","pass","date","mode","coverage","polarization","cycle","granule_id"]];
-    granules.forEach(g=> rows.push([p.id,p.track,p.frame,p.passDirection,g.date,g.mode,g.cov,g.pol,g.cycle,g.gid]));
+    const rows = [["frame_id","track","frame","pass","direction","date","mode","coverage","polarization","cycle","granule_id"]];
+    granules.forEach(g=> rows.push([p.id,p.track,p.frame,p.passDirection,g.dir,g.date,g.mode,g.cov,g.pol,g.cycle,g.gid]));
     return toCsv(rows);
   }
 
   function granulePopupHtml(p){
     const granules = parseGranules(p);
     const isSel = selected.has(p.id);
-    let rows = granules.map(g=>
-      `<div class="granule-row"><span class="gdate">${g.date}</span> `+
-      `<span class="gmode">${g.mode}_${g.cov}</span> ${g.pol} c${g.cycle}<br>${g.gid}</div>`
-    ).join("");
+    const dirs = uniqSorted(granules.map(g=>g.dir));
+    const dirChips = dirs.length > 1
+      ? `<div class="seg" id="pop-dir">`+
+        `<div class="chip active" data-dir="all">All</div>`+
+        dirs.map(d=>`<div class="chip" data-dir="${d}">${DIR_LABEL[d] || d}</div>`).join("")+
+        `</div>`
+      : "";
+    let rows = granuleRowsHtml(granules);
     if (!rows) rows = `<div class="granule-row">No GSLC granules in CMR for this frame.</div>`;
     return `
       <div class="pop-title">Track ${p.track} / Frame ${p.frame} (${p.id})</div>
@@ -1399,7 +1593,14 @@ APP_JS = r"""
         <button class="btn small" id="pop-csv"${granules.length ? "" : " disabled"}>Export CSV</button>
         <button class="btn small" id="pop-plot"${granules.length ? "" : " disabled"}>Show plot</button>
       </div>
-      <div class="granule-list" id="pop-granule-list" hidden>${rows}</div>`;
+      <div id="pop-granule-panel" hidden>${dirChips}<div class="granule-list" id="pop-granule-list">${rows}</div></div>`;
+  }
+
+  function granuleRowsHtml(granules){
+    return granules.map(g=>
+      `<div class="granule-row"><span class="gdate">${g.date}</span> `+
+      `<span class="gmode">${g.mode}_${g.cov}</span> ${g.pol} ${g.dir} c${g.cycle}<br>${g.gid}</div>`
+    ).join("");
   }
 
   function wireGranulePopup(feature){
@@ -1411,10 +1612,21 @@ APP_JS = r"""
       selBtn.textContent = selected.has(p.id) ? "Remove from selection" : "Add to selection";
     });
     const listBtn = document.getElementById("pop-granules");
+    const panel = document.getElementById("pop-granule-panel");
     const list = document.getElementById("pop-granule-list");
-    if (listBtn && list) listBtn.addEventListener("click", ()=>{
-      list.hidden = !list.hidden;
-      listBtn.textContent = `${list.hidden ? "Show" : "Hide"} granules (${granules.length})`;
+    if (listBtn && panel) listBtn.addEventListener("click", ()=>{
+      panel.hidden = !panel.hidden;
+      listBtn.textContent = `${panel.hidden ? "Show" : "Hide"} granules (${granules.length})`;
+    });
+    const dirBar = document.getElementById("pop-dir");
+    if (dirBar && list) dirBar.addEventListener("click", (e)=>{
+      const chip = e.target.closest("[data-dir]");
+      if (!chip) return;
+      dirBar.querySelectorAll(".chip").forEach(c=>c.classList.toggle("active", c === chip));
+      const dir = chip.dataset.dir;
+      const shown = dir === "all" ? granules : granules.filter(g=>g.dir === dir);
+      list.innerHTML = granuleRowsHtml(shown) ||
+        `<div class="granule-row">No ${DIR_LABEL[dir] || dir} granules for this frame.</div>`;
     });
     const csvBtn = document.getElementById("pop-csv");
     if (csvBtn) csvBtn.addEventListener("click", ()=>
@@ -1427,7 +1639,7 @@ APP_JS = r"""
   // Categorical steps chosen for the dark panel surface; adjacent pairs clear the
   // colour-vision-deficiency separation floor. Every row is also directly
   // labelled, so identity never rests on colour alone.
-  const CHART_PALETTE = ["#3f8fd0","#8ecfae","#2e9d9a","#b2daf7","#7c93a8"];
+  const CHART_PALETTE = ["#3987e5","#d95926","#199e70","#c98500","#d55181","#008300","#9085e9","#e66767"];
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const DAY_MS = 86400000;
   let modeKeyOrder = null;
@@ -1467,7 +1679,7 @@ APP_JS = r"""
 
   function modeTimelineSvg(granules){
     chartPoints = granules.filter(g=>g.date).map(g=>({
-      t: Date.parse(`${g.date}T00:00:00Z`), key: `${g.mode}_${g.cov}`, g
+      t: Date.parse(`${g.date}T00:00:00Z`), key: `${g.mode}_${g.cov}`, dir: g.dir, g
     })).sort((a,b)=>a.t-b.t);
     if (!chartPoints.length) return `<div class="stat-line">No dated granules to plot.</div>`;
 
@@ -1492,12 +1704,23 @@ APP_JS = r"""
       `<text class="chart-row-label" x="${padL-10}" y="${yOf(key)+3.5}" text-anchor="end">${key}</text>`
     ).join("");
 
-    const dots = chartPoints.map((pt,i)=>
-      `<circle class="chart-dot" data-i="${i}" cx="${xOf(pt.t).toFixed(1)}" cy="${yOf(pt.key)}" r="4.5" fill="${modeColor(pt.key)}"/>`
-    ).join("");
+    // Circle = ascending, diamond = descending; shape carries the direction so it
+    // survives the mode colouring and colour-vision deficiency alike.
+    const dots = chartPoints.map((pt,i)=>{
+      const x = xOf(pt.t), y = yOf(pt.key), fill = modeColor(pt.key);
+      if (pt.dir === "D") {
+        const r = 5.2;
+        const pts = [[x, y-r],[x+r, y],[x, y+r],[x-r, y]].map(c=>c.map(v=>v.toFixed(1)).join(",")).join(" ");
+        return `<polygon class="chart-dot" data-i="${i}" points="${pts}" fill="${fill}"/>`;
+      }
+      return `<circle class="chart-dot" data-i="${i}" cx="${x.toFixed(1)}" cy="${y}" r="4.5" fill="${fill}"/>`;
+    }).join("");
+    const shapeKey = uniqSorted(chartPoints.map(pt=>pt.dir)).map(d=>
+      d === "D" ? "&#9670; descending" : d === "A" ? "&#9679; ascending" : `? ${d}`).join(" &middot; ");
 
     return `<svg id="chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="GSLC acquisitions by mode over time">${ticks}${lanes}${dots}</svg>`;
+      aria-label="GSLC acquisitions by mode over time">${ticks}${lanes}${dots}</svg>`+
+      `<div class="chart-sub">${shapeKey}</div>`;
   }
 
   function showModeTimeline(p, granules){
@@ -1528,7 +1751,7 @@ APP_JS = r"""
     if (!dot) { chartTip.hidden = true; return; }
     const pt = chartPoints[Number(dot.dataset.i)];
     chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.key}<br>`+
-      `<span class="tdim">${pt.g.pol} &middot; cycle ${pt.g.cycle}</span><br>`+
+      `<span class="tdim">${pt.g.pol} &middot; ${DIR_LABEL[pt.dir] || pt.dir} &middot; cycle ${pt.g.cycle}</span><br>`+
       `<span class="tdim">${pt.g.gid}</span>`;
     const card = chartTip.parentElement.getBoundingClientRect();
     chartTip.style.left = `${Math.min(e.clientX - card.left + 12, card.width - chartTip.offsetWidth - 8)}px`;
@@ -1574,6 +1797,7 @@ APP_JS = r"""
       applyColorBy();
     });
     document.getElementById("btn-reset-style").addEventListener("click", ()=>{
+      Object.keys(baseColorMapsCache).forEach(k=>delete baseColorMapsCache[k]);
       document.getElementById("color-by").value = "gslc_count";
       document.getElementById("fill-opacity").value = 32;
       document.getElementById("opacity-val").textContent = 32;
@@ -1610,6 +1834,53 @@ APP_JS = r"""
     });
     // Close on a delay so the pointer can travel onto the popup (and its X) first.
     map.on("mouseleave", "frames-fill", ()=>{ map.getCanvas().style.cursor = ""; scheduleHoverClose(); });
+
+    // ---------- UNR GPS sites ----------
+    // Hidden until asked for: 10k markers over the frames is a lot of ink.
+    if (UNR_GPS_DATA.features.length) {
+      map.addSource("unr-gps", { type:"geojson", data: UNR_GPS_DATA });
+      map.addLayer({
+        id:"gps-points", type:"circle", source:"unr-gps",
+        minzoom: 0,
+        layout:{ visibility:"none" },
+        paint:{
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 2, 1.5, 6, 3, 12, 6],
+          "circle-color": "#ff6fc7",
+          "circle-stroke-color": "#0f1418", "circle-stroke-width": 1
+        }
+      });
+      document.getElementById("gps-count").textContent = UNR_GPS_DATA.features.length;
+      document.getElementById("row-gps").hidden = false;
+      document.getElementById("gps-hint").hidden = false;
+      document.getElementById("f-gps-show").addEventListener("change", (e)=>{
+        map.setLayoutProperty("gps-points", "visibility", e.target.checked ? "visible" : "none");
+      });
+
+      const gpsHoverPopup = new maplibregl.Popup({ closeButton:false, closeOnClick:false });
+      map.on("mousemove", "gps-points", (e)=>{
+        map.getCanvas().style.cursor = "pointer";
+        const p = e.features[0].properties;
+        gpsHoverPopup.setLngLat(e.lngLat).setHTML(
+          `<div class="pop-title">${p.id}</div><div class="pop-row">${p.frame} &middot; click for time series</div>`
+        ).addTo(map);
+      });
+      map.on("mouseleave", "gps-points", ()=>{ map.getCanvas().style.cursor = ""; gpsHoverPopup.remove(); });
+
+      map.on("click", "gps-points", (e)=>{
+        const p = e.features[0].properties;
+        const imgUrl = `https://geodesy.unr.edu/gps_timeseries/${p.frame}/tsplots/${p.frame}/TimeSeries/${p.id}.png`;
+        new maplibregl.Popup({ closeButton:true, closeOnClick:true, maxWidth:"320px" })
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div class="pop-title">${p.id}</div>
+             <a href="${imgUrl}" target="_blank" rel="noopener">
+               <img src="${imgUrl}" style="width:100%;max-width:300px;border-radius:4px;margin-top:4px;" alt="${p.id} time series">
+             </a>
+             <div class="pop-row" style="margin-top:4px;"><a href="${imgUrl}" target="_blank" rel="noopener" style="color:var(--accent)">Open full plot &#8594;</a></div>`
+          )
+          .addTo(map);
+      });
+    }
 
     // click -> granule list popup with a select toggle
     const clickPopup = new maplibregl.Popup({ closeButton:true, closeOnClick:false, maxWidth:"340px" });
@@ -1674,6 +1945,17 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Optional per-frame reference-dates JSON/.json.zip; shows InSAR "
         "reference resets on hover/click.",
+    )
+    parser.add_argument(
+        "--gps-source",
+        default=NGL_STATION_MAP,
+        help="UNR/NGL station map URL, a local copy of that page, or a GeoJSON "
+        "of sites; drawn as an optional map layer.",
+    )
+    parser.add_argument(
+        "--no-gps",
+        action="store_true",
+        help="Build without the UNR GPS layer.",
     )
     parser.add_argument(
         "--output",
@@ -1742,7 +2024,11 @@ def main(argv: list[str] | None = None) -> None:
         "has_reference": reference is not None,
     }
 
-    html = render_html(frame_data, meta)
+    gps_sites = load_gps_sites(None if args.no_gps else args.gps_source)
+    if gps_sites["features"]:
+        print(f"  {len(gps_sites['features'])} UNR GPS sites")
+
+    html = render_html(frame_data, meta, gps_sites)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(html)
     size_mb = args.output.stat().st_size / 1e6
