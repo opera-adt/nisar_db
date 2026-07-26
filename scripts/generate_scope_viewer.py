@@ -1781,16 +1781,18 @@ APP_JS = r"""
 
   const chartTip = document.getElementById("chart-tip");
   document.getElementById("chart-body").addEventListener("mousemove", (e)=>{
-    const dot = e.target.closest ? e.target.closest("circle[data-i]") : null;
+    // Ascending dots are circles and descending ones polygons, so match the class.
+    const dot = e.target.closest ? e.target.closest(".chart-dot[data-i]") : null;
     if (!dot) { chartTip.hidden = true; return; }
     const pt = chartPoints[Number(dot.dataset.i)];
     chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.key}<br>`+
       `<span class="tdim">${pt.g.pol} &middot; ${DIR_LABEL[pt.dir] || pt.dir} &middot; cycle ${pt.g.cycle}</span><br>`+
       `<span class="tdim">${pt.g.gid}</span>`;
+    // Unhide first: a display:none tip measures 0 wide and would defeat the clamp.
+    chartTip.hidden = false;
     const card = chartTip.parentElement.getBoundingClientRect();
     chartTip.style.left = `${Math.min(e.clientX - card.left + 12, card.width - chartTip.offsetWidth - 8)}px`;
     chartTip.style.top = `${e.clientY - card.top + 14}px`;
-    chartTip.hidden = false;
   });
   document.getElementById("chart-body").addEventListener("mouseleave", ()=>{ chartTip.hidden = true; });
 
