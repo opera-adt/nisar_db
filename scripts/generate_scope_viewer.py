@@ -5,7 +5,9 @@ The viewer is a single offline HTML file (MapLibre GL is vendored under
 ``scripts/vendor/``) that draws every OPERA NISAR-DISP frame and joins in the
 GSLC catalog so each frame carries:
 
-* the number of GSLC granules present in CMR (``gslc_count``),
+* the number of GSLC granules present in CMR (``gslc_count``), split into the
+  acquisitions they represent (``n_unique``) and the granules that repeat a
+  date and mode (``n_duplicate``),
 * the *consistent* observation mode / coverage chosen for DISP time series
   (``cons_mode`` / ``cons_cov``, following the same voting rule as
   :mod:`nisar_db.consistent_gslc`), and
@@ -15,7 +17,8 @@ It is intentionally a design sibling of ``scripts/nisar_frame_viewer_v1.html``
 (same look and controls) with these deliberate differences:
 
 * globe (global) projection is the default at start,
-* frames can be colored by GSLC count or by consistent mode / coverage,
+* frames can be colored by GSLC count, duplicate count, or consistent
+  mode / coverage,
 * hovering a frame shows a dismissable summary and clicking it opens the
   granule list, a per-frame granule CSV export, and a plot of observation mode
   against acquisition date,
@@ -215,7 +218,7 @@ def load_period_json(path: Path, *keys: str) -> dict[str, list]:
 def common_mode_coverage(group: pd.DataFrame) -> tuple[str, str]:
     """Return the ``(common_mode, common_coverage)`` for one frame's granules.
 
-    Priority, identical to :func:`nisar_db.consistent_gslc._common_mode_coverage`.
+    Priority, as in :func:`nisar_db.consistent_gslc._common_mode_coverage`.
     Each mode settles its own coverage by majority (``F`` when ``n_F >= n_P``),
     then the modes compete on:
 
@@ -226,6 +229,11 @@ def common_mode_coverage(group: pd.DataFrame) -> tuple[str, str]:
        acquisitions, and
     3. mode — :data:`MODE_PRIORITY` (``4005`` then ``2005``) settles modes level
        on coverage and count.
+
+    This is a describe-the-catalog view, so unlike the package function it
+    always returns a winner: a frame seen only in non-standard modes still gets
+    a mode here, while the consistent-GSLC catalog drops it (such a frame shows
+    up as ``in_consistent: false`` once ``--consistent-json`` is supplied).
     """
     counts = (
         group.groupby(["mode", "coverage"])
@@ -271,8 +279,14 @@ def summarize_frame(group: pd.DataFrame) -> dict:
         .rename(columns={"granule_id": "gid", "coverage": "cov", "polarization": "pol"})
         .to_dict("records")
     )
+    # A pass split into several granules of the same mode -- partial segments of
+    # one acquisition -- lands on a single point of the timeline chart, so the
+    # granule count overstates how many acquisitions a frame really has.
+    n_unique = int(len(group.drop_duplicates(subset=["date", "mode", "coverage"])))
     return {
         "gslc_count": int(len(group)),
+        "n_unique": n_unique,
+        "n_duplicate": int(len(group)) - n_unique,
         "n_modes": int(group["mode"].nunique()),
         "n_full": int((group["coverage"] == "F").sum()),
         "n_partial": int((group["coverage"] == "P").sum()),
@@ -378,6 +392,8 @@ def build_frame_data(
             "isSNWG": bool(row["isSNWG"]),
             "isDNC": bool(row["isDNC"]),
             "gslc_count": s["gslc_count"] if s else 0,
+            "n_unique": s["n_unique"] if s else 0,
+            "n_duplicate": s["n_duplicate"] if s else 0,
             "n_modes": s["n_modes"] if s else 0,
             "n_full": s["n_full"] if s else 0,
             "n_partial": s["n_partial"] if s else 0,
@@ -740,6 +756,7 @@ BODY_HTML = r"""<body>
           <select id="color-by">
             <option value="passDirection">Pass Direction</option>
             <option value="gslc_count" selected>GSLC count in CMR (default)</option>
+            <option value="n_duplicate">Duplicate granules (same date &amp; mode)</option>
             <option value="cons_mode">Consistent mode</option>
             <option value="cons_cov">Consistent coverage (full/partial)</option>
             <option value="n_modes">Distinct modes per frame</option>
@@ -773,8 +790,8 @@ BODY_HTML = r"""<body>
           <input type="text" id="f-track" placeholder="all tracks">
           <label>Frame</label>
           <input type="text" id="f-frame" placeholder="all frames">
-          <label>Frame ID (track_frame, e.g. 34_19)</label>
-          <input type="text" id="f-id" placeholder="e.g. 34_19">
+          <label>Frame ID (e.g. 8109) or track_frame (e.g. 34_19)</label>
+          <input type="text" id="f-id" placeholder="e.g. 8109 or 34_19">
         </div>
       </div>
 
@@ -902,6 +919,7 @@ APP_JS = r"""
   const COLOR_BY_FIELDS = {
     passDirection: { label:"Pass Direction",      key:"passDirection", kind:"cat" },
     gslc_count:    { label:"GSLC count in CMR",    key:"gslc_count_sel", kind:"num" },
+    n_duplicate:   { label:"Duplicate granules",   key:"n_duplicate",   kind:"num" },
     cons_mode:     { label:"Consistent mode",      key:"cons_mode",     kind:"cat" },
     cons_cov:      { label:"Consistent coverage",  key:"cons_cov",      kind:"cat" },
     n_modes:       { label:"Distinct modes",       key:"n_modes",       kind:"num" },
@@ -927,8 +945,11 @@ APP_JS = r"""
     return m;
   }
 
+  // A viewer built before a field existed still has to render: an all-missing
+  // field collapses to a flat colour rather than NaN stops MapLibre rejects.
   function numericStops(propKey){
-    const vals = FRAME_DATA.features.map(f=>Number(f.properties[propKey]));
+    const vals = FRAME_DATA.features.map(f=>Number(f.properties[propKey])).filter(Number.isFinite);
+    if (!vals.length) return {lo:0, hi:0};
     const lo = Math.min(...vals), hi = Math.max(...vals);
     return {lo, hi};
   }
@@ -1134,7 +1155,8 @@ APP_JS = r"""
       const p = f.properties;
       if (trackSet && !trackSet.has(p.track)) return false;
       if (frameSet && !frameSet.has(p.frame)) return false;
-      if (idFilter && !p.id.toLowerCase().includes(idFilter)) return false;
+      if (idFilter && !p.id.toLowerCase().includes(idFilter) &&
+          !String(p.frame_idx).includes(idFilter)) return false;
       if (passVal !== "all" && p.passDirection !== passVal) return false;
       if (calval && !p.isCalVal) return false;
       if (blackoutOnly && !p.has_blackout) return false;
@@ -1363,7 +1385,7 @@ APP_JS = r"""
       sw.onclick = ()=>{ entry.color = currentColor; refreshSelectedSource(); renderSelectedList(); };
       const lbl = document.createElement("div");
       lbl.className = "li-label";
-      lbl.innerHTML = `T${p.track}_F${p.frame} <span class="sub">${p.passDirection[0]} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</span>`;
+      lbl.innerHTML = `${p.frame_idx} <span class="sub">T${p.track}_F${p.frame} &middot; ${p.passDirection[0]} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</span>`;
       lbl.title = "Click to zoom to frame";
       lbl.onclick = ()=> zoomToFeature(entry.feature);
       const x = document.createElement("button");
@@ -1493,10 +1515,10 @@ APP_JS = r"""
     URL.revokeObjectURL(a.href);
   }
   document.getElementById("btn-export-csv").addEventListener("click", ()=>{
-    const rows = [["track","frame","id","passDirection","color","gslc_count","cons_mode","cons_cov","n_modes","n_full","n_partial","isCalVal","isSNWG","isDNC"]];
+    const rows = [["frame_id","track","frame","passDirection","color","gslc_count","n_unique","n_duplicate","cons_mode","cons_cov","n_modes","n_full","n_partial","isCalVal","isSNWG","isDNC"]];
     Array.from(selected.values()).forEach(e=>{
       const p = e.feature.properties;
-      rows.push([p.track,p.frame,p.id,p.passDirection,e.color,p.gslc_count,p.cons_mode,p.cons_cov,
+      rows.push([p.frame_idx,p.track,p.frame,p.passDirection,e.color,p.gslc_count,p.n_unique,p.n_duplicate,p.cons_mode,p.cons_cov,
         p.n_modes,p.n_full,p.n_partial,p.isCalVal,p.isSNWG,p.isDNC]);
     });
     downloadBlob(toCsv(rows), "nisar_selected_frames.csv", "text/csv");
@@ -1600,8 +1622,16 @@ APP_JS = r"""
 
   function granuleCsv(p, granules){
     const rows = [["frame_id","track","frame","pass","direction","date","mode","coverage","polarization","cycle","granule_id"]];
-    granules.forEach(g=> rows.push([p.id,p.track,p.frame,p.passDirection,g.dir,g.date,g.mode,g.cov,g.pol,g.cycle,g.gid]));
+    granules.forEach(g=> rows.push([p.frame_idx,p.track,p.frame,p.passDirection,g.dir,g.date,g.mode,g.cov,g.pol,g.cycle,g.gid]));
     return toCsv(rows);
+  }
+
+  // Same date and mode means one acquisition delivered as several granules, so
+  // the unique count -- not the granule count -- is what the timeline plots.
+  function duplicateRow(p){
+    if (!p.n_duplicate) return "";
+    return `<div class="pop-row">Unique acquisitions: ${p.n_unique} `+
+           `&middot; ${p.n_duplicate} duplicate granule(s) on the same date &amp; mode</div>`;
   }
 
   function granulePopupHtml(p){
@@ -1617,9 +1647,10 @@ APP_JS = r"""
     let rows = granuleRowsHtml(granules);
     if (!rows) rows = `<div class="granule-row">No GSLC granules in CMR for this frame.</div>`;
     return `
-      <div class="pop-title">Track ${p.track} / Frame ${p.frame} (${p.id})</div>
+      <div class="pop-title">Frame ${p.frame_idx} &middot; Track ${p.track} / Frame ${p.frame}</div>
       <div class="pop-row">Pass: ${p.passDirection} &middot; consistent: ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
       <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s) &middot; ${p.n_full}F / ${p.n_partial}P</div>
+      ${duplicateRow(p)}
       ${blackoutDetailBlock(p)}
       <div class="pop-actions">
         <button class="btn small primary" id="pop-select">${isSel ? "Remove from selection" : "Add to selection"}</button>
@@ -1717,6 +1748,12 @@ APP_JS = r"""
     })).sort((a,b)=>a.t-b.t);
     if (!chartPoints.length) return `<div class="stat-line">No dated granules to plot.</div>`;
 
+    // Same date and mode plot at the same pixel, so a dot can hide others; count
+    // them and let the tooltip say so rather than silently under-reporting.
+    const stacks = new Map();
+    chartPoints.forEach(pt=> stacks.set(`${pt.t}|${pt.key}`, (stacks.get(`${pt.t}|${pt.key}`) || 0) + 1));
+    chartPoints.forEach(pt=> pt.stack = stacks.get(`${pt.t}|${pt.key}`));
+
     const rows = uniqSorted(chartPoints.map(pt=>pt.key));
     const padL = 96, padR = 24, padT = 10, padB = 30, rowH = 34;
     const W = Math.min(720, Math.max(420, window.innerWidth - 140));
@@ -1760,9 +1797,10 @@ APP_JS = r"""
   function showModeTimeline(p, granules){
     const dated = granules.filter(g=>g.date).map(g=>g.date).sort();
     document.getElementById("chart-title").textContent =
-      `Track ${p.track} / Frame ${p.frame} - acquisitions by mode`;
+      `Frame ${p.frame_idx} (Track ${p.track} / Frame ${p.frame}) - acquisitions by mode`;
+    const dup = p.n_duplicate ? ` (${p.n_unique} unique, ${p.n_duplicate} stacked)` : "";
     document.getElementById("chart-sub").textContent = dated.length
-      ? `${dated.length} GSLC granules - ${dated[0]} to ${dated[dated.length-1]}`
+      ? `${dated.length} GSLC granules${dup} - ${dated[0]} to ${dated[dated.length-1]}`
       : "No dated GSLC granules";
     document.getElementById("chart-body").innerHTML = modeTimelineSvg(granules);
     document.getElementById("chart-modal").hidden = false;
@@ -1785,9 +1823,12 @@ APP_JS = r"""
     const dot = e.target.closest ? e.target.closest(".chart-dot[data-i]") : null;
     if (!dot) { chartTip.hidden = true; return; }
     const pt = chartPoints[Number(dot.dataset.i)];
+    const stacked = pt.stack > 1
+      ? `<br><span class="tdim">${pt.stack} granules here (${pt.stack - 1} duplicate) - showing the top one</span>`
+      : "";
     chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.key}<br>`+
       `<span class="tdim">${pt.g.pol} &middot; ${DIR_LABEL[pt.dir] || pt.dir} &middot; cycle ${pt.g.cycle}</span><br>`+
-      `<span class="tdim">${pt.g.gid}</span>`;
+      `<span class="tdim">${pt.g.gid}</span>${stacked}`;
     // Unhide first: a display:none tip measures 0 wide and would defeat the clamp.
     chartTip.hidden = false;
     const card = chartTip.parentElement.getBoundingClientRect();
@@ -1856,9 +1897,10 @@ APP_JS = r"""
       cancelHoverClose();
       const p = e.features[0].properties;
       popup.setLngLat(e.lngLat).setHTML(`
-        <div class="pop-title">Track ${p.track} / Frame ${p.frame}</div>
+        <div class="pop-title">Frame ${p.frame_idx} &middot; Track ${p.track} / Frame ${p.frame}</div>
         <div class="pop-row">Pass: ${p.passDirection} &middot; ${p.cons_mode}${p.cons_cov!=="none"?"_"+p.cons_cov:""}</div>
         <div class="pop-row">GSLC in CMR: ${p.gslc_count} &middot; ${p.n_modes} mode(s)</div>
+        ${duplicateRow(p)}
         ${blackoutHoverLine(p)}
         ${referenceHoverLine(p)}
         <div class="pop-row" style="color:var(--accent)">click to list granules &amp; select</div>
