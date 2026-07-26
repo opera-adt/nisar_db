@@ -26,7 +26,7 @@
     display:flex;flex-direction:column;height:100%;overflow:hidden;}
   #sidebar-scroll{overflow-y:auto;flex:1;padding:12px 14px 8px 14px;}
   #map{flex:1;position:relative;}
-  h1{font-size:15px;margin:0;padding:14px 14px 10px 14px;border-bottom:1px solid var(--border);font-weight:600;}
+  h1{position:relative;font-size:15px;margin:0;padding:14px 14px 10px 14px;border-bottom:1px solid var(--border);font-weight:600;}
   h1 small{display:block;font-weight:400;color:var(--text-dim);font-size:11px;margin-top:2px;}
   #hdr-queried{font-size:10.5px;}
   .section{margin-bottom:14px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);}
@@ -72,7 +72,10 @@
   .li-x{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:13px;padding:0 3px;}
   .li-x:hover{color:#ff5d5d;}
   .footer-actions{padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
-  #top-hint{position:absolute;top:10px;left:10px;background:var(--scrim);color:var(--text-dim);
+  #pass-ctrl{position:absolute;top:10px;left:10px;background:var(--scrim);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
+  #pass-ctrl label{display:flex;align-items:center;gap:4px;color:var(--text);margin:0;cursor:pointer;}
+  #top-hint{position:absolute;top:48px;left:10px;background:var(--scrim);color:var(--text-dim);
     font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);pointer-events:none;z-index:5;}
   #basemap-ctrl{position:absolute;top:10px;right:10px;background:var(--scrim);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px;z-index:5;font-size:11.5px;display:flex;gap:8px;}
@@ -101,8 +104,8 @@
   .date-row input[type=date]{flex:1;background:var(--inset);border:1px solid var(--border);color:var(--text);
     border-radius:5px;padding:3px 5px;font-size:11px;color-scheme:dark;}
   body.theme-light .date-row input[type=date]{color-scheme:light;}
-  .legend-color{width:20px;height:14px;padding:0;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;}
-  #theme-toggle{background:none;border:none;color:var(--text);cursor:pointer;font-size:12px;padding:0 2px;}
+  .legend-color{width:28px;height:20px;padding:0;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;}
+  #theme-toggle{position:absolute;top:11px;right:12px;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;line-height:1;padding:2px 4px;}
   #theme-toggle:hover{color:var(--accent);}
   .seg{display:flex;gap:4px;margin:6px 0 2px 0;}
   .seg .chip{flex:1;text-align:center;}
@@ -139,6 +142,7 @@
 <div id="app">
   <div id="sidebar">
     <h1>OPERA NISAR-DB Viewer
+      <button id="theme-toggle" title="Switch to the light theme">&#9788;</button>
       <small>North America &middot; <span id="hdr-count">0</span> frames shown</small>
       <small id="hdr-queried">CMR queried: unknown</small>
     </h1>
@@ -161,6 +165,7 @@
         </div>
       </div>
 
+
       <div class="section">
         <div class="section-head" data-target="sec-cons"><span>Consistent Mode Summary</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-cons">
@@ -169,28 +174,7 @@
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-loc">
-          <label>Track (e.g. "12" or "10-20" or "12,34,56")</label>
-          <input type="text" id="f-track" placeholder="all tracks">
-          <label>Frame</label>
-          <input type="text" id="f-frame" placeholder="all frames">
-          <label>Frame ID (track_frame, e.g. 34_19)</label>
-          <input type="text" id="f-id" placeholder="e.g. 34_19">
-        </div>
-      </div>
 
-      <div class="section">
-        <div class="section-head" data-target="sec-pass"><span>Pass Direction</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-pass">
-          <div class="radio-group" id="f-pass">
-            <label><input type="radio" name="pass" value="all" checked> All</label>
-            <label><input type="radio" name="pass" value="Ascending"> Ascending</label>
-            <label><input type="radio" name="pass" value="Descending"> Descending</label>
-          </div>
-        </div>
-      </div>
 
       <div class="section">
         <div class="section-head" data-target="sec-style"><span>Frame Color / Opacity</span><span class="chev">&#9660;</span></div>
@@ -213,14 +197,6 @@
         </div>
       </div>
 
-      <div class="section">
-        <div class="section-head" data-target="sec-flags"><span>Product / Site Flags</span><span class="chev">&#9660;</span></div>
-        <div class="section-body" id="sec-flags">
-          <div class="check-row"><input type="checkbox" id="f-calval"><label for="f-calval" style="margin:0;color:var(--text)">CalVal frames only</label></div>
-          <div class="check-row" id="row-gps" hidden><input type="checkbox" id="f-gps-show"><label for="f-gps-show" style="margin:0;color:var(--text)">Show UNR GPS sites (<span id="gps-count">0</span>)</label></div>
-          <div class="stat-line" id="gps-hint" hidden>Nevada Geodetic Laboratory sites; click one for its position time series.</div>
-        </div>
-      </div>
 
       <div class="section">
         <div class="section-head" data-target="sec-gslc"><span>GSLC Mode / Polarization</span><span class="chev">&#9660;</span></div>
@@ -232,6 +208,30 @@
         </div>
       </div>
 
+
+      <div class="section collapsed">
+        <div class="section-head" data-target="sec-loc"><span>Location (Track / Frame)</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-loc">
+          <label>Track (e.g. "12" or "10-20" or "12,34,56")</label>
+          <input type="text" id="f-track" placeholder="all tracks">
+          <label>Frame</label>
+          <input type="text" id="f-frame" placeholder="all frames">
+          <label>Frame ID (track_frame, e.g. 34_19)</label>
+          <input type="text" id="f-id" placeholder="e.g. 34_19">
+        </div>
+      </div>
+
+
+      <div class="section">
+        <div class="section-head" data-target="sec-flags"><span>Product / Site Flags</span><span class="chev">&#9660;</span></div>
+        <div class="section-body" id="sec-flags">
+          <div class="check-row"><input type="checkbox" id="f-calval"><label for="f-calval" style="margin:0;color:var(--text)">CalVal frames only</label></div>
+          <div class="check-row" id="row-gps" hidden><input type="checkbox" id="f-gps-show"><label for="f-gps-show" style="margin:0;color:var(--text)">Show UNR GPS sites (<span id="gps-count">0</span>)</label></div>
+          <div class="stat-line" id="gps-hint" hidden>Nevada Geodetic Laboratory sites; click one for its position time series.</div>
+        </div>
+      </div>
+
+
       <div class="section" id="section-blackout" hidden>
         <div class="section-head" data-target="sec-blackout"><span>Blackout &amp; Reference Dates</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-blackout">
@@ -241,7 +241,8 @@
         </div>
       </div>
 
-      <div class="section">
+
+      <div class="section collapsed">
         <div class="section-head" data-target="sec-paint"><span>Paint / Select Frames</span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-paint">
           <div id="palette"></div>
@@ -252,7 +253,8 @@
         </div>
       </div>
 
-      <div class="section">
+
+      <div class="section collapsed">
         <div class="section-head" data-target="sec-sel"><span>Selected List <span id="count-badge">0</span></span><span class="chev">&#9660;</span></div>
         <div class="section-body" id="sec-sel">
           <ul id="selected-list"></ul>
@@ -269,13 +271,17 @@
     </div>
   </div>
   <div id="map">
+    <div id="pass-ctrl">
+      <label><input type="radio" name="pass" value="all" checked> All</label>
+      <label><input type="radio" name="pass" value="Ascending"> Asc</label>
+      <label><input type="radio" name="pass" value="Descending"> Desc</label>
+    </div>
     <div id="top-hint">Click a frame to list granules &amp; select &middot; the (i) button toggles hover summaries</div>
     <div id="basemap-ctrl">
       <label><input type="radio" name="basemap" value="light" checked> Light</label>
       <label><input type="radio" name="basemap" value="dark"> Dark</label>
       <label><input type="radio" name="basemap" value="sat"> Satellite</label>
       <label><input type="radio" name="basemap" value="sat2"> Satellite-H</label>
-      <button id="theme-toggle" title="Switch to the light theme">&#9788;</button>
     </div>
     <div id="chart-modal" hidden>
       <div class="chart-card">

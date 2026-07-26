@@ -44,10 +44,11 @@ it with its `x`. **GSLC Acquisitions Over Time**, at the top of the sidebar,
 counts granules by acquisition date across the frames currently shown — binning
 to weeks or months as the span grows — and takes a start/end date of its own.
 
-Basemaps (light, dark, Esri satellite, Google hybrid as *Satellite-H*) and the
-light/dark theme switch sit in the top-right control. **Product / Site Flags**
-carries an optional layer of Nevada Geodetic Laboratory GPS sites, off by
-default; clicking a site opens its position time series.
+Pass direction sits in the top-left map control and basemaps (light, dark, Esri
+satellite, Google hybrid as *Satellite-H*) in the top-right; the light/dark
+theme switch is beside the viewer title. **Product / Site Flags** carries an
+optional layer of Nevada Geodetic Laboratory GPS sites, off by default; clicking
+a site opens its position time series.
 
 !!! note "Keeping the CalVal frames current"
     The `isCalVal`, `isSNWG`, and `isDNC` flags behind the **Product / Site
