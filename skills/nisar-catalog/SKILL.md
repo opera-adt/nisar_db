@@ -15,7 +15,7 @@ exposed through the `nisar-db` CLI (defined in [cli.py](../../src/nisar_db/cli.p
 Installing the package (`pip install -e .` or `pixi run build`) creates that command.
 
 ```
-nisar-db create-catalog          Parse a NISAR GSLC file list into a structured CSV.
+nisar-db create-gslc-csv         Parse a NISAR GSLC file list into a structured CSV.
 nisar-db create-frame-to-bound   Create a frame_to_bound JSON file for NISAR.
 nisar-db create-consistent       Create the consistent-GSLC JSON for NISAR frames.
 nisar-db create-nisar-catalog    Build the GSLC/GUNW catalogs (DuckDB + JSON) from CMR.
@@ -40,7 +40,7 @@ TrackFrame gpkg ──create-frame-to-bound──> frame-to-bounds JSON
 
 snow-analysis GeoJSON ──create-blackout-dates──> blackout-dates JSON
                                                      │
-GSLC file list ──create-catalog──> gslc_catalog.csv  │
+GSLC file list ──create-gslc-csv──> gslc_catalog.csv │
                                           │          │
                                           └──create-consistent──> consistent-GSLC JSON
                                              (twice: with and without --blackout-file)
@@ -60,7 +60,7 @@ supplied and otherwise carries the previous release's file forward.
 `cli_app` in [cli.py](../../src/nisar_db/cli.py) mixes two styles:
 
 - **Native click commands** reused directly as subcommands: `create-frame-to-bound`,
-  `create-catalog`, `create-consistent`, `append-blackout-dates`,
+  `create-gslc-csv`, `create-consistent`, `append-blackout-dates`,
   `create-reference-dates`, `label-processing-mode`, and `search`. Their options are
   defined on each module's `main`.
 - **Argparse pass-through commands**: `create-nisar-catalog`, `create-blackout-dates`,
@@ -103,9 +103,9 @@ Both builders share one pipeline in
 | Command | Input | Output |
 |---|---|---|
 | `create-nisar-catalog` | CMR (network); `--output-dir`, `--gslc-db`, `--gunw-db`, `--max-results`, `--gslc`/`--gunw`/`--all` | `<db>.duckdb` + JSON files in `--output-dir` |
-| `create-catalog` | `--input` GSLC file list `.txt`; optional `--na-only`, `--nisar-gpkg` | `--output` CSV |
+| `create-gslc-csv` | `--input` GSLC file list `.txt`; optional `--na-only`, `--nisar-gpkg` | `--output` CSV |
 | `create-frame-to-bound` | `--nisar-gpkg` (NISAR_TrackFrame_L_*.gpkg; downloaded when omitted) | `--output` JSON + `.json.zip`; `opera-nisar-disp-frames.gpkg`; `--geojson` simplified `.geojson[.zip]` |
-| `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames; optional `--blackout-file` | `--output` consistent JSON |
+| `create-consistent` | `--catalog` CSV + `--nisar-gpkg` filtered frames; optional `--blackout-file`, `--keep-nonstandard-modes` | `--output` consistent JSON |
 | `create-blackout-dates` | `--input-file` snow/monthly GeoJSON, or `--manual` | `--output-file` blackout JSON |
 | `append-blackout-dates` | `--json-file` existing blackout JSON, `--frame`, repeatable `--period START END` | same file (or `--output`) + `.json.zip` |
 | `create-reference-dates` | `--consistent-json` (required), optional `--blackout-file` (switches to month-based, and rejects an unfiltered stack); `--interval`, `--min-acquisitions` | `--output` reference-dates JSON + `.json.zip` |

@@ -85,23 +85,39 @@ def test_common_mode_coverage_is_order_independent() -> None:
     )
 
 
-def test_common_mode_coverage_falls_back_to_nonstandard() -> None:
+def test_common_mode_coverage_drops_frame_without_standard_mode() -> None:
     grp = pd.DataFrame({"mode": ["7700", "7700", "7700"], "coverage": ["P", "P", "F"]})
-    assert _common_mode_coverage(grp) == ("7700", "P")
+    assert _common_mode_coverage(grp) is None
+
+
+def test_common_mode_coverage_falls_back_to_nonstandard_when_kept() -> None:
+    grp = pd.DataFrame({"mode": ["7700", "7700", "7700"], "coverage": ["P", "P", "F"]})
+    assert _common_mode_coverage(grp, keep_nonstandard_modes=True) == ("7700", "P")
 
 
 def test_select_consistent_acquisitions(consistent_catalog_df: pd.DataFrame) -> None:
     out = select_consistent_acquisitions(consistent_catalog_df)
 
-    # Frame (128,129) -> 4005/F on two dates (same-date dup collapsed);
-    # frame (200,300) -> 7700/P on two dates. Four rows total.
-    assert len(out) == 4
+    # Frame (128,129) -> 4005/F on two dates (same-date dup collapsed); frame
+    # (200,300) is 7700-only, so it contributes nothing.
+    assert len(out) == 2
 
     f1 = out[(out["track"] == 128) & (out["frame"] == 129)]
     assert set(f1["common_mode"]) == {"4005"}
     assert set(f1["common_coverage"]) == {"F"}
     assert list(f1["sensing_date"]) == ["2024-06-01", "2024-06-13"]
 
+    assert out[(out["track"] == 200) & (out["frame"] == 300)].empty
+
+
+def test_select_consistent_acquisitions_keeps_nonstandard_when_asked(
+    consistent_catalog_df: pd.DataFrame,
+) -> None:
+    out = select_consistent_acquisitions(
+        consistent_catalog_df, keep_nonstandard_modes=True
+    )
+
+    assert len(out) == 4
     f2 = out[(out["track"] == 200) & (out["frame"] == 300)]
     assert set(f2["common_mode"]) == {"7700"}
     assert set(f2["common_coverage"]) == {"P"}

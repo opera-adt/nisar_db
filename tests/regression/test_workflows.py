@@ -119,13 +119,29 @@ def test_workflow_make_consistent(
     data = payload["data"]
 
     # Frames keyed by frame_idx; frame (128,129)->1001 keeps two 4005/F dates.
-    assert set(data) == {"1001", "2002"}
+    # Frame (200,300)->2002 is 7700-only, so it is absent.
+    assert set(data) == {"1001"}
     assert data["1001"]["common_mode"] == "4005"
     assert data["1001"]["common_coverage"] == "F"
     assert data["1001"]["sensing_time_list"] == [
         "2024-06-01T00:00:00",
         "2024-06-13T00:00:00",
     ]
+
+
+def test_workflow_make_consistent_keeps_nonstandard_when_asked(
+    consistent_catalog_df: pd.DataFrame, frames_gpkg: Path, tmp_path: Path
+) -> None:
+    catalog_csv = tmp_path / "gslc_catalog.csv"
+    consistent_catalog_df.to_csv(catalog_csv, index=False)
+    out = tmp_path / "consistent.json"
+
+    make_consistent_gslc_json(
+        catalog_csv, frames_gpkg, output=out, keep_nonstandard_modes=True
+    )
+
+    data = json.loads(out.read_text())["data"]
+    assert set(data) == {"1001", "2002"}
     assert data["2002"]["common_mode"] == "7700"
     assert data["2002"]["common_coverage"] == "P"
 
@@ -133,16 +149,16 @@ def test_workflow_make_consistent(
 def test_workflow_make_consistent_from_create_catalog_csv(
     consistent_catalog_df: pd.DataFrame, frames_gpkg: Path, tmp_path: Path
 ) -> None:
-    """Check the Step 2 -> Step 3 handoff: create-catalog CSV into create-consistent.
+    """Check the Step 2 -> Step 3 handoff: create-gslc-csv CSV into create-consistent.
 
-    ``create-catalog`` emits its own ``common_mode`` holding the 2-char mode
+    ``create-gslc-csv`` emits its own ``common_mode`` holding the 2-char mode
     *family*, which used to collide with the 4-char mode ``create-consistent``
     computes and break the merge.
     """
     catalog_csv = tmp_path / "gslc_catalog.csv"
     df = consistent_catalog_df.copy()
     df["mode_family"] = df["mode"].str[:2]
-    df["common_mode"] = "40"  # what create-catalog writes: the family, not the mode
+    df["common_mode"] = "40"  # what create-gslc-csv writes: the family, not the mode
     df["is_full"] = df["coverage"] == "F"
     df.to_csv(catalog_csv, index=False)
 
@@ -150,9 +166,8 @@ def test_workflow_make_consistent_from_create_catalog_csv(
     make_consistent_gslc_json(catalog_csv, frames_gpkg, output=out)
 
     data = json.loads(out.read_text())["data"]
-    # Full 4-char modes, not the "40" family value carried in from the catalog.
+    # Full 4-char mode, not the "40" family value carried in from the catalog.
     assert data["1001"]["common_mode"] == "4005"
-    assert data["2002"]["common_mode"] == "7700"
 
 
 def test_workflow_make_consistent_with_blackout(
