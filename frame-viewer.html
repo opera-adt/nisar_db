@@ -684,7 +684,10 @@ summary, popup, CSV export and <strong>Show plot</strong> over to the frame's in
 the plot draws each pair as a segment from reference to secondary date, raised
 by its temporal baseline, over the frame's blackout windows. When the pairs do
 not form one connected network, the subtitle says so in red, spans no pair
-bridges are shaded red, and pairs cut off from the main network get a red halo. The over-time chart
+bridges are shaded red, and pairs cut off from the main network get a red halo.
+<strong>Color frames by → GUNW network</strong> paints every frame by the same test:
+connected, disconnected, or no GUNW, so broken networks can be found on the
+map without opening each plot. The over-time chart
 counts interferograms by secondary date, and the <strong>Mode / Polarization</strong> chips
 list GUNW modes and polarizations; each product keeps its own chip selection.</p>
 <p>Pass direction and a <strong>Frame popup</strong> switch sit in the top-left map controls
@@ -693,14 +696,23 @@ satellite, Google hybrid as <em>Satellite-H</em>) in the top-right; the light/da
 theme switch is beside the viewer title. <strong>Product / Site Flags</strong> carries an
 optional layer of Nevada Geodetic Laboratory GPS sites, off by default; clicking
 a site opens its position time series.</p>
+<p><strong>Show only selected frames</strong>, in the same section, narrows the map, the
+summary and the over-time chart to the frames in your selection, on top of
+whatever other filters are set.</p>
 <div class="admonition note">
-<p class="admonition-title">Keeping the CalVal frames current</p>
-<p>The <code>isCalVal</code>, <code>isSNWG</code>, and <code>isDNC</code> flags behind the <strong>Product / Site
-Flags</strong> filters are carried straight from the TrackFrame GeoPackage, so the
-viewer is only as current as the GeoPackage it was built from. When the
-CalVal site list changes, refresh the database and rebuild the viewer:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nisar-db<span class="w"> </span>download-frame-db<span class="w"> </span>--force
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
+<p class="admonition-title">Where the CalVal frames come from</p>
+<p><strong>CalVal frames only</strong> shows the NISAR frames over the twelve DISP-S1
+validation sites, listed as DISP-S1 frame polygons in
+<a href="https://github.com/opera-adt/nisar_db/blob/main/scripts/disp_s1_calval_sites.geojson"><code>scripts/disp_s1_calval_sites.geojson</code></a>,
+plus the Mexico City basin, added as a fast-deforming area. No DISP-S1 frame
+is centred on the city, so that site is a box around the basin instead.
+Every NISAR frame covering at least 10 % of a site is flagged, ascending and
+descending alike. This replaces the TrackFrame GeoPackage's own
+<code>isCalVal</code> flag; <code>isSNWG</code> and <code>isDNC</code> are still carried from the GeoPackage.
+To change the sites, edit the GeoJSON (or pass <code>--calval-sites</code>) and rebuild
+the viewer, or re-flag an already built one in place:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
 </code></pre></div>
 </div>
 <p><iframe
