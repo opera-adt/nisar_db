@@ -64,6 +64,18 @@ theme switch is beside the viewer title. **Product / Site Flags** carries an
 optional layer of Nevada Geodetic Laboratory GPS sites, off by default; clicking
 a site opens its position time series.
 
+**Per-granule flags.** When the viewer is built with `--granule-flags`, six
+**Color frames by** options paint each frame by a flag read from every product's
+HDF5 metadata. The flags are joint observation, full frame, orbit type, RFI
+mitigation applied, mixed mode and dithered. A frame reads *all*, *some* or
+*none* of its acquisitions under the current mode / polarization chips; orbit
+type shows its value, or *mixed*. **Show flags** in the plot window adds one lane
+per flag under the GSLC timeline and the GUNW pair plot, and the hover tooltip
+lists every flag of the granule or pair. `scripts/collect_granule_flags.py`
+reads the flags with HTTP byte-range requests (an Earthdata login in
+`~/.netrc`) into `catalog/granule_flags.json.gz`; the weekly viewer build reads
+only the granules published since the last run.
+
 **Show only selected frames**, in the same section, narrows the map, the
 summary and the over-time chart to the frames in your selection, on top of
 whatever other filters are set.

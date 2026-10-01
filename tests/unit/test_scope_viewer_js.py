@@ -31,6 +31,8 @@ const window = {innerWidth: 900};
 let chartPoints = [];
 let modeKeyOrder = null;
 let archiveSpan = null;
+let showFlags = false;
+const META = {};
 """
 
 GRANULES = [
@@ -414,3 +416,19 @@ def test_gunw_network_status_names_connected_and_disconnected_frames() -> None:
         f" gunwNetworkStatus({json.dumps(split)}), gunwNetworkStatus([])];",
     )
     assert result == ["connected", "disconnected", "no GUNW"]
+
+
+def test_flag_status_reads_all_some_none_and_orbit() -> None:
+    def g(**fl: object) -> dict:
+        return {"fl": {"j": 0, "f": 1, "o": "MOE", "r": 0, "m": 0, "d": 1, **fl}}
+
+    items = json.dumps([g(), g(m=1, o="POE"), {"gid": "no flags yet"}])
+    result = run_js(
+        ["flagStatus"],
+        f"const items = {items};"
+        " return [flagStatus(items, 'f'), flagStatus(items, 'm'),"
+        " flagStatus(items, 'j'), flagStatus(items, 'o'),"
+        " flagStatus(items.slice(0, 1), 'o'),"
+        " flagStatus(items.slice(2), 'f')];",
+    )
+    assert result == ["all", "some", "none", "mixed", "MOE", "not collected"]

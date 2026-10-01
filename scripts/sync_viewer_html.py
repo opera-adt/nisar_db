@@ -5,9 +5,9 @@
 are not in the repository, so a checked-in viewer cannot simply be rebuilt after
 a UI change. This script swaps the generated parts of an existing HTML file --
 ``APP_CSS``, ``BODY_HTML``, ``APP_JS`` and the GPS site collection -- for the
-current ones, and re-derives the frames' CalVal flag from the current site list.
-The vendored MapLibre bundle and the rest of the embedded frame data are left
-untouched.
+current ones, re-derives the frames' CalVal flag from the current site list and,
+given a granule flag cache, attaches the per-granule flags. The vendored MapLibre
+bundle and the rest of the embedded frame data are left untouched.
 
 Examples
 --------
@@ -75,7 +75,9 @@ def _upsert_gps_data(html: str, gps_sites: dict) -> str:
     )
 
 
-def _reflag_calval(html: str, calval_sites: gpd.GeoDataFrame) -> str:
+def _refresh_frame_data(
+    html: str, calval_sites: gpd.GeoDataFrame, granule_flags: dict[str, dict] | None
+) -> str:
     opener = "const FRAME_DATA = "
     start = html.index(opener) + len(opener)
     end = html.index(";\nconst META", start)
@@ -84,18 +86,38 @@ def _reflag_calval(html: str, calval_sites: gpd.GeoDataFrame) -> str:
     flags = gen.flag_calval_frames(frames, calval_sites)
     for feature, flag in zip(frame_data["features"], flags, strict=True):
         feature["properties"]["isCalVal"] = bool(flag)
+    if granule_flags is not None:
+        n_flagged = gen.attach_granule_flags(frame_data, granule_flags)
+        print(f"  flags for {n_flagged} granules / interferograms")
     payload = json.dumps(frame_data, separators=(",", ":"))
-    return f"{html[:start]}{payload}{html[end:]}"
+    html = f"{html[:start]}{payload}{html[end:]}"
+    if granule_flags is None:
+        return html
+    # META is one line of JSON; the viewer only offers the flag views when it
+    # says the page carries flags.
+    match = re.search(r"const META = ([^\n]*);", html)
+    if match is None:
+        raise ValueError("no META block: not a generated viewer")
+    meta = json.loads(match.group(1))
+    meta["has_flags"] = n_flagged > 0
+    return html.replace(
+        match.group(0), f"const META = {json.dumps(meta, separators=(',', ':'))};", 1
+    )
 
 
-def sync(path: Path, gps_sites: dict, calval_sites: gpd.GeoDataFrame) -> None:
+def sync(
+    path: Path,
+    gps_sites: dict,
+    calval_sites: gpd.GeoDataFrame,
+    granule_flags: dict[str, dict] | None = None,
+) -> None:
     """Rewrite ``path`` with the current generated blocks."""
     html = path.read_text()
     html = _replace_app_css(html)
     html = _replace_body(html)
     html = _replace_app_js(html)
     html = _upsert_gps_data(html, gps_sites)
-    html = _reflag_calval(html, calval_sites)
+    html = _refresh_frame_data(html, calval_sites, granule_flags)
     path.write_text(html)
     print(f"synced {path} ({path.stat().st_size / 1e6:.1f} MB)")
 
@@ -119,12 +141,21 @@ def main(argv: list[str] | None = None) -> None:
         default=gen.CALVAL_SITES,
         help="GeoJSON of CalVal site polygons the frames are flagged against.",
     )
+    parser.add_argument(
+        "--granule-flags",
+        type=Path,
+        default=None,
+        help="Per-granule flag cache (from collect_granule_flags.py) to attach.",
+    )
     args = parser.parse_args(argv)
 
     gps_sites = gen.load_gps_sites(None if args.no_gps else args.gps_source)
     calval_sites = gpd.read_file(args.calval_sites)
+    granule_flags = (
+        gen.load_granule_flags(args.granule_flags) if args.granule_flags else None
+    )
     for path in args.html:
-        sync(path, gps_sites, calval_sites)
+        sync(path, gps_sites, calval_sites, granule_flags)
 
 
 if __name__ == "__main__":

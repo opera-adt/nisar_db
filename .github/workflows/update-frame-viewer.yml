@@ -129,13 +129,42 @@ jobs:
       - name: Render the viewer HTML
         run: |
           GUNW=$(ls catalog/gunw_interferograms.json.gz catalog/gunw_interferograms.json 2>/dev/null | head -n1)
-          python scripts/generate_scope_viewer.py \
-            ${GUNW:+--gunw-catalog "$GUNW"} \
+          RENDER_ARGS="${GUNW:+--gunw-catalog $GUNW} \
             --frames-gpkg opera-nisar-disp-frames.gpkg \
             --gslc-catalog gslc_catalog.csv \
             --consistent-json opera-nisar-disp-consistent-gslc-${DATE}.json \
-            ${VIEWER_EXTRA} \
-            --output "${VIEWER_HTML}"
+            ${VIEWER_EXTRA} --output ${VIEWER_HTML}"
+          echo "RENDER_ARGS=$(echo $RENDER_ARGS)" >> "$GITHUB_ENV"
+          python scripts/generate_scope_viewer.py $RENDER_ARGS
+
+      # Mixed mode, dithering and RFI mitigation are only inside the products, so
+      # each granule is read once (byte ranges, not the whole file) and cached on
+      # main; a weekly run reads only the granules published since the last one.
+      # The page rendered above lists the granules to read.
+      - name: Collect per-granule flags
+        run: |
+          python scripts/collect_granule_flags.py \
+            --viewer-html "${VIEWER_HTML}" \
+            --output catalog/granule_flags.json.gz
+
+      - name: Render the viewer HTML with the flags
+        run: |
+          python scripts/generate_scope_viewer.py $RENDER_ARGS \
+            --granule-flags catalog/granule_flags.json.gz
+
+      - name: Commit the flag cache
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add catalog/granule_flags.json.gz
+          if git diff --cached --quiet; then
+            echo "Flag cache unchanged"
+          else
+            git commit -m "Update granule flags [skip ci]"
+            # The daily catalog Action also pushes to main.
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
+          fi
 
       # The rendered page is ~3 MB, so it is published rather than committed:
       # gh-deploy picks up the working-tree copy written above, and main keeps

@@ -663,6 +663,52 @@ def parse_gps_sites(
     return {"type": "FeatureCollection", "features": features}
 
 
+def load_granule_flags(path: Path) -> dict[str, dict]:
+    """Read the per-granule flag cache written by ``collect_granule_flags.py``.
+
+    Parameters
+    ----------
+    path : Path
+        Gzipped JSON mapping granule id to its flags.
+
+    Returns
+    -------
+    dict
+        Granule id to flags (``j f o r m d``).
+
+    """
+    with gzip.open(path, "rt") as fh:
+        return json.load(fh)
+
+
+def attach_granule_flags(frame_data: dict, flags: dict[str, dict]) -> int:
+    """Attach cached flags to every GSLC granule and GUNW interferogram.
+
+    Each entry found in ``flags`` gains an ``fl`` field; entries not yet
+    collected are left without one, and the viewer shows them as not collected.
+
+    Returns
+    -------
+    int
+        Number of granules and interferograms that received flags.
+
+    """
+    attached = 0
+    for feature in frame_data["features"]:
+        props = feature["properties"]
+        ifgs = props.get("gunw_ifgs") or []
+        # A viewer built by an older generator stores the interferograms as a string.
+        if isinstance(ifgs, str):
+            ifgs = json.loads(ifgs)
+            props["gunw_ifgs"] = ifgs
+        for entry in [*(props.get("granules") or []), *ifgs]:
+            fl = flags.get(entry.get("gid"))
+            if fl is not None:
+                entry["fl"] = fl
+                attached += 1
+    return attached
+
+
 def load_gps_sites(source: str | Path | None) -> dict:
     """Fetch (or read) the UNR GPS sites, or an empty collection when disabled.
 
@@ -875,6 +921,9 @@ APP_CSS = r"""
   .chart-ifg-end{pointer-events:none;stroke:var(--panel);stroke-width:1;}
   .chart-gap{fill:#e5484d;fill-opacity:.16;stroke:#e5484d;stroke-width:1;stroke-dasharray:4 3;}
   .chart-warn{color:#e5484d;font-weight:600;}
+  .chart-flag-ctl{display:flex;align-items:center;gap:4px;margin:2px 8px 0 auto;font-size:11px;color:var(--text-dim);white-space:nowrap;cursor:pointer;}
+  .chart-flag-ctl[hidden]{display:none;}
+  .chart-flag-ctl input{width:auto;margin:0;}
   .chart-ifg-off{stroke:#e5484d;stroke-opacity:.45;stroke-width:10;stroke-linecap:round;pointer-events:none;}
   .chart-tip{position:absolute;pointer-events:none;background:var(--inset);border:1px solid var(--border);border-radius:5px;
     padding:5px 7px;font-size:11px;color:var(--text);white-space:nowrap;z-index:2;}
@@ -949,6 +998,12 @@ BODY_HTML = r"""<body>
             <option value="gslc_pols">GSLC polarization (most common)</option>
             <option value="gunw_count" id="opt-gunw" hidden>GUNW interferograms</option>
             <option value="gunw_net" id="opt-gunw-net" hidden>GUNW network (connected / disconnected)</option>
+            <option value="flag_j" class="opt-flag" hidden>Flag: joint observation</option>
+            <option value="flag_f" class="opt-flag" hidden>Flag: full frame</option>
+            <option value="flag_o" class="opt-flag" hidden>Flag: orbit type</option>
+            <option value="flag_r" class="opt-flag" hidden>Flag: RFI mitigation applied</option>
+            <option value="flag_m" class="opt-flag" hidden>Flag: mixed mode</option>
+            <option value="flag_d" class="opt-flag" hidden>Flag: dithered</option>
           </select>
           <label>Fill opacity (<span id="opacity-val">32</span>%)</label>
           <input type="range" id="fill-opacity" min="0" max="100" value="32">
@@ -1055,6 +1110,7 @@ BODY_HTML = r"""<body>
             <div class="pop-title" id="chart-title"></div>
             <div class="chart-sub" id="chart-sub"></div>
           </div>
+          <label class="chart-flag-ctl" id="chart-flags-ctl" hidden><input type="checkbox" id="chart-flags"> Show flags</label>
           <button class="li-x" id="chart-close" title="Close">&times;</button>
         </div>
         <div id="chart-body"></div>
@@ -1119,7 +1175,13 @@ APP_JS = r"""
     gslc_modes:    { label:"GSLC mode",            key:"_gslcMode",     kind:"cat" },
     gslc_pols:     { label:"GSLC polarization",    key:"_gslcPol",      kind:"cat" },
     gunw_count:    { label:"GUNW interferograms",  key:"gunw_count_sel", kind:"num" },
-    gunw_net:      { label:"GUNW network",         key:"_gunwNet",      kind:"cat" }
+    gunw_net:      { label:"GUNW network",         key:"_gunwNet",      kind:"cat" },
+    flag_j:        { label:"Joint observation",    key:"_flag_j",       kind:"cat" },
+    flag_f:        { label:"Full frame",           key:"_flag_f",       kind:"cat" },
+    flag_o:        { label:"Orbit type",           key:"_flag_o",       kind:"cat" },
+    flag_r:        { label:"RFI mitigation applied", key:"_flag_r",     kind:"cat" },
+    flag_m:        { label:"Mixed mode",           key:"_flag_m",       kind:"cat" },
+    flag_d:        { label:"Dithered",             key:"_flag_d",       kind:"cat" }
   };
 
   const baseColorMapsCache = {};
@@ -1132,6 +1194,10 @@ APP_JS = r"""
       m = new Map([["F","#4da3ff"],["P","#ff8a4d"],["none","#555a61"]]);
     } else if (propKey === "_gunwNet") {
       m = new Map([["connected","#7ee787"],["disconnected","#e5484d"],["no GUNW","#6b6b6b"]]);
+    } else if (propKey === "_flag_o") {
+      m = orbitColorMap();
+    } else if (propKey.startsWith("_flag_")) {
+      m = new Map([["all",FLAG_YES],["some","#ffd24d"],["none","#555a61"],["not collected","#2b2b2b"]]);
     } else {
       const vals = uniqSorted(FRAME_DATA.features.map(f=>String(f.properties[propKey])));
       m = new Map();
@@ -1261,6 +1327,10 @@ APP_JS = r"""
     document.getElementById("opt-gunw").hidden = false;
     document.getElementById("opt-gunw-net").hidden = false;
   }
+  if (META.has_flags) {
+    document.querySelectorAll(".opt-flag").forEach(o=>{ o.hidden = false; });
+    document.getElementById("chart-flags-ctl").hidden = false;
+  }
 
   if (META.has_blackout) document.getElementById("opt-blackout").hidden = false;
 
@@ -1368,6 +1438,7 @@ APP_JS = r"""
   function applyFilters(){
     updateSelectedGslcCounts();
     updateSelectedGunwCounts();
+    updateFlagStatus();
     const filtered = currentFiltered();
     if (map.getSource("frames")) {
       map.getSource("frames").setData({type:"FeatureCollection", features: filtered});
@@ -1419,6 +1490,93 @@ APP_JS = r"""
     });
   }
   updateSelectedGunwCounts();
+
+  // ---------- per-granule flags ----------
+  // Collected from each product's HDF5 metadata (collect_granule_flags.py); an
+  // entry without ``fl`` has not been read yet.
+  const FLAG_FIELDS = [
+    {k:"j", lane:"joint obs"}, {k:"f", lane:"full frame"}, {k:"o", lane:"orbit"},
+    {k:"r", lane:"RFI mitig."}, {k:"m", lane:"mixed mode"}, {k:"d", lane:"dithered"}
+  ];
+  const FLAG_YES = "#4da3ff";
+  const ORBIT_COLORS = {MOE:"#4da3ff", POE:"#7ee787", NOE:"#ffd24d", FOE:"#ff5d5d"};
+
+  function orbitColorMap(){
+    const seen = new Set();
+    FRAME_DATA.features.forEach(f=>[...asArray(f.properties.granules), ...asArray(f.properties.gunw_ifgs)]
+      .forEach(g=>{ if (g.fl) seen.add(g.fl.o); }));
+    const m = new Map();
+    uniqSorted(Array.from(seen)).forEach((v,i)=> m.set(v, ORBIT_COLORS[v] || CAT_PALETTE[(i + 4) % CAT_PALETTE.length]));
+    m.set("mixed", "#a389ff");
+    m.set("not collected", "#2b2b2b");
+    return m;
+  }
+
+  // "all" / "some" / "none" of the entries that have flags; orbit type reports
+  // its value, or "mixed".
+  function flagStatus(items, k){
+    const known = items.filter(g=>g.fl);
+    if (!known.length) return "not collected";
+    if (k === "o") {
+      const vals = new Set(known.map(g=>g.fl.o));
+      return vals.size === 1 ? Array.from(vals)[0] : "mixed";
+    }
+    const n = known.filter(g=>g.fl[k]).length;
+    return n === known.length ? "all" : (n ? "some" : "none");
+  }
+
+  // Follows the mode / polarization chips, as the count ramps do.
+  function updateFlagStatus(){
+    if (!META.has_flags) return;
+    const gunw = product === "gunw";
+    const modes = gunw ? activeChips.gunwMode : activeChips.gslcMode;
+    const pols = gunw ? activeChips.gunwPol : activeChips.gslcPol;
+    FRAME_DATA.features.forEach(f=>{
+      const items = asArray(gunw ? f.properties.gunw_ifgs : f.properties.granules)
+        .filter(g=>(!modes.size || modes.has(g.mode)) && (!pols.size || pols.has(g.pol)));
+      FLAG_FIELDS.forEach(ff=>{ f.properties[`_flag_${ff.k}`] = flagStatus(items, ff.k); });
+    });
+  }
+
+  function flagLine(entries){
+    const e = entries.find(g=>g && g.fl);
+    if (!e) return META.has_flags ? `<br><span class="tdim">flags not collected</span>` : "";
+    return `<br><span class="tdim">`+FLAG_FIELDS.map(ff=>
+      ff.k === "o" ? `orbit ${e.fl.o}` : `${ff.lane} ${e.fl[ff.k] ? "yes" : "no"}`).join(" &middot; ")+`</span>`;
+  }
+
+  // One lane per flag under a plot. ``entries`` carry the chart point index, a
+  // start time, an optional end time (GUNW pairs) and the flag-carrying entry.
+  function flagLanesSvg(entries, xOf, x0, x1, yTop){
+    const rowH = 20;
+    const orbit = baseColorMap("_flag_o");
+    let svg = "";
+    FLAG_FIELDS.forEach((ff, r)=>{
+      const y = yTop + r * rowH + rowH / 2;
+      svg += `<line class="chart-grid" x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" opacity="0.6"/>`+
+             `<text class="chart-row-label" x="${x0-10}" y="${y+3.5}" text-anchor="end">${ff.lane}</text>`;
+      entries.forEach(en=>{
+        const fl = en.g && en.g.fl;
+        if (!fl) return;
+        const on = ff.k === "o" ? true : Boolean(fl[ff.k]);
+        const color = ff.k === "o" ? (orbit.get(fl.o) || "#9a9a9a") : (on ? FLAG_YES : "#6b6b6b");
+        const xa = xOf(en.ta).toFixed(1);
+        if (en.tb != null) {
+          svg += `<line class="chart-ifg" data-i="${en.i}" x1="${xa}" x2="${xOf(en.tb).toFixed(1)}" y1="${y}" y2="${y}"`+
+                 ` stroke="${color}" stroke-width="${on ? 4 : 1.5}"/>`;
+        } else {
+          svg += `<circle class="chart-dot" data-i="${en.i}" cx="${xa}" cy="${y}" r="${on ? 4 : 2}" fill="${color}"/>`;
+        }
+      });
+    });
+    const orbitKey = Array.from(orbit).filter(([v])=>entries.some(en=>en.g && en.g.fl && en.g.fl.o === v))
+      .map(([v, c])=>`<span style="color:${c}">&#9679;</span> ${v}`).join(" ");
+    const legend = `flags: <span style="color:${FLAG_YES}">&#9679;</span> yes &middot; `+
+      `<span style="color:#6b6b6b">&middot;</span> no &middot; orbit ${orbitKey}`;
+    return {svg, height: FLAG_FIELDS.length * rowH, legend};
+  }
+  let showFlags = false;
+  let redrawChart = null;
 
   // Judged on all of a frame's interferograms, as the GUNW plot is, so a frame
   // coloured disconnected is one whose plot says so.
@@ -2092,6 +2250,7 @@ APP_JS = r"""
     if (!chartPoints.length) return `<div class="stat-line">No interferograms to plot.</div>`;
 
     const padL = 52, padR = 24, padT = 12, padB = 30, H = 280;
+    const withFlags = showFlags && META.has_flags;
     const W = Math.min(720, Math.max(420, window.innerWidth - 140));
     let [t0, t1] = spanWithBlackouts(p, Math.min(...chartPoints.map(pt=>pt.ta)), Math.max(...chartPoints.map(pt=>pt.tb)));
     if (t1 === t0) { t0 -= 15 * DAY_MS; t1 += 15 * DAY_MS; }
@@ -2140,16 +2299,24 @@ APP_JS = r"""
       .concat(net.components > 1 ? [`<span style="color:#e5484d">&#9644;</span> cut off from the main network`] : [])
       .join(" &middot; ");
 
-    return `<svg id="chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="GUNW interferograms by temporal baseline">${bands}${gaps}${xTicks}${yTicks}${axis}${segs}</svg>`+
-      `<div class="chart-sub">${legend}</div>`;
+    // Flag lanes sit under the axis labels, so the baseline scale is untouched;
+    // the wider left margin of their labels comes from the lanes' own offset.
+    const flags = withFlags
+      ? flagLanesSvg(chartPoints.map((pt,i)=>({i, ta: pt.ta, tb: pt.tb, g: pt.group.find(g=>g.fl) || pt.ifg})),
+                     xOf, padL + 40, W - padR, H + 4)
+      : null;
+    const HH = flags ? H + 8 + flags.height : H;
+    return `<svg id="chart-svg" width="${W}" height="${HH}" viewBox="0 0 ${W} ${HH}" role="img"
+      aria-label="GUNW interferograms by temporal baseline">${bands}${gaps}${xTicks}${yTicks}${axis}${segs}${flags ? flags.svg : ""}</svg>`+
+      `<div class="chart-sub">${legend}${flags ? " &middot; " + flags.legend : ""}</div>`;
   }
 
   function showGunwPlot(p, ifgs){
     document.getElementById("chart-title").textContent =
       `Frame ${p.frame_idx} (Track ${p.track} / Frame ${p.frame}) - interferograms by temporal baseline`;
     const refs = ifgs.map(g=>g.ref).sort(), secs = ifgs.map(g=>g.sec).sort();
-    document.getElementById("chart-body").innerHTML = gunwPlotSvg(ifgs, p);
+    redrawChart = ()=>{ document.getElementById("chart-body").innerHTML = gunwPlotSvg(ifgs, p); };
+    redrawChart();
     const net = gunwNetwork(chartPoints);
     // Interleaved pieces can overlap in time and leave no gap to shade, so the
     // piece count is stated even when there is no break.
@@ -2280,7 +2447,10 @@ APP_JS = r"""
     chartPoints = chartPoints.concat(dupPoints);
     const padL = 96, padR = 24, padT = 10, padB = 30, rowH = 34;
     const W = Math.min(720, Math.max(420, window.innerWidth - 140));
-    const H = padT + rows.length * rowH + padB;
+    const withFlags = showFlags && META.has_flags;
+    const flagTop = padT + rows.length * rowH + 6;
+    const flagH = withFlags ? FLAG_FIELDS.length * 20 + 6 : 0;
+    const H = padT + rows.length * rowH + flagH + padB;
     let [t0, t1] = spanWithBlackouts(p, chartPoints[0].t, chartPoints[chartPoints.length-1].t);
     if (t1 === t0) { t0 -= 15 * DAY_MS; t1 += 15 * DAY_MS; }
     const pad = (t1 - t0) * 0.03;
@@ -2311,13 +2481,17 @@ APP_JS = r"""
       }
       return `<circle class="chart-dot" data-i="${i}" cx="${x.toFixed(1)}" cy="${y}" r="4.5" fill="${fill}"/>`;
     }).join("");
+    const flags = withFlags
+      ? flagLanesSvg(chartPoints.map((pt,i)=>({i, ta: pt.t, g: pt.key === DUP_ROW ? null : pt.g})), xOf, padL, W - padR, flagTop)
+      : null;
     const shapeKey = uniqSorted(chartPoints.map(pt=>pt.dir)).map(d=>
       d === "D" ? "&#9670; descending" : d === "A" ? "&#9679; ascending" : `? ${d}`)
       .concat(blackoutWindows.length ? [`<span style="color:#8c8c8c">&#9632;</span> blackout (${p.blackout_label})`] : [])
+      .concat(flags ? [flags.legend] : [])
       .join(" &middot; ");
 
     return `<svg id="chart-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="GSLC acquisitions by mode over time">${bands}${ticks}${lanes}${dots}</svg>`+
+      aria-label="GSLC acquisitions by mode over time">${bands}${ticks}${lanes}${dots}${flags ? flags.svg : ""}</svg>`+
       `<div class="chart-sub">${shapeKey}</div>`;
   }
 
@@ -2329,7 +2503,8 @@ APP_JS = r"""
     document.getElementById("chart-sub").textContent = dated.length
       ? `${dated.length} GSLC granules${dup} - ${dated[0]} to ${dated[dated.length-1]}`
       : "No dated GSLC granules";
-    document.getElementById("chart-body").innerHTML = modeTimelineSvg(granules, p);
+    redrawChart = ()=>{ document.getElementById("chart-body").innerHTML = modeTimelineSvg(granules, p); };
+    redrawChart();
     document.getElementById("chart-modal").hidden = false;
   }
 
@@ -2339,6 +2514,10 @@ APP_JS = r"""
   }
 
   document.getElementById("chart-close").addEventListener("click", hideModeTimeline);
+  document.getElementById("chart-flags").addEventListener("change", (e)=>{
+    showFlags = e.target.checked;
+    if (redrawChart) redrawChart();
+  });
   document.getElementById("chart-modal").addEventListener("click", (e)=>{
     if (e.target.id === "chart-modal") hideModeTimeline();
   });
@@ -2353,17 +2532,17 @@ APP_JS = r"""
     if (pt.ifg) {
       chartTip.innerHTML = `<b>${pt.ifg.ref} &rarr; ${pt.ifg.sec}</b> &middot; ${pt.ifg.dt} days<br>`+
         `<span class="tdim">${pt.key} &middot; ${pt.group.map(g=>g.pol).join(", ")}</span><br>`+
-        pt.group.map(g=>`<span class="tdim">${g.gid}</span>`).join("<br>");
+        pt.group.map(g=>`<span class="tdim">${g.gid}</span>`).join("<br>") + flagLine(pt.group);
     } else if (pt.group) {
       chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.modeKey} &middot; ${pt.group.length} granules<br>`+
-        pt.group.map(g=>`<span class="tdim">${g.pol} &middot; ${DIR_LABEL[g.dir] || g.dir} &middot; ${g.gid}</span>`).join("<br>");
+        pt.group.map(g=>`<span class="tdim">${g.pol} &middot; ${DIR_LABEL[g.dir] || g.dir} &middot; ${g.gid}</span>`).join("<br>") + flagLine(pt.group);
     } else {
       const stacked = pt.stack > 1
         ? `<br><span class="tdim">${pt.stack} granules here (${pt.stack - 1} duplicate) - showing the top one</span>`
         : "";
       chartTip.innerHTML = `<b>${pt.g.date}</b> &middot; ${pt.key}<br>`+
         `<span class="tdim">${pt.g.pol} &middot; ${DIR_LABEL[pt.dir] || pt.dir} &middot; cycle ${pt.g.cycle}</span><br>`+
-        `<span class="tdim">${pt.g.gid}</span>${stacked}`;
+        `<span class="tdim">${pt.g.gid}</span>${stacked}` + flagLine([pt.g]);
     }
     // Unhide first: a display:none tip measures 0 wide and would defeat the clamp.
     chartTip.hidden = false;
@@ -2739,6 +2918,13 @@ def main(argv: list[str] | None = None) -> None:
         "'create_gunw_catalog'); adds a GSLC / GUNW switch to the viewer.",
     )
     parser.add_argument(
+        "--granule-flags",
+        type=Path,
+        default=None,
+        help="Optional per-granule flag cache (from collect_granule_flags.py); "
+        "adds flag colouring and flag lanes in the per-frame plots.",
+    )
+    parser.add_argument(
         "--calval-sites",
         type=Path,
         default=CALVAL_SITES,
@@ -2811,6 +2997,14 @@ def main(argv: list[str] | None = None) -> None:
     )
     n_with = sum(1 for f in frame_data["features"] if f["properties"]["gslc_count"] > 0)
 
+    n_flagged = 0
+    if args.granule_flags is not None:
+        print(f"Loading granule flags from {args.granule_flags}")
+        n_flagged = attach_granule_flags(
+            frame_data, load_granule_flags(args.granule_flags)
+        )
+        print(f"  flags for {n_flagged} granules / interferograms")
+
     catalog_path = args.gslc_catalog if args.gslc_catalog is not None else args.gslc_db
     meta = {
         "title": args.title,
@@ -2837,6 +3031,7 @@ def main(argv: list[str] | None = None) -> None:
         "has_blackout": blackout is not None,
         "has_reference": reference is not None,
         "has_gunw": gunw is not None,
+        "has_flags": n_flagged > 0,
         "n_gunw": sum(
             f["properties"].get("gunw_count", 0) for f in frame_data["features"]
         ),
