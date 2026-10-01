@@ -40,10 +40,12 @@ import netrc
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import fsspec
-import h5py
 import requests
+
+if TYPE_CHECKING:
+    import h5py
 
 DATA_URL = "https://nisar.asf.earthdatacloud.nasa.gov/NISAR/{collection}/{gid}/{gid}.h5"
 COLLECTIONS = {
@@ -99,6 +101,11 @@ def read_flags(gid: str) -> dict:
         Flags keyed ``j f o r m d`` as described in the module docstring.
 
     """
+    # Only this function needs the HDF5 / HTTP stack (the ``flags`` extra), so the
+    # cache and listing helpers stay importable without it.
+    import fsspec
+    import h5py
+
     # The data URL redirects to a signed CloudFront URL, which serves byte ranges.
     signed = (
         _session()

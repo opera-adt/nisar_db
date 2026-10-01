@@ -33,10 +33,12 @@ dynamic = ["version", "dependencies"]
 test = ["pytest>=7", "pytest-randomly", "pytest-cov"]
 docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "pymdown-extensions>=10"]
 publish = ["build>=1.0", "twine>=5.0"]
+# Reading per-granule flags from the products (scripts/collect_granule_flags.py).
+flags = ["aiohttp", "fsspec", "h5py"]
 # Everything needed to work on the package; the conda environment.yml stays
 # runtime-only so plain users do not pull the tooling in.
 lint = ["black", "mypy", "pre-commit", "ruff"]
-dev = ["nisar_db[test,docs,publish,lint]"]
+dev = ["nisar_db[test,docs,publish,lint,flags]"]
 
 [project.urls]
 Homepage = "https://github.com/opera-adt/nisar_db"
