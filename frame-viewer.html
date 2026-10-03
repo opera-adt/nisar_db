@@ -664,20 +664,33 @@ capped slice.</p>
 <p>It opens on the globe projection (the control at the bottom right switches to
 Mercator), with frames coloured by GSLC count in CMR and the science modes
 (<code>2005</code>, <code>4005</code>) and polarizations (<code>DHDH</code>, <code>QPDH</code>) preselected under
-<strong>GSLC Mode / Polarization</strong>. The count colouring follows those chips, so the
-ramp always answers "how many granules of the kind I selected". Every swatch in
-the <strong>Frame Color / Opacity</strong> legend is a colour picker — click one to recolour
-that category, and <strong>Reset to default</strong> puts the palette back.</p>
-<p>Clicking a frame opens the frame panel: <strong>Show granules</strong> expands the granule
+<strong>GSLC Mode / Polarization</strong>. The count colourings (GSLC acquisitions, duplicate
+granules, distinct modes, GUNW interferograms) follow those chips <em>and</em> the date
+range of <strong>GSLC Acquisitions Over Time</strong>: drag across its bars, or type the
+dates, and every frame is recounted over just that window. The numeric ramps fit
+the frames currently shown.</p>
+<p><strong>Frame Color / Opacity</strong> has two tabs, the same as the map's colour panel.
+<strong>Color by</strong> lists the colourings grouped into counts, mode / coverage, planning
+and flags, each with a preview of its colours. <strong>Style</strong> holds fill and outline
+opacity and the colormap: pick one of 31, in folding groups (closed at first; each header names the
+current colormap) of perceptual (Viridis, Turbo,
+Batlow, ...), single hue (Blues, Greens, ...), multi hue (YlOrRd, YlGnBu, ...)
+and diverging (RdBu, Vik, Roma, ...), invert it, or fix its min / max; an empty
+range, or <strong>Auto</strong>, fits the frames shown again. Every swatch of a categorical
+legend is a colour picker — click one to recolour that category. <strong>Reset all to
+default</strong> puts colours, colormaps, ranges and opacities back.</p>
+<p>Clicking a frame opens the frame panel; drag its bottom-right corner to resize
+it, or use ⤢ to widen it (the map pans to keep it on screen). Its other parts: <strong>Show granules</strong> expands the granule
 list, which can be filtered to ascending or descending passes; <strong>Export CSV</strong>
 downloads that frame's granules; and <strong>Show plot</strong> charts observation mode
 against acquisition date, drawing ascending acquisitions as circles and
-descending as diamonds.</p>
+descending as diamonds. The plot window resizes from its corner, and ⤢ fills the screen; the chart redraws to the new size.</p>
 <p>The <strong>(i)</strong> button above the globe toggle turns on hover summaries: with it on,
 pointing at a frame pops up its summary, which stays until you move on or close
 it with its <code>x</code>. <strong>GSLC Acquisitions Over Time</strong>, at the top of the sidebar,
 counts granules by acquisition date across the frames currently shown — binning
-to weeks or months as the span grows — and takes a start/end date of its own.</p>
+to weeks or months as the span grows. Its date range (dragged on the bars or
+typed) also sets the window the frame colours count over; <strong>All</strong> clears it.</p>
 <p>When the viewer is built with a GUNW catalog, a <strong>GSLC / GUNW</strong> switch sits at
 the top left. GUNW colours the frames by interferogram count and turns the hover
 summary, popup, CSV export and <strong>Show plot</strong> over to the frame's interferograms:
@@ -707,6 +720,59 @@ lists every flag of the granule or pair. <code>scripts/collect_granule_flags.py<
 reads the flags with HTTP byte-range requests (an Earthdata login in
 <code>~/.netrc</code>) into <code>catalog/granule_flags.json.gz</code>; the weekly viewer build reads
 only the granules published since the last run.</p>
+<p><strong>Rollout regions.</strong> NISAR has no rollout list of its own yet, so each NISAR
+frame is tagged with the DISP-S1 North America rollout options it overlaps:
+priorities <code>P0</code>, <code>P1</code>, <code>P2</code>, <code>P3a</code>, <code>P3b</code> and <code>P4</code>, from the frame-based rollout
+in <a href="https://github.com/opera-adt/burst_db/tree/main/src/burst_db/data"><code>opera-adt/burst_db</code></a>
+(priority 3 is split into its 3a and 3b deliveries). A frame joins an option
+once that option's Sentinel-1 frames cover at least a quarter of it, so a frame
+on a boundary can sit in two. The <strong>Rollout Regions</strong> section lists the frames
+per option under the other filters; click an option to show only its frames,
+and <strong>Color frames by → Rollout option</strong> paints each frame by its earliest
+option. The frame popup names its options and the states / regions it overlaps,
+and the CSV export carries both. <code>scripts/make_rollout_regions.py</code> refreshes
+<a href="https://github.com/opera-adt/nisar_db/blob/main/scripts/disp_s1_rollout_regions.geojson"><code>scripts/disp_s1_rollout_regions.geojson</code></a>
+from burst_db; <code>--rollout</code> on either viewer script takes another GeoJSON, or an
+OPERA PCM-style region database <code>{"&lt;option&gt;": [frame_idx, ...]}</code> once an official
+NISAR list exists.</p>
+<p><strong>Map buttons.</strong> Three buttons stack above the globe toggle at the bottom
+right. For the two overlays each click steps through <em>layer on</em>, <em>layer and
+panel</em>, then <em>off</em>; a panel's <code>x</code> hides just the panel. On a phone only one
+bottom panel is open at a time.</p>
+<ul>
+<li>The <em>palette</em> button is <strong>Color frames by</strong> on the map. The first click opens
+  its panel. The <strong>Color by</strong> tab lists every colouring for the product shown
+  (GSLC or GUNW), grouped into counts, mode / coverage, planning and flags, each
+  with a preview of its colours; tap one to apply it. The <strong>Style</strong> tab holds
+  fill opacity (with 0-100 presets), outline opacity (fill 0 with outlines gives
+  an outline-only map), and the colormap, invert and range of a numeric
+  colouring or the colour of each category. The second click (or the panel's
+  <code>x</code>) closes the panel and leaves a small legend on the map; drag it by its
+  title bar to wherever it is out of the way (the spot is remembered), or click
+  it to reopen the panel. The third click, or the legend's <code>x</code>, hides it. The panel
+  and the sidebar's <strong>Frame Color / Opacity</strong> edit the same settings.</li>
+<li>The <em>flag</em> button draws the rollout regions themselves, coloured by option,
+  with a panel listing each option's NISAR and Sentinel-1 frame counts and the
+  states / regions it spans; click an option to zoom to it.</li>
+<li>The <em>cloud</em> button shows the <strong>rainy / snow season blackouts</strong>: every frame
+  with a blackout window is filled on a light-to-dark blue ramp by the share of
+  the year it loses (<strong>YR</strong>, the default; the panel gives it in days), or of
+  one month picked in the panel. The frame colouring is hidden underneath while
+  it is on. Most windows are winter snow cover. Central America's frames carry
+  an August-November window instead: its peak rainy season, which DISP-S1
+  blacks out the same way and the NISAR windows inherit.</li>
+</ul>
+<p><strong>CRID.</strong> The <strong>Mode / Polarization / CRID</strong> section also lists the composite
+release IDs (<code>P05023</code>, ...) read from the granule names. Selecting some narrows
+the map to frames with granules from those releases and recounts the colourings
+over just them; none selected means every release.</p>
+<p><strong>Blackout by month.</strong> When the viewer is built with blackout dates, the
+<strong>Blackout by Month</strong> chart counts, for each calendar month, the frames shown
+whose blackout window covers at least half of it (dark) or any part of it
+(light). Clicking a month colours the map by the share of that month each frame
+loses (<strong>Color frames by → Blackout share of a month</strong>, with a month picker),
+and the frame popup draws a twelve-month strip shaded by the same share.
+<strong>Blackout duration (months)</strong> still colours by the window's total length.</p>
 <p><strong>Show only selected frames</strong>, in the same section, narrows the map, the
 summary and the over-time chart to the frames in your selection, on top of
 whatever other filters are set.</p>
@@ -721,10 +787,13 @@ Every NISAR frame covering at least 10 % of a site is flagged, ascending and
 descending alike. This replaces the TrackFrame GeoPackage's own
 <code>isCalVal</code> flag; <code>isSNWG</code> and <code>isDNC</code> are still carried from the GeoPackage.
 To change the sites, edit the GeoJSON (or pass <code>--calval-sites</code>) and rebuild
-the viewer, or re-flag an already built one in place:</p>
+the viewer, or re-flag an already built one in place (this also re-tags
+the rollout options):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
 </code></pre></div>
+<p><code>sync_viewer_html.py</code> also takes <code>--blackout-json</code> and <code>--gunw-catalog</code> to
+attach snow blackout dates or the GUNW view to a page built without them.</p>
 </div>
 <p><iframe
   src="assets/opera_nisar_db_viewer.html"
