@@ -841,6 +841,11 @@ next to the key. The first click opens its choices, and a second click (or
 </tr>
 </tbody>
 </table>
+<p>Two boxes in the same panel also collect what the caches miss: <strong>granule
+flags</strong> (read from each product's metadata, about 5 granules a second) and <strong>QA
+metrics</strong> (each <code>QA_STATS.h5</code>, about 20 a second). Both are written to the
+helper's cache, not the repository's, and need the Earthdata login in
+<code>~/.netrc</code>.</p>
 <p>The helper searches CMR for every GSLC and GUNW granule in that scope. It
 builds the page with <code>scripts/build_local_view.py</code> and opens it; a box in the
 lower-left corner shows each step until it does. Frames keep the <code>frame_idx</code>
