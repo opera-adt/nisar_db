@@ -16,6 +16,8 @@
         <link rel="prev" href="tutorials/snow-analysis.html">
       
       
+        <link rel="next" href="data-sources.html">
+      
       
         
       
@@ -572,6 +574,60 @@
   
   
   
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frame viewer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Frame viewer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -596,6 +652,42 @@
   
 
       </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data-sources.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Viewer data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
       
     </li>
   
@@ -681,8 +773,14 @@ current colormap) of perceptual (Viridis, Turbo,
 Batlow, ...), single hue (Blues, Greens, ...), multi hue (YlOrRd, YlGnBu, ...)
 and diverging (RdBu, Vik, Roma, ...), invert it, or fix its min / max; an empty
 range, or <strong>Auto</strong>, fits the frames shown again. Every swatch of a categorical
-legend is a colour picker — click one to recolour that category. <strong>Reset all to
-default</strong> puts colours, colormaps, ranges and opacities back.</p>
+legend is a colour picker — click one to recolour that category. <strong>Hide frames
+with no value</strong> removes the frames the current colouring has nothing for: a
+category of <em>none</em>, <em>not collected</em> or <em>no GUNW</em>, a QA metric not read yet, or
+no acquisitions / interferograms / modes at all (zero duplicates or zero
+blackout months are values, and stay). It filters like the other filters, so
+the counts and charts follow, and it follows the colouring when that changes.
+<strong>Reset all to default</strong> puts colours, colormaps, ranges and opacities back, and
+shows every frame again.</p>
 <p>Clicking a frame opens the frame panel; drag its bottom-right corner to resize
 it, or use ⤢ to widen it (the map pans to keep it on screen). Its other parts: <strong>Show granules</strong> expands the granule
 list, which can be filtered to ascending or descending passes; <strong>Export CSV</strong>
@@ -720,10 +818,19 @@ mitigation applied, mixed mode and dithered. A frame reads <em>all</em>, <em>som
 <em>none</em> of its acquisitions under the current mode / polarization chips; orbit
 type shows its value, or <em>mixed</em>. <strong>Show flags</strong> in the plot window adds one lane
 per flag under the GSLC timeline and the GUNW pair plot, and the hover tooltip
-lists every flag of the granule or pair. <code>scripts/collect_granule_flags.py</code>
-reads the flags with HTTP byte-range requests (an Earthdata login in
-<code>~/.netrc</code>) into <code>catalog/granule_flags.json.gz</code>; the weekly viewer build reads
-only the granules published since the last run.</p>
+lists every flag of the granule or pair. <code>scripts/collect_granule_qa.py
+--flags-output</code> reads the flags from each product's small <code>QA_STATS.h5</code> (an
+Earthdata login in <code>~/.netrc</code>), with the orbit type from CMR, into
+<code>catalog/granule_flags.json.gz</code>; the weekly viewer build reads only the
+granules published since the last run. A GUNW's orbit type is its reference
+acquisition's, the one CMR records; pairs read from the product before carry
+both as <em>reference/secondary</em> (e.g. <code>MOE/FOE</code>). Joint observation, full frame and
+orbit type are also in every granule's CMR record, and RFI mitigation is the
+same for every granule of a product type and release, so a local rebuild shows
+those four for every granule; mixed mode and dithering wait for the download
+and read <em>not read</em> until then.</p>
+<p>Where each flag, QA metric and frame value comes from is listed in
+<a href="data-sources.html">Viewer data sources</a>.</p>
 <p><strong>QA metrics.</strong> When the viewer is built with <code>--granule-qa</code>, the
 <strong>Quality (QA)</strong> group of <strong>Color frames by</strong> paints each frame by a metric from
 every product's <code>QA_STATS.h5</code>. For GUNW the metrics are:</p>
@@ -755,7 +862,8 @@ mark flags a value past its threshold. <strong>Colour pairs</strong> recolours t
 segments by one metric, so poor pairs stand out in the network. The tooltips,
 the frame popup's QA line and the CSV export carry the values.</p>
 <p><code>scripts/collect_granule_qa.py</code> downloads the QA files into
-<code>catalog/granule_qa.json.gz</code>. The weekly build reads only new granules, and a
+<code>catalog/granule_qa.json.gz</code>, 48 at a time; with <code>--flags-output</code> it also fills
+the flag cache from the same files. The weekly build reads only new granules, and a
 granule withdrawn from the archive is cached as empty.</p>
 <p><strong>Browse and QA images.</strong> Each row in the granule or interferogram list has a
 <strong>browse</strong> button, and so does each point in the plot (click it). The button
@@ -841,9 +949,15 @@ next to the key. The first click opens its choices, and a second click (or
 </tr>
 </tbody>
 </table>
-<p>Two boxes in the same panel also collect what the caches miss: <strong>granule
-flags</strong> (read from each product's metadata, about 5 granules a second) and <strong>QA
-metrics</strong> (each <code>QA_STATS.h5</code>, about 20 a second). Both are written to the
+<p><strong>Land only</strong> leaves the frames with no land out of the page, and their
+granules out of any collection: about half the globe's frames are open ocean.
+Two boxes in the same panel also collect what the caches miss: <strong>granule
+flags</strong> and <strong>QA metrics</strong>. Both come from one download of each granule's small
+<code>QA_STATS.h5</code>, about 75 granules a second (a globe of ~185,000 granules in
+about 40 minutes), so ticking either box fills both. The orbit type comes from
+the CMR search, and the RFI mitigation flag, which no small file records, is
+inherited from the granules of the same product type and release already read
+(one product read for a release not seen before). Both are written to the
 helper's cache, not the repository's, and need the Earthdata login in
 <code>~/.netrc</code>.</p>
 <p>The helper searches CMR for every GSLC and GUNW granule in that scope. It
@@ -962,7 +1076,9 @@ QA) over just them. A GUNW pair counts when either acquisition is in one of the
 cycles; its name carries both.</p>
 <p><strong>Show only selected frames</strong>, in the same section, narrows the map, the
 summary and the over-time chart to the frames in your selection, on top of
-whatever other filters are set.</p>
+whatever other filters are set. <strong>Land frames only</strong> hides the frames with no
+land at all (the TrackFrame database's <code>hasLand</code>, i.e. <code>fractionLand</code> above
+zero): about half of the globe's frames, and 30 of North America's 1,295.</p>
 <div class="admonition note">
 <p class="admonition-title">Where the CalVal frames come from</p>
 <p><strong>CalVal frames only</strong> shows the NISAR frames over the twelve DISP-S1
