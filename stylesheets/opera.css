@@ -1,0 +1,17 @@
+/* OPERA branding: a deep navy header and a brighter blue for links, in both
+   colour schemes. No logos: the OPERA, JPL and NASA marks need approval. */
+[data-md-color-primary="custom"] {
+  --md-primary-fg-color: #0b2545;
+  --md-primary-fg-color--light: #13315c;
+  --md-primary-fg-color--dark: #06162b;
+}
+[data-md-color-accent="custom"] {
+  --md-accent-fg-color: #3d8bfd;
+  --md-accent-fg-color--transparent: rgba(61, 139, 253, 0.1);
+}
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: #1d5fbf;
+}
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #6aa9ff;
+}
