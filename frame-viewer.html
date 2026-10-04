@@ -769,7 +769,15 @@ drawn only in each product's QA report, which needs an Earthdata login that a
 web page cannot send. <code>scripts/qa_browse_server.py</code> runs on your own machine
 (<code>127.0.0.1:8797</code>, with your login in <code>~/.netrc</code>). On request it downloads a
 report (about 400 kB), extracts its images and caches them. It also reads the
-grid corners that place any image on the map. The helper uses the
+grid corners that place any image on the map.</p>
+<p>Start it from a checkout of this repository with <a href="https://pixi.sh">pixi</a>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pixi<span class="w"> </span>run<span class="w"> </span>nisar_db-ui
+</code></pre></div>
+<p>Then open <code>http://127.0.0.1:8797/</code>. The first run installs the environment.
+Extra arguments pass through to the helper, e.g.
+<code>pixi run nisar_db-ui --port 8800</code> or <code>--viewer-html &lt;page&gt;</code> to serve another
+page. Its cache stays in <code>.qa_helper_cache/</code> in the checkout.</p>
+<p>The helper uses the
 <code>urs.earthdata.nasa.gov</code> entry of <code>~/.netrc</code> (or <code>$NETRC</code>). Without one, the
 <strong>key icon</strong> next to the theme switch logs it in instead. The page sends the
 username and password only to the helper on <code>127.0.0.1</code>. The helper checks them
@@ -842,7 +850,7 @@ the same number in every scope.</p>
 and QA metrics come from the repo's caches, so they cover North America and
 the granules collected so far. <strong>back to the published view</strong> returns to <code>/</code>.
 The same build runs by hand:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/build_local_view.py<span class="w"> </span>--scope<span class="w"> </span>bbox<span class="w"> </span>--bbox<span class="o">=</span>-123,36,-121,38<span class="w"> </span>--output<span class="w"> </span>view.html
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/build_local_view.py<span class="w"> </span>--scope<span class="w"> </span>bbox<span class="w"> </span>--bbox<span class="o">=</span>-123,36,-121,38<span class="w"> </span>--output<span class="w"> </span>view.html
 </code></pre></div>
 <p><strong>Rollout regions.</strong> NISAR has no rollout list of its own yet, so each NISAR
 frame is tagged with the DISP-S1 North America rollout options it overlaps:
@@ -886,6 +894,42 @@ bottom panel is open at a time.</p>
   an August-November window instead: its peak rainy season, which DISP-S1
   blacks out the same way and the NISAR windows inherit.</li>
 </ul>
+<p><strong>Earthquakes.</strong> The <em>seismogram</em> button above the globe toggle draws USGS
+earthquakes, fetched straight from the USGS FDSN event service, so it works on
+the published page too. The first click shows them: M4.5 and larger over the
+last year, in this page's area. The second click opens its panel:</p>
+<ul>
+<li><strong>Minimum magnitude</strong>;</li>
+<li><strong>Period</strong>: 7 days, 30 days, a year, 5 years, or two dates;</li>
+<li><strong>Area</strong>: this page's area, the current map view, or the whole world;</li>
+<li><strong>Colour by</strong>: depth (the default, as USGS maps draw it), magnitude, age, or
+  one colour of your choice; this recolours at once, with no new fetch.</li>
+</ul>
+<p><strong>Show</strong> fetches again. Circles grow with magnitude, and clicking one gives its
+time, depth and a link to its USGS event page. USGS
+returns at most 20,000 events per request; the panel says when that cap was
+hit. The third click swaps the panel for a small legend: the query, the event
+count, magnitude sizes and colour key. Its <code>x</code> hides just the legend. The
+fourth click adds labels: magnitude over date beside each event. Overlapping
+labels are dropped, larger events first. The fifth click hides everything.</p>
+<p><strong>Volcanoes.</strong> The <em>volcano</em> button steps through the same five clicks as
+the earthquakes: triangles, options, legend, labels (name and last eruption),
+off. The volcanoes are the Smithsonian Global Volcanism Program's Holocene list
+(about 1,200 worldwide). Its server sends no CORS header, so a trimmed copy
+ships in the page, refreshed by <code>scripts/make_volcano_list.py</code>. The current US
+alert levels and aviation colour codes come live from the USGS Volcano Hazards
+Program each time the layer first opens.</p>
+<p>The options panel offers:</p>
+<ul>
+<li><strong>Erupted since</strong>: any time in the Holocene, or a year;</li>
+<li><strong>Area</strong>: this page's area, the current view, or the world;</li>
+<li><strong>Colour by</strong>: USGS alert (the default), volcano type, last eruption, or one
+  colour;</li>
+<li><strong>USGS-monitored only</strong>.</li>
+</ul>
+<p>Clicking a volcano gives its type, country, last eruption, elevation and
+evidence, any USGS alert with its notice, and links to its GVP page and its
+USGS observatory page.</p>
 <p><strong>CRID.</strong> The <strong>Mode / Polarization / CRID</strong> section also lists the composite
 release IDs (<code>P05023</code>, ...) read from the granule names. Selecting some narrows
 the map to frames with granules from those releases and recounts the colourings
@@ -918,8 +962,8 @@ descending alike. This replaces the TrackFrame GeoPackage's own
 To change the sites, edit the GeoJSON (or pass <code>--calval-sites</code>) and rebuild
 the viewer, or re-flag an already built one in place (this also re-tags
 the rollout options):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
 </code></pre></div>
 <p><code>sync_viewer_html.py</code> also takes <code>--blackout-json</code> and <code>--gunw-catalog</code> to
 attach snow blackout dates or the GUNW view to a page built without them.</p>
