@@ -670,8 +670,8 @@ range of <strong>GSLC Acquisitions Over Time</strong>: drag across its bars, or 
 dates, and every frame is recounted over just that window. The numeric ramps fit
 the frames currently shown.</p>
 <p><strong>Frame Color / Opacity</strong> has two tabs, the same as the map's colour panel.
-<strong>Color by</strong> lists the colourings grouped into counts, mode / coverage, planning
-and flags, each with a preview of its colours. <strong>Style</strong> holds fill and outline
+<strong>Color by</strong> lists the colourings grouped into counts, mode / coverage, planning,
+flags and quality (QA), each with a preview of its colours. <strong>Style</strong> holds fill and outline
 opacity and the colormap: pick one of 31, in folding groups (closed at first; each header names the
 current colormap) of perceptual (Viridis, Turbo,
 Batlow, ...), single hue (Blues, Greens, ...), multi hue (YlOrRd, YlGnBu, ...)
@@ -720,6 +720,60 @@ lists every flag of the granule or pair. <code>scripts/collect_granule_flags.py<
 reads the flags with HTTP byte-range requests (an Earthdata login in
 <code>~/.netrc</code>) into <code>catalog/granule_flags.json.gz</code>; the weekly viewer build reads
 only the granules published since the last run.</p>
+<p><strong>QA metrics.</strong> When the viewer is built with <code>--granule-qa</code>, the
+<strong>Quality (QA)</strong> group of <strong>Color frames by</strong> paints each frame by a metric from
+every product's <code>QA_STATS.h5</code>. For GUNW the metrics are:</p>
+<ul>
+<li>the coherence median and mean;</li>
+<li>the valid unwrapped share (pixels in a non-zero connected component), as a
+  percentage of the data area rather than of the whole grid;</li>
+<li>the share of the largest connected component;</li>
+<li>the number of connected components;</li>
+<li>the ionosphere screen's mean, median and spread, and its mean uncertainty;</li>
+<li>the pair's RFI likelihood, the larger of its two acquisitions'.</li>
+</ul>
+<p>For GSLC it is the RFI likelihood alone.</p>
+<p>A frame's value summarises the granules or pairs that pass the chips and the
+date range, the same way the counts do. The <strong>Style</strong> tab chooses the
+statistic: the <strong>median</strong>, the <strong>worst</strong> value (the 10th or 90th percentile,
+whichever direction is bad), or the <strong>% bad</strong> past a threshold you can edit.
+Frames with nothing read yet are grey.</p>
+<p>Means, medians and spreads are computed from the stored histograms. The QA
+software's own means read near zero for some granules whose histograms are
+fine.</p>
+<p>The RFI likelihood is documented as 0-1, but most granules report far larger
+values, up to about 1e31, so it is coloured on a log10 scale, and "bad" means
+above 1. The ionosphere mean carries a different arbitrary offset in each pair.
+Its spread compares better across pairs.</p>
+<p>In the plot window, <strong>Show QA</strong> adds one lane per metric under the timeline or
+pair plot. Values are coloured from dark (worse) to bright (better), and a red
+mark flags a value past its threshold. <strong>Colour pairs</strong> recolours the GUNW
+segments by one metric, so poor pairs stand out in the network. The tooltips,
+the frame popup's QA line and the CSV export carry the values.</p>
+<p><code>scripts/collect_granule_qa.py</code> downloads the QA files into
+<code>catalog/granule_qa.json.gz</code>. The weekly build reads only new granules, and a
+granule withdrawn from the archive is cached as empty.</p>
+<p><strong>Browse and QA images.</strong> Each row in the granule or interferogram list has a
+<strong>browse</strong> button, and so does each point in the plot (click it). The button
+opens a card with the product's public browse image: the unwrapped phase of a
+GUNW, the backscatter of a GSLC.</p>
+<p><strong>Browse images</strong> in the frame popup lays out a strip of thumbnails for the
+granules or pairs that pass the filters. Each thumbnail's border is coloured by
+a QA metric.</p>
+<p>The wrapped phase, coherence, connected components and ionosphere screen are
+drawn only in each product's QA report, which needs an Earthdata login that a
+web page cannot send. <code>scripts/qa_browse_server.py</code> runs on your own machine
+(<code>127.0.0.1:8797</code>, with your login in <code>~/.netrc</code>). On request it downloads a
+report (about 400 kB), extracts its images and caches them. It also reads the
+grid corners that place any image on the map.</p>
+<p>While the helper runs, the card gains a tab for each layer, the strip can show
+any of them, and <strong>on map</strong> lays the image over its frame with an opacity
+slider. The first request for a pair takes a few seconds, and later ones come
+from the cache. Without the helper the card shows the public image and the
+command to start it.</p>
+<p>The published page reaches the helper from Chrome, Edge and Firefox; Chrome may
+first ask to allow access to devices on your local network. Safari and phones
+see the public images only.</p>
 <p><strong>Rollout regions.</strong> NISAR has no rollout list of its own yet, so each NISAR
 frame is tagged with the DISP-S1 North America rollout options it overlaps:
 priorities <code>P0</code>, <code>P1</code>, <code>P2</code>, <code>P3a</code>, <code>P3b</code> and <code>P4</code>, from the frame-based rollout
@@ -742,8 +796,8 @@ bottom panel is open at a time.</p>
 <ul>
 <li>The <em>palette</em> button is <strong>Color frames by</strong> on the map. The first click opens
   its panel. The <strong>Color by</strong> tab lists every colouring for the product shown
-  (GSLC or GUNW), grouped into counts, mode / coverage, planning and flags, each
-  with a preview of its colours; tap one to apply it. The <strong>Style</strong> tab holds
+  (GSLC or GUNW), grouped into counts, mode / coverage, planning, flags and quality (QA),
+  each with a preview of its colours; tap one to apply it. The <strong>Style</strong> tab holds
   fill opacity (with 0-100 presets), outline opacity (fill 0 with outlines gives
   an outline-only map), and the colormap, invert and range of a numeric
   colouring or the colour of each category. The second click (or the panel's
