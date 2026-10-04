@@ -34,6 +34,10 @@ call it):
   ``netrc``, ``page`` or ``none``);
 * ``POST /login`` -- ``{"username": ..., "password": ...}`` from the viewer;
 * ``POST /logout`` -- forget that login and fall back to the netrc file;
+* ``POST /build`` -- ``{"scope": "na" | "globe" | "bbox", "bbox": [w, s, e, n]}``:
+  search CMR and rebuild the viewer for that scope in the background
+  (``build_local_view.py``); ``GET /build`` reports its progress;
+* ``/view/<id>`` -- a page such a build wrote;
 * ``/qa/<gid>/index.json`` -- the layers extracted from the report;
 * ``/qa/<gid>/<layer>.png`` -- one layer, ``?thumb=1`` for a small copy;
 * ``/corners/<gid>.json`` -- the grid's corners and lon/lat bounding box.
@@ -423,21 +427,29 @@ class QaCache:
 class ViewerPage:
     """The viewer page the helper serves: a local file, or the published page.
 
-    The published page is fetched again at most every ``ttl`` seconds, so a
-    long-running helper follows the weekly rebuild.
+    A local file is read again whenever it changes; the published page is
+    fetched again at most every ``ttl`` seconds, so a long-running helper
+    follows the weekly rebuild.
     """
 
     def __init__(self, source: str, ttl: float = 600.0) -> None:
         self.source = source
         self.ttl = ttl
         self._html: bytes | None = None
-        self._at = 0.0
+        self._stamp: float | None = None
         self._lock = threading.Lock()
+
+    def _current_stamp(self) -> float:
+        if self.source.startswith(("http://", "https://")):
+            # Changes once per ``ttl`` window.
+            return float(int(time.time() // self.ttl))
+        return Path(self.source).stat().st_mtime
 
     def html(self) -> bytes:
         """Return the page, marked as served by the helper."""
         with self._lock:
-            if self._html is None or time.time() - self._at > self.ttl:
+            stamp = self._current_stamp()
+            if self._html is None or stamp != self._stamp:
                 if self.source.startswith(("http://", "https://")):
                     resp = requests.get(self.source, timeout=60)
                     resp.raise_for_status()
@@ -447,12 +459,111 @@ class ViewerPage:
                 self._html = text.replace(
                     "<head>", f"<head>{SAME_ORIGIN_MARK}", 1
                 ).encode()
-                self._at = time.time()
+                self._stamp = stamp
             return self._html
 
 
+VIEW_ID = re.compile(r"^[a-z]+-[0-9TZ]+$")
+
+
+class ViewBuilds:
+    """Rebuilds of the viewer for another scope, one at a time.
+
+    A build searches CMR and renders a page with ``build_local_view``; the
+    viewer polls :meth:`status` and opens the page when it is done.
+    """
+
+    def __init__(self, root: Path, trackframe_gpkg: Path | None = None) -> None:
+        self.root = root / "views"
+        self.trackframe_gpkg = trackframe_gpkg
+        self._job: dict | None = None
+        self._lock = threading.Lock()
+
+    def status(self) -> dict:
+        """Return the current (or last) build, or ``{"state": "idle"}``."""
+        with self._lock:
+            return dict(self._job) if self._job else {"state": "idle"}
+
+    def start(self, scope: str, bbox: list[float] | None) -> dict:
+        """Start a build unless one is running; return its status.
+
+        Raises
+        ------
+        ValueError
+            For an unknown scope or a malformed box.
+
+        """
+        if scope not in ("na", "globe", "bbox"):
+            raise ValueError(f"unknown scope {scope!r}")
+        if scope == "bbox":
+            if bbox is None or len(bbox) != 4:
+                raise ValueError("the bbox scope needs [west, south, east, north]")
+            west, south, east, north = (float(v) for v in bbox)
+            if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
+                raise ValueError("bbox must be west < east, south < north, in degrees")
+            bbox = [round(v, 4) for v in (west, south, east, north)]
+        with self._lock:
+            if self._job and self._job["state"] == "running":
+                return dict(self._job)
+            stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+            self._job = {
+                "id": f"{scope}-{stamp}",
+                "scope": scope,
+                "bbox": bbox if scope == "bbox" else None,
+                "state": "running",
+                "step": "Starting",
+                "started": time.time(),
+            }
+            job = dict(self._job)
+        threading.Thread(target=self._run, args=(job,), daemon=True).start()
+        return job
+
+    def _update(self, **fields: object) -> None:
+        with self._lock:
+            assert self._job is not None
+            self._job.update(fields)
+
+    def _run(self, job: dict) -> None:
+        try:
+            # Heavy (geopandas and the viewer generator); only builds need it.
+            from build_local_view import build_view
+            from nisar_db.geodb import get_trackframe_db
+
+            gpkg = self.trackframe_gpkg
+            if gpkg is None:
+                self._update(step="Fetching the NISAR frame database")
+                gpkg = get_trackframe_db(output_dir=self.root.parent)
+            out = self.root / f"{job['id']}.html"
+            meta = build_view(
+                job["scope"],
+                out,
+                Path(gpkg),
+                tuple(job["bbox"]) if job["bbox"] else None,
+                progress=lambda msg: self._update(step=msg),
+            )
+            self._update(
+                state="done",
+                view=f"/view/{job['id']}",
+                n_frames=meta["n_frames"],
+                finished=time.time(),
+            )
+        except Exception as exc:  # noqa: BLE001 - reported to the page
+            self._update(state="error", step=f"{type(exc).__name__}: {exc}")
+
+    def page(self, view_id: str) -> bytes | None:
+        """Return a built page, marked as served by the helper."""
+        path = self.root / f"{view_id}.html"
+        if not VIEW_ID.match(view_id) or not path.exists():
+            return None
+        return (
+            path.read_text().replace("<head>", f"<head>{SAME_ORIGIN_MARK}", 1).encode()
+        )
+
+
 def make_handler(
-    cache: QaCache, viewer: ViewerPage | None = None
+    cache: QaCache,
+    viewer: ViewerPage | None = None,
+    builds: ViewBuilds | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     """Build the request handler bound to ``cache``."""
 
@@ -491,6 +602,15 @@ def make_handler(
                     body = viewer.html()
                     self._headers(HTTPStatus.OK, "text/html; charset=utf-8", len(body))
                     self.wfile.write(body)
+                elif len(parts) == 2 and parts[0] == "view" and builds is not None:
+                    page = builds.page(parts[1])
+                    if page is None:
+                        self._json({"error": "no such view"}, HTTPStatus.NOT_FOUND)
+                        return
+                    self._headers(HTTPStatus.OK, "text/html; charset=utf-8", len(page))
+                    self.wfile.write(page)
+                elif parts == ["build"] and builds is not None:
+                    self._json(builds.status())
                 elif parts == ["health"]:
                     self._json(
                         {
@@ -539,6 +659,16 @@ def make_handler(
 
         def do_POST(self) -> None:  # noqa: N802 - http.server naming
             path = urlparse(self.path).path.strip("/")
+            if path == "build" and builds is not None:
+                length = int(self.headers.get("Content-Length") or 0)
+                try:
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                    self._json(
+                        builds.start(str(body.get("scope", "na")), body.get("bbox"))
+                    )
+                except (ValueError, TypeError) as exc:
+                    self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+                return
             if path == "logout":
                 cache.auth.logout()
                 self._json({"ok": True, "auth": cache.auth.source})
@@ -595,12 +725,21 @@ def main(argv: list[str] | None = None) -> None:
         default=PUBLISHED_VIEWER,
         help="Viewer page to serve at / (a file, or a URL; default: the published one).",
     )
+    parser.add_argument(
+        "--trackframe-gpkg",
+        type=Path,
+        default=None,
+        help="NISAR TrackFrame GeoPackage for the viewer's search; downloaded into "
+        "--cache-dir on the first search when omitted.",
+    )
     args = parser.parse_args(argv)
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer(
         ("127.0.0.1", args.port),
         make_handler(
-            QaCache(args.cache_dir, EarthdataAuth()), ViewerPage(args.viewer_html)
+            QaCache(args.cache_dir, EarthdataAuth()),
+            ViewerPage(args.viewer_html),
+            ViewBuilds(args.cache_dir, args.trackframe_gpkg),
         ),
     )
     print(

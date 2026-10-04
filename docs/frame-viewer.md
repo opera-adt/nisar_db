@@ -183,6 +183,31 @@ The published page reaches the helper from Chrome, Edge and Firefox; Chrome may
 first ask to allow access to devices on your local network. Safari and phones
 see the public images only.
 
+**Search and rebuild (local).** On a page the helper serves, a magnifier sits
+next to the key. The first click opens its choices, and a second click (or
+**Search & rebuild**) starts a build:
+
+| Scope | What it covers | Build time | Page size |
+|---|---|---|---|
+| **OPERA North America** (default) | the published page's 1,295 frames, rebuilt from a fresh CMR search | about a minute | similar to the published page |
+| **Globe** | every frame of the NISAR TrackFrame database, about 30,000 | about 5 minutes, ~10 GB of memory | about 70 MB, 10-20 s to draw |
+| **Screen view** | the frames in the map's current view | seconds | small |
+
+The helper searches CMR for every GSLC and GUNW granule in that scope. It
+builds the page with `scripts/build_local_view.py` and opens it; a box in the
+lower-left corner shows each step until it does. Frames keep the `frame_idx`
+OPERA uses, the TrackFrame database's row number, so a North American frame has
+the same number in every scope.
+
+The consistent mode is computed from the catalog. Blackout dates, granule flags
+and QA metrics come from the repo's caches, so they cover North America and
+the granules collected so far. **back to the published view** returns to `/`.
+The same build runs by hand:
+
+```bash
+python scripts/build_local_view.py --scope bbox --bbox=-123,36,-121,38 --output view.html
+```
+
 **Rollout regions.** NISAR has no rollout list of its own yet, so each NISAR
 frame is tagged with the DISP-S1 North America rollout options it overlaps:
 priorities `P0`, `P1`, `P2`, `P3a`, `P3b` and `P4`, from the frame-based rollout
@@ -225,6 +250,22 @@ bottom panel is open at a time.
   it is on. Most windows are winter snow cover. Central America's frames carry
   an August-November window instead: its peak rainy season, which DISP-S1
   blacks out the same way and the NISAR windows inherit.
+
+**Earthquakes.** The *seismogram* button above the globe toggle draws USGS
+earthquakes, fetched straight from the USGS FDSN event service, so it works on
+the published page too. The first click shows them: M4.5 and larger over the
+last year, in this page's area. The second click opens its panel:
+
+- **Minimum magnitude**;
+- **Period**: 7 days, 30 days, a year, 5 years, or two dates;
+- **Area**: this page's area, the current map view, or the whole world.
+
+**Show** fetches again. Circles grow with magnitude and are coloured by depth,
+and clicking one gives its time, depth and a link to its USGS event page. USGS
+returns at most 20,000 events per request; the panel says when that cap was
+hit. The third click swaps the panel for a small legend: the query, the event
+count, magnitude sizes and depth colours. Its `x` hides just the legend. The
+fourth click hides the events.
 
 **CRID.** The **Mode / Polarization / CRID** section also lists the composite
 release IDs (`P05023`, ...) read from the granule names. Selecting some narrows
