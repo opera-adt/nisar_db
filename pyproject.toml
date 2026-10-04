@@ -35,8 +35,9 @@ docs = ["mkdocs>=1.5", "mkdocs-material>=9.5", "pymdown-extensions>=10"]
 publish = ["build>=1.0", "twine>=5.0"]
 # Reading per-granule flags from the products (scripts/collect_granule_flags.py).
 flags = ["aiohttp", "fsspec", "h5py"]
-# The local QA image helper for the viewer (scripts/qa_browse_server.py).
-browse = ["nisar_db[flags]", "pillow", "pypdf", "pyproj"]
+# The local QA image helper for the viewer (scripts/qa_browse_server.py), and
+# its search-and-rebuild of the viewer (scripts/build_local_view.py).
+browse = ["nisar_db[flags]", "geopandas>=1.0", "pillow", "pypdf", "pyproj"]
 # Everything needed to work on the package; the conda environment.yml stays
 # runtime-only so plain users do not pull the tooling in.
 lint = ["black", "mypy", "pre-commit", "ruff"]

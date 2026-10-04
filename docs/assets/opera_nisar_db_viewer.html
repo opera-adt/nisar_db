@@ -267,6 +267,27 @@
   #edl-btn{position:absolute;top:10px;right:36px;background:none;border:none;color:var(--text-dim);cursor:pointer;
     padding:2px 4px;line-height:0;}
   #edl-btn:hover{color:var(--accent);}
+  #srch-btn{position:absolute;top:10px;right:60px;background:none;border:none;color:var(--text-dim);cursor:pointer;
+    padding:2px 4px;line-height:0;}
+  #srch-btn[hidden]{display:none;}
+  #srch-btn:hover,#srch-btn.armed{color:var(--accent);}
+  #srch-pop{position:absolute;top:40px;right:8px;z-index:30;width:290px;max-width:calc(100% - 16px);background:var(--panel);
+    border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11.5px;font-weight:400;
+    box-shadow:0 4px 16px rgb(0 0 0 / .35);}
+  #srch-pop[hidden]{display:none;}
+  #srch-pop .srch-opt{display:flex;gap:7px;align-items:flex-start;padding:5px 2px;border-bottom:1px solid var(--hairline);cursor:pointer;}
+  #srch-pop .srch-opt input{width:auto;margin:2px 0 0;}
+  #srch-pop .srch-opt b{display:block;color:var(--text);font-weight:600;}
+  #srch-pop .srch-opt span{color:var(--text-dim);font-size:10.5px;}
+  #build-status{position:absolute;left:10px;bottom:52px;z-index:8;display:flex;align-items:center;gap:8px;max-width:min(420px,calc(100% - 80px));
+    background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:11.5px;color:var(--text);
+    box-shadow:0 4px 16px rgb(0 0 0 / .3);}
+  #build-status[hidden]{display:none;}
+  #build-status .spin{width:14px;height:14px;flex-shrink:0;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);
+    animation:bspin .9s linear infinite;}
+  #build-status.err .spin{display:none;}
+  #build-status.err{border-color:#e5484d;}
+  @keyframes bspin{to{transform:rotate(360deg);}}
   #edl-btn .edl-dot{position:absolute;right:1px;bottom:1px;width:7px;height:7px;border-radius:50%;
     background:#6b6b6b;border:1px solid var(--panel);}
   #edl-btn.on .edl-dot{background:#2fbf71;}
@@ -337,8 +358,12 @@
     #sidebar.open{transform:none;}
     #sidebar-backdrop{position:fixed;inset:0;z-index:39;background:rgb(0 0 0 / .45);}
     #sidebar.open ~ #sidebar-backdrop{display:block;}
-    #edl-btn{right:72px;}
-    #sidebar-close{display:block;position:absolute;top:9px;right:40px;background:none;border:none;
+    /* The close button takes the corner; the theme, key and search icons
+       step left of it. */
+    #theme-toggle{right:40px;}
+    #edl-btn{right:64px;}
+    #srch-btn{right:88px;}
+    #sidebar-close{display:block;position:absolute;top:9px;right:6px;background:none;border:none;
       color:var(--text-dim);font-size:22px;line-height:1;padding:2px 6px;cursor:pointer;}
     #menu-btn{display:flex;align-items:center;justify-content:center;position:absolute;top:10px;left:10px;z-index:7;
       width:40px;height:40px;border-radius:8px;border:1px solid var(--border);background:var(--scrim);color:var(--text);
@@ -379,6 +404,24 @@
   <div id="sidebar">
     <h1>OPERA NISAR-DB Viewer
       <button id="theme-toggle" title="Switch to the light theme">&#9788;</button>
+      <button id="srch-btn" hidden title="Search CMR and rebuild the viewer (local)" aria-label="Search and rebuild" aria-expanded="false">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8"/></svg>
+      </button>
+      <div id="srch-pop" hidden>
+        <div class="overlay-head"><span>Search CMR &amp; rebuild</span>
+          <button class="li-x" id="srch-close" title="Close">&times;</button></div>
+        <label class="srch-opt"><input type="radio" name="srch-scope" value="na" checked>
+          <div><b>OPERA North America</b><span>the 1,295 OPERA frames, as published (about a minute)</span></div></label>
+        <label class="srch-opt"><input type="radio" name="srch-scope" value="globe">
+          <div><b>Globe</b><span>every NISAR frame (~30,000); a few minutes and a large page</span></div></label>
+        <label class="srch-opt"><input type="radio" name="srch-scope" value="bbox">
+          <div><b>Screen view</b><span id="srch-bbox">the frames in the map's current view</span></div></label>
+        <div class="bc-ctl"><button type="button" class="btn small primary" id="srch-go">Search &amp; rebuild</button>
+          <a href="/" id="srch-home">back to the published view</a></div>
+        <div class="stat-line">Searches CMR for GSLC and GUNW granules, builds the page on the QA helper and opens it.
+          Clicking the magnifier again starts it too.</div>
+      </div>
       <button id="edl-btn" title="Earthdata login for the QA images" aria-label="Earthdata login" aria-expanded="false">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -400,7 +443,7 @@
         <div class="stat-line">The login goes only to the QA helper on this machine, which keeps it in memory and
           uses it only with Earthdata. The page itself never stores the password.</div>
       </div>
-      <small>North America &middot; <span id="hdr-count">0</span> frames shown</small>
+      <small><span id="hdr-scope">North America</span> &middot; <span id="hdr-count">0</span> frames shown</small>
       <small id="hdr-queried">CMR queried: unknown</small>
       <button id="sidebar-close" title="Close the panel" aria-label="Close the panel">&times;</button>
     </h1>
@@ -651,6 +694,8 @@
       <div class="pop-row" id="rollout-panel-note"></div>
       <div id="rollout-panel-list"></div>
     </div>
+    <div id="build-status" hidden role="status" aria-live="polite"><span class="spin"></span><span id="build-text"></span>
+      <button class="li-x" id="build-x" title="Hide" hidden>&times;</button></div>
     <div id="browse-card" hidden>
       <div class="overlay-head"><span id="browse-title">Browse</span><button class="li-x" id="browse-close" title="Close">&times;</button></div>
       <div class="bc-sub" id="browse-sub"></div>
@@ -2249,6 +2294,83 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   });
   refreshEdl();
 
+
+  // ---------- local search and rebuild ----------
+  // Only a page the QA helper served can ask it to search CMR and rebuild the
+  // viewer for another scope; the published page has no server behind it.
+  if (META.view_label) {
+    document.getElementById("hdr-scope").textContent =
+      `${META.view_label}${META.view_bbox ? ` [${META.view_bbox.map(v=>v.toFixed(1)).join(", ")}]` : ""}`;
+  }
+  const srchBtn = document.getElementById("srch-btn"), srchPop = document.getElementById("srch-pop");
+  srchBtn.hidden = !SERVED_BY_HELPER;
+  function viewBbox(){
+    const b = map.getBounds();
+    const clamp = (v, lo, hi)=> Math.max(lo, Math.min(hi, v));
+    return [clamp(b.getWest(), -180, 180), clamp(b.getSouth(), -90, 90),
+            clamp(b.getEast(), -180, 180), clamp(b.getNorth(), -90, 90)].map(v=>Number(v.toFixed(3)));
+  }
+  function setSrchOpen(open){
+    srchPop.hidden = !open;
+    srchBtn.classList.toggle("armed", open);
+    srchBtn.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const [w, s, e, n] = viewBbox();
+      document.getElementById("srch-bbox").textContent = `the frames in the map's current view: ${w}, ${s} to ${e}, ${n}`;
+    }
+  }
+  const buildBox = document.getElementById("build-status");
+  function showBuild(text, error){
+    buildBox.hidden = false;
+    buildBox.classList.toggle("err", Boolean(error));
+    document.getElementById("build-text").textContent = text;
+    document.getElementById("build-x").hidden = !error;
+  }
+  let buildPoll = null;
+  function pollBuild(){
+    clearTimeout(buildPoll);
+    fetch(`${qaHelper}/build`).then(r=>r.json()).then(j=>{
+      const secs = j.started ? Math.round(Date.now() / 1000 - j.started) : 0;
+      if (j.state === "running") {
+        showBuild(`${j.step}... (${secs} s)`);
+        buildPoll = setTimeout(pollBuild, 1500);
+      } else if (j.state === "done") {
+        showBuild(`Done: ${j.n_frames} frames. Opening the new view`+
+          `${j.n_frames > 5000 ? " (a page this size takes 10-20 s to draw)" : ""}...`);
+        location.href = j.view;
+      } else if (j.state === "error") {
+        showBuild(`Search failed: ${j.step}`, true);
+      }
+    }).catch(()=> showBuild("Lost the QA helper while searching.", true));
+  }
+  async function startBuild(){
+    const scope = document.querySelector('input[name="srch-scope"]:checked').value;
+    setSrchOpen(false);
+    showBuild("Starting the search...");
+    try {
+      const r = await fetch(`${qaHelper}/build`, {method:"POST", headers:{"Content-Type":"application/json"},
+                                                  body: JSON.stringify({scope, bbox: scope === "bbox" ? viewBbox() : null})});
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      pollBuild();
+    } catch (err) {
+      showBuild(`Search failed: ${err.message}`, true);
+    }
+  }
+  // First click opens the choices; a second click on the magnifier starts.
+  srchBtn.addEventListener("click", e=>{
+    e.stopPropagation();
+    if (srchPop.hidden) setSrchOpen(true); else startBuild();
+  });
+  document.getElementById("srch-go").addEventListener("click", startBuild);
+  document.getElementById("srch-close").addEventListener("click", ()=> setSrchOpen(false));
+  document.getElementById("build-x").addEventListener("click", ()=>{ buildBox.hidden = true; });
+  document.addEventListener("pointerdown", e=>{
+    if (!srchPop.hidden && !srchPop.contains(e.target) && !srchBtn.contains(e.target)) setSrchOpen(false);
+  });
+  // A search started before a reload, or in another tab, shows here too.
+  if (SERVED_BY_HELPER) fetch(`${qaHelper}/build`).then(r=>r.json()).then(j=>{ if (j.state === "running") pollBuild(); }).catch(()=>{});
+
   // ---------- browse strip in the frame popup ----------
   // One thumbnail per granule / pair left by the filters, newest last; the
   // public browse thumbnails need nothing, the QA layers the helper. Helper
@@ -2778,8 +2900,8 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   const map = new maplibregl.Map({
     container: "map",
     style: style,
-    center: [-100, 40],
-    zoom: 1.4,
+    center: META.view_scope === "globe" ? [0, 20] : [-100, 40],
+    zoom: META.view_scope === "globe" ? 1 : 1.4,
     attributionControl: true
   });
   map.addControl(new maplibregl.NavigationControl(), "bottom-right");
@@ -3791,6 +3913,10 @@ const UNR_GPS_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
   });
 
   map.on("load", ()=>{
+    if (Array.isArray(META.view_bbox)) {
+      const [w, s, e, n] = META.view_bbox;
+      map.fitBounds([[w, s], [e, n]], {padding: 30, duration: 0});
+    }
     map.addSource("frames", { type:"geojson", data: FRAME_DATA });
     map.addLayer({
       id:"frames-fill", type:"fill", source:"frames",

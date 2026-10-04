@@ -245,3 +245,17 @@ def test_viewer_page_is_marked_as_served_by_the_helper(tmp_path: Path) -> None:
     html = helper.ViewerPage(str(page)).html().decode()
 
     assert html.startswith(f"<!DOCTYPE html>\n<html><head>{helper.SAME_ORIGIN_MARK}")
+
+
+def test_viewer_page_follows_a_changed_file(tmp_path: Path) -> None:
+    import os
+
+    helper = _load("qa_browse_server")
+    page = tmp_path / "viewer.html"
+    page.write_text("<html><head></head>one</html>")
+    viewer = helper.ViewerPage(str(page))
+    assert b"one" in viewer.html()
+
+    page.write_text("<html><head></head>two</html>")
+    os.utime(page, (1, 1))  # a different modification time, whatever the clock
+    assert b"two" in viewer.html()
