@@ -800,6 +800,50 @@ command to start it.</p>
 <p>The published page reaches the helper from Chrome, Edge and Firefox; Chrome may
 first ask to allow access to devices on your local network. Safari and phones
 see the public images only.</p>
+<p><strong>Search and rebuild (local).</strong> On a page the helper serves, a magnifier sits
+next to the key. The first click opens its choices, and a second click (or
+<strong>Search &amp; rebuild</strong>) starts a build:</p>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>What it covers</th>
+<th>Build time</th>
+<th>Page size</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OPERA North America</strong> (default)</td>
+<td>the published page's 1,295 frames, rebuilt from a fresh CMR search</td>
+<td>about a minute</td>
+<td>similar to the published page</td>
+</tr>
+<tr>
+<td><strong>Globe</strong></td>
+<td>every frame of the NISAR TrackFrame database, about 30,000</td>
+<td>about 5 minutes, ~10 GB of memory</td>
+<td>about 70 MB, 10-20 s to draw</td>
+</tr>
+<tr>
+<td><strong>Screen view</strong></td>
+<td>the frames in the map's current view</td>
+<td>seconds</td>
+<td>small</td>
+</tr>
+</tbody>
+</table>
+<p>The helper searches CMR for every GSLC and GUNW granule in that scope. It
+builds the page with <code>scripts/build_local_view.py</code> and opens it; a box in the
+lower-left corner shows each step until it does. Frames keep the <code>frame_idx</code>
+OPERA uses, the TrackFrame database's row number, so a North American frame has
+the same number in every scope.</p>
+<p>The consistent mode is computed from the catalog. Blackout dates, granule flags
+and QA metrics come from the repo's caches, so they cover North America and
+the granules collected so far. <strong>back to the published view</strong> returns to <code>/</code>.
+The same build runs by hand:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/build_local_view.py<span class="w"> </span>--scope<span class="w"> </span>bbox<span class="w"> </span>--bbox<span class="o">=</span>-123,36,-121,38<span class="w"> </span>--output<span class="w"> </span>view.html
+</code></pre></div>
 <p><strong>Rollout regions.</strong> NISAR has no rollout list of its own yet, so each NISAR
 frame is tagged with the DISP-S1 North America rollout options it overlaps:
 priorities <code>P0</code>, <code>P1</code>, <code>P2</code>, <code>P3a</code>, <code>P3b</code> and <code>P4</code>, from the frame-based rollout
@@ -874,8 +918,8 @@ descending alike. This replaces the TrackFrame GeoPackage's own
 To change the sites, edit the GeoJSON (or pass <code>--calval-sites</code>) and rebuild
 the viewer, or re-flag an already built one in place (this also re-tags
 the rollout options):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python<span class="w"> </span>scripts/generate_scope_viewer.py<span class="w"> </span>--frames-gpkg<span class="w"> </span>...<span class="w"> </span>--gslc-db<span class="w"> </span>...
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>scripts/sync_viewer_html.py<span class="w"> </span>docs/assets/opera_nisar_db_viewer.html
 </code></pre></div>
 <p><code>sync_viewer_html.py</code> also takes <code>--blackout-json</code> and <code>--gunw-catalog</code> to
 attach snow blackout dates or the GUNW view to a page built without them.</p>
