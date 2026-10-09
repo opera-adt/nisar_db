@@ -834,12 +834,28 @@ connected, disconnected, or no GUNW, so broken networks can be found on the
 map without opening each plot. The over-time chart
 counts interferograms by secondary date, and the <strong>Mode / Polarization</strong> chips
 list GUNW modes and polarizations; each product keeps its own chip selection.</p>
-<p>Pass direction and a <strong>Frame popup</strong> switch sit in the top-left map controls
-(clicking a GPS site never opens the frame panel underneath it); basemaps (light, dark, Esri
-satellite, Google hybrid as <em>Satellite-H</em>) in the top-right; the light/dark
-theme switch is beside the viewer title. <strong>Product / Site Flags</strong> carries an
-optional layer of Nevada Geodetic Laboratory GPS sites, off by default; clicking
-a site opens its position time series.</p>
+<p>Pass direction sits in the top-left map controls; basemaps (light, dark, Esri
+satellite, Google hybrid as <em>Satellite-H</em>) and the <strong>Frame popup</strong> switch in the
+top-right; the light/dark theme switch is beside the viewer title. The antenna
+button under the volcanoes, bottom right, shows the Nevada Geodetic Laboratory
+GPS sites, off by default; clicking a site opens its position time series (and
+never the frame panel underneath it).</p>
+<p><strong>OPERA switch.</strong> The stacked-layers icon beside the viewer title, on by
+default, carries the DISP planning features: the rainy / snow blackouts (map
+layer, colourings, popup month strip and the grey bands in <strong>Show plot</strong>),
+<strong>Blackout by Month</strong>, the rollout regions (map layer, sidebar section, filter
+and colouring), the consistent mode with its <strong>Consistent Mode Summary</strong>, and
+the reference resets. Turned off, all of these leave the page, and the GPS
+layer widens from North America to the whole network.</p>
+<p><strong>Play and full screen.</strong> Under the <strong>Frame popup</strong> switch, the play button
+slowly spins the globe; a second click stops it, as does grabbing the map.
+Double-click it (long-press on a phone) for its options: step through the
+<strong>cycles</strong> (the cycle filter) or through <strong>time</strong> (the date range, in windows of
+a chosen number of days), one step at a time or cumulatively, at a chosen speed,
+with any <strong>Color frames by</strong> colouring. A caption over the map names the step
+and its frames; stopping restores the cycle filter and the date range. The
+button beside it fills the screen with the map alone; Esc brings the sidebar and
+the controls back.</p>
 <p><strong>Per-granule flags.</strong> When the viewer is built with <code>--granule-flags</code>, six
 <strong>Color frames by</strong> options paint each frame by a flag read from every product's
 HDF5 metadata. The flags are joint observation, full frame, orbit type, RFI
