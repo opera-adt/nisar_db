@@ -1,0 +1,1734 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Frame database and product-catalog generation for OPERA DISP-NISAR. Mirrors the burst_db workflow used for Sentinel-1 (DISP-S1).">
+      
+      
+      
+        <link rel="canonical" href="https://opera-adt.github.io/nisar_db/api.html">
+      
+      
+        <link rel="prev" href="data-sources.html">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>REST API - OPERA NISAR-DB</title>
+      
+    
+    
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="stylesheets/opera.css">
+    
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rest-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="OPERA NISAR-DB" class="md-header__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OPERA NISAR-DB
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              REST API
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/opera-adt/nisar_db" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opera-adt/nisar_db
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="OPERA NISAR-DB" class="md-nav__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    OPERA NISAR-DB
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/opera-adt/nisar_db" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    opera-adt/nisar_db
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="background/consistent-mode.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consistent mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="background/blackout-dates.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blackout dates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="background/reference-dates.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference (reset) dates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="background/processing-modes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing modes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorials/consistent-mode-database.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build a consistent-mode database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorials/snow-analysis.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Derive blackout dates from snow cover
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frame viewer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Frame viewer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="frame-viewer.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frame viewer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data-sources.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Viewer data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="api.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    REST API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-answers-come-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the answers come from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-a-key-decides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a key decides
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-and-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install and start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-see-what-you-can-query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. See what you can query
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-query-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Query frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-run-a-command-as-a-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Run a command as a job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-open-the-viewer-in-a-given-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Open the viewer in a given state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-a-shared-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running a shared service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://www.jpl.nasa.gov/go/opera/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OPERA project ↗
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How it works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#where-the-answers-come-from" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the answers come from
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how-jobs-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How jobs run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-a-key-decides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a key decides
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-and-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install and start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-see-what-you-can-query" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. See what you can query
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-query-frames" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Query frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-run-a-command-as-a-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Run a command as a job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-open-the-viewer-in-a-given-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Open the viewer in a given state
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#running-a-shared-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running a shared service
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="rest-api">REST API<a class="headerlink" href="#rest-api" title="Permanent link">&para;</a></h1>
+<p><code>nisar-db serve</code> starts one web server that does four things:</p>
+<ul>
+<li><strong>Answers catalog questions</strong> over the frames the <a href="frame-viewer.html">frame viewer</a>
+  shows: which frames match a filter, a frame's granules or GUNW pairs, cycles,
+  blackout windows, and summaries.</li>
+<li><strong>Runs <code>nisar-db</code> commands as jobs</strong>, such as <code>search</code>, <code>create-consistent</code> or
+  <code>create-nisar-catalog</code>, in the background. You collect the outputs when they
+  finish.</li>
+<li><strong>Serves the viewer</strong>, and builds links that open it in a chosen state.</li>
+<li><strong>Stands in for the viewer helper.</strong> It keeps the QA images, grid corners,
+  Earthdata login and search-and-rebuild of <code>scripts/qa_browse_server.py</code>, on
+  the same paths, so it can replace that script.</li>
+</ul>
+<p>It runs in two modes. <strong>Local</strong> is for your own machine: it listens on
+127.0.0.1 and asks for no key. <strong>Shared</strong> is a service for a team: callers need
+API keys, and the heavy and credentialed parts are limited.</p>
+<p>Every route is documented interactively at <code>/docs</code> (with a "Try it out" button)
+once the server runs. The machine-readable schema is at <code>/openapi.json</code>.</p>
+<h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    client["Browser, script,&lt;br&gt;notebook, curl"] --&gt;|HTTP| api["nisar-db serve&lt;br&gt;(FastAPI)"]
+    api --&gt;|/api/v1/frames, cycles, ...| store["Frame store&lt;br&gt;(reads viewer pages)"]
+    store --&gt; pages[("Published page&lt;br&gt;+ rebuilt views")]
+    api --&gt;|/api/v1/jobs| jobs["Job runner&lt;br&gt;(max N at once)"]
+    jobs --&gt;|"python -m nisar_db.cli ..."| proc["nisar-db process&lt;br&gt;in jobs/&amp;lt;id&amp;gt;/"]
+    api --&gt;|"/, /view, /qa, /corners, /build"| helper["Viewer helper&lt;br&gt;(scripts/qa_browse_server.py)"]
+    helper --&gt; ed[("Earthdata / CMR")]
+    proc --&gt; ed</code></pre>
+<h3 id="where-the-answers-come-from">Where the answers come from<a class="headerlink" href="#where-the-answers-come-from" title="Permanent link">&para;</a></h3>
+<p>The API does not keep its own database. Every built viewer page already holds
+its frames: their outlines, granule and GUNW lists, consistent mode, blackout
+windows, rollout options, flags and QA. That data sits in the page's
+<code>FRAME_DATA</code> and <code>META</code> blocks. The API reads those pages as <strong>datasets</strong>:</p>
+<ul>
+<li><code>published</code> is the checked-in North America page,
+  <code>scripts/opera_nisar_db_viewer.html</code>;</li>
+<li>every view a rebuild wrote is one more, named like <code>globe-20261009T193409</code>,
+  from <code>&lt;cache-dir&gt;/views/</code>.</li>
+</ul>
+<p>A dataset is read on its first query (the 30,000-frame globe takes about
+5 seconds) and kept in memory until its file changes. A rebuild therefore shows
+up as a new dataset on the next request. The filters are the viewer's own, so
+the API and the map always agree on what "cycle 23, mode 4005" means.</p>
+<h3 id="how-jobs-run">How jobs run<a class="headerlink" href="#how-jobs-run" title="Permanent link">&para;</a></h3>
+<p>A job is one <code>nisar-db</code> subcommand with checked parameters:</p>
+<ol>
+<li><code>POST /api/v1/jobs</code> validates the parameters against that kind's schema, so
+   an unknown field or a wrong type is refused before anything runs. It then
+   creates <code>&lt;cache-dir&gt;/jobs/&lt;id&gt;/</code> and queues the job.</li>
+<li>At most <code>--max-jobs</code> jobs run at once (2 by default); the rest wait in
+   order. Each runs <code>python -m nisar_db.cli &lt;command&gt; ...</code> as its own process
+   inside its folder. A crash, or a crawl of the whole archive, therefore stays
+   out of the server's memory.</li>
+<li>The folder keeps the outputs, <code>log.txt</code>, and a <code>job.json</code> record (state,
+   command line, times, outputs). The server reloads those records when it
+   restarts, and marks any job that was running at the time as failed.</li>
+<li><code>GET /api/v1/jobs/&lt;id&gt;</code> reports the state and the last log lines.
+   <code>GET .../files/&lt;name&gt;</code> downloads an output, and <code>DELETE</code> cancels.</li>
+</ol>
+<p>An input file can be a path on the server, or another job's output written as
+<code>job:&lt;id&gt;/&lt;file&gt;</code>, so jobs chain without copying files around.</p>
+<h3 id="what-a-key-decides">What a key decides<a class="headerlink" href="#what-a-key-decides" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Local mode</th>
+<th>Shared mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Listens on</td>
+<td>127.0.0.1 only (refuses anything else)</td>
+<td>the network (put TLS in front)</td>
+</tr>
+<tr>
+<td>Catalog queries, viewer</td>
+<td>open</td>
+<td>open, or need a key with <code>--private-read</code></td>
+</tr>
+<tr>
+<td>Jobs, rebuilds</td>
+<td>open</td>
+<td>need a key with the <code>jobs</code> scope</td>
+</tr>
+<tr>
+<td>Whose jobs you see</td>
+<td>all</td>
+<td>your own; <code>admin</code> keys see all</td>
+</tr>
+<tr>
+<td>Earthdata login</td>
+<td><code>~/.netrc</code>, or the viewer's key icon</td>
+<td>the server's <code>~/.netrc</code> only (page login off)</td>
+</tr>
+<tr>
+<td>QA images, corners</td>
+<td>unlimited</td>
+<td>rate limited per client (<code>--rate-limit</code>, per minute)</td>
+</tr>
+<tr>
+<td>Downloads, S3 catalogs</td>
+<td>allowed</td>
+<td>refused unless <code>--allow-job</code></td>
+</tr>
+<tr>
+<td>Job input files</td>
+<td>any path</td>
+<td>only under <code>catalog/</code>, the rebuilt views, or job outputs</td>
+</tr>
+<tr>
+<td>Browser origins (CORS)</td>
+<td>any</td>
+<td>only <code>--cors-origin</code></td>
+</tr>
+</tbody>
+</table>
+<p>A key is sent as an <code>X-API-Key: &lt;key&gt;</code> header or as <code>Authorization: Bearer &lt;key&gt;</code>.
+A browser can trade one for a cookie with <code>POST /api/v1/session</code>. The server
+stores only each key's SHA-256 and compares in constant time. A shared server
+refuses to start without at least one key.</p>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="1-install-and-start">1. Install and start<a class="headerlink" href="#1-install-and-start" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"nisar_db[api]"</span><span class="w">          </span><span class="c1"># or, in a checkout: pixi install</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>nisar_db<span class="w">                           </span><span class="c1"># a checkout, for the viewer and rebuilds</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>nisar-db<span class="w"> </span>serve<span class="w"> </span>--cache-dir<span class="w"> </span>.qa_helper_cache
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># or: pixi run nisar_db-api</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>nisar_db API (local) on http://127.0.0.1:8797/  docs: /docs
+</code></pre></div>
+<p>Open <code>http://127.0.0.1:8797/</code> for the viewer, or <code>/docs</code> to try the routes in
+the browser. Without a checkout (a plain <code>pip install</code>), the catalog and job
+routes still work: pass <code>--viewer-html &lt;page&gt;</code> to give them a page to read.</p>
+<h3 id="2-see-what-you-can-query">2. See what you can query<a class="headerlink" href="#2-see-what-you-can-query" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">API</span><span class="o">=</span>http://127.0.0.1:8797/api/v1
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>curl<span class="w"> </span><span class="nv">$API</span>/datasets
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p">[{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"published"</span><span class="p">,</span><span class="w"> </span><span class="nt">"file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"opera_nisar_db_viewer.html"</span><span class="p">,</span><span class="w"> </span><span class="nt">"loaded"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w"> </span><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"globe-20261009T193409"</span><span class="p">,</span><span class="w"> </span><span class="nt">"file"</span><span class="p">:</span><span class="w"> </span><span class="s2">"globe-20261009T193409.html"</span><span class="p">,</span><span class="w"> </span><span class="nt">"loaded"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}]</span>
+</code></pre></div>
+<p>Every catalog route takes <code>?dataset=&lt;id&gt;</code>, defaulting to <code>published</code>.</p>
+<h3 id="3-query-frames">3. Query frames<a class="headerlink" href="#3-query-frames" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Ascending frames on track 163, first five</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames?track=163&amp;direction=A&amp;limit=5"</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Frames acquired in cycle 23 in mode 4005, as GeoJSON for QGIS</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames?cycle=23&amp;modes=4005&amp;format=geojson"</span><span class="w"> </span>&gt;<span class="w"> </span>cycle23_4005.geojson
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># One frame, by id or track_frame</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/5826"</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/T34_F19?geometry=true"</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># Its GSLC granules in cycles 22-24, or its GUNW pairs</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/34_19/granules?cycle=22-24"</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/34_19/granules?product=gunw&amp;start=2026-06-01"</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># Blackout windows, the share of each month they cover, reference dates</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/34_19/blackout"</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="c1"># Every cycle with its dates and frame count, on the globe rebuild</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/cycles?dataset=globe-20261009T193409&amp;product=gunw"</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="c1"># The Consistent Mode Summary and rollout counts for a box</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/summary?bbox=-125,32,-114,42"</span>
+</code></pre></div>
+<p>The filters match the viewer's sidebar:</p>
+<table>
+<thead>
+<tr>
+<th>Filter</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product</code></td>
+<td><code>gslc</code> (default) or <code>gunw</code>: which lists the entry filters below read</td>
+</tr>
+<tr>
+<td><code>track</code>, <code>frame</code></td>
+<td>numbers, ranges (<code>10-20</code>) or lists (<code>12,34</code>)</td>
+</tr>
+<tr>
+<td><code>direction</code></td>
+<td><code>A</code> / <code>D</code></td>
+</tr>
+<tr>
+<td><code>bbox</code></td>
+<td>west,south,east,north</td>
+</tr>
+<tr>
+<td><code>cycle</code></td>
+<td>as for <code>track</code>; a GUNW pair matches on either of its dates</td>
+</tr>
+<tr>
+<td><code>start</code>, <code>end</code></td>
+<td><code>YYYY-MM-DD</code></td>
+</tr>
+<tr>
+<td><code>modes</code>, <code>pols</code>, <code>crids</code></td>
+<td>comma-separated lists</td>
+</tr>
+<tr>
+<td><code>calval</code>, <code>land</code></td>
+<td><code>true</code> / <code>false</code></td>
+</tr>
+<tr>
+<td><code>rollout</code></td>
+<td>rollout options; <code>none</code> for frames in none</td>
+</tr>
+<tr>
+<td><code>consistent_mode</code></td>
+<td>a mode such as <code>4005</code></td>
+</tr>
+<tr>
+<td><code>has_data</code></td>
+<td><code>true</code> keeps only frames with granules or pairs left, <code>false</code> only those without</td>
+</tr>
+</tbody>
+</table>
+<p>The cycle, date, mode, polarization and CRID filters act on each frame's
+granules (or pairs). As in the viewer, a frame with nothing left drops out, and
+each listed frame's <code>n_selected</code> counts what is left. Results come in pages
+(<code>limit</code>, default 500, and <code>offset</code>), and <code>total</code> gives the full count.</p>
+<p>From Python, for example in a notebook:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">geopandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gpd</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">api</span> <span class="o">=</span> <span class="s2">"http://127.0.0.1:8797/api/v1"</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1"># Frames with an acquisition in cycle 23, as a table</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">r</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/frames"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"cycle"</span><span class="p">:</span> <span class="s2">"23"</span><span class="p">,</span> <span class="s2">"limit"</span><span class="p">:</span> <span class="mi">50000</span><span class="p">})</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">"frames"</span><span class="p">])</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">frames</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"cons_mode"</span><span class="p">)</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="c1"># The same frames on a map</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="n">geo</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/frames"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"cycle"</span><span class="p">:</span> <span class="s2">"23"</span><span class="p">,</span> <span class="s2">"format"</span><span class="p">:</span> <span class="s2">"geojson"</span><span class="p">,</span> <span class="s2">"limit"</span><span class="p">:</span> <span class="mi">50000</span><span class="p">})</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="n">gdf</span> <span class="o">=</span> <span class="n">gpd</span><span class="o">.</span><span class="n">GeoDataFrame</span><span class="o">.</span><span class="n">from_features</span><span class="p">(</span><span class="n">geo</span><span class="p">[</span><span class="s2">"features"</span><span class="p">],</span> <span class="n">crs</span><span class="o">=</span><span class="s2">"EPSG:4326"</span><span class="p">)</span>
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># One frame's granules</span>
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">granules</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/frames/34_19/granules"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"cycle"</span><span class="p">:</span> <span class="s2">"22-24"</span><span class="p">})</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">"items"</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="4-run-a-command-as-a-job">4. Run a command as a job<a class="headerlink" href="#4-run-a-command-as-a-job" title="Permanent link">&para;</a></h3>
+<p><code>GET $API/jobs/kinds</code> lists every kind with the JSON schema of its parameters,
+and whether this server runs it:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Command</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>search</code></td>
+<td><code>nisar-db search</code></td>
+<td><code>results.csv</code></td>
+</tr>
+<tr>
+<td><code>create-consistent</code></td>
+<td><code>nisar-db create-consistent</code></td>
+<td><code>consistent.json</code></td>
+</tr>
+<tr>
+<td><code>create-blackout-dates</code></td>
+<td><code>nisar-db create-blackout-dates</code></td>
+<td><code>blackout-dates.json</code></td>
+</tr>
+<tr>
+<td><code>create-reference-dates</code></td>
+<td><code>nisar-db create-reference-dates</code></td>
+<td><code>reference-dates.json</code></td>
+</tr>
+<tr>
+<td><code>create-frame-to-bound</code></td>
+<td><code>nisar-db create-frame-to-bound</code></td>
+<td><code>frame_to_bound.json</code>, <code>frames.geojson</code></td>
+</tr>
+<tr>
+<td><code>create-nisar-catalog</code></td>
+<td><code>nisar-db create-nisar-catalog</code></td>
+<td><code>catalog/*</code>, <code>*.duckdb</code></td>
+</tr>
+<tr>
+<td><code>label-processing-mode</code></td>
+<td><code>nisar-db label-processing-mode</code></td>
+<td><code>labelled.json</code></td>
+</tr>
+<tr>
+<td><code>query-catalog</code></td>
+<td><code>nisar-db query-catalog</code></td>
+<td><code>matches.csv</code></td>
+</tr>
+<tr>
+<td><code>download</code></td>
+<td><code>nisar-db download</code></td>
+<td><code>*.h5</code> (heavy)</td>
+</tr>
+<tr>
+<td><code>build-s3-catalog</code></td>
+<td><code>nisar-db build-s3-catalog</code></td>
+<td><code>catalog.parquet</code> (heavy)</td>
+</tr>
+</tbody>
+</table>
+<p>Start one, follow it, and fetch its output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">     </span>-d<span class="w"> </span><span class="s1">'{"kind": "search", "params": {"product_type": "GSLC", "track": 163, "frame": 22, "max_results": 0}}'</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># {"id": "search-20261009T142435-1c7af5", "state": "running", "argv": ["search", ...], ...}</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>curl<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># {"state": "done", "returncode": 0, "outputs": ["results.csv"], "log": [...]}</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>curl<span class="w"> </span>-O<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5/files/results.csv
+</code></pre></div>
+<p>Chain jobs by naming an earlier job's output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="s1">  "kind": "create-reference-dates",</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s1">  "params": {"consistent_json": "job:create-consistent-20261009T150000-ab12cd/consistent.json",</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s1">             "interval": 1.0}}'</span>
+</code></pre></div>
+<p>From Python:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">api</span> <span class="o">=</span> <span class="s2">"http://127.0.0.1:8797/api/v1"</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">job</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>                                          <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"product_type"</span><span class="p">:</span> <span class="s2">"GUNW"</span><span class="p">,</span> <span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="k">while</span> <span class="p">(</span><span class="n">state</span> <span class="o">:=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">())[</span><span class="s2">"state"</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"queued"</span><span class="p">,</span> <span class="s2">"running"</span><span class="p">):</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"state"</span><span class="p">],</span> <span class="n">state</span><span class="p">[</span><span class="s2">"outputs"</span><span class="p">])</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">csv</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">/files/results.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+</code></pre></div>
+<p>Rebuilding the viewer for North America, the globe or a box keeps its own
+route, <code>POST /build</code>, with the payload the viewer's magnifier sends (for
+example <code>{"scope": "globe", "flags": true, "qa": true}</code>). Poll it with
+<code>GET /build</code>. The result appears as a new dataset and as the page
+<code>/view/&lt;id&gt;</code>.</p>
+<h3 id="5-open-the-viewer-in-a-given-state">5. Open the viewer in a given state<a class="headerlink" href="#5-open-the-viewer-in-a-given-state" title="Permanent link">&para;</a></h3>
+<p>The viewer reads its state from the query string when it loads. <code>GET
+$API/viewer/link</code> checks the parameters and returns the URL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/viewer/link?dataset=globe-20261009T193409&amp;product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1"</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="c1"># {"url": "http://127.0.0.1:8797/view/globe-20261009T193409?product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1", ...}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Sets</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product</code></td>
+<td><code>gslc</code> / <code>gunw</code></td>
+</tr>
+<tr>
+<td><code>opera</code></td>
+<td><code>1</code> / <code>0</code>: the OPERA switch</td>
+</tr>
+<tr>
+<td><code>track</code>, <code>frame</code>, <code>id</code>, <code>cycle</code>, <code>start</code>, <code>end</code>, <code>pass</code></td>
+<td>the sidebar filters (<code>pass</code>: <code>all</code>, <code>asc</code>, <code>desc</code>)</td>
+</tr>
+<tr>
+<td><code>modes</code>, <code>pols</code></td>
+<td>the chips, comma-separated</td>
+</tr>
+<tr>
+<td><code>color</code></td>
+<td>a <em>Color frames by</em> option, e.g. <code>gslc_count</code>, <code>cons_mode</code>, <code>gunw_net</code>, <code>gunw_qa_cm</code></td>
+</tr>
+<tr>
+<td><code>basemap</code></td>
+<td><code>light</code>, <code>dark</code>, <code>sat</code>, <code>sat2</code></td>
+</tr>
+<tr>
+<td><code>sky</code></td>
+<td><code>theme</code>, <code>white</code>, <code>black</code>, <code>space</code></td>
+</tr>
+<tr>
+<td><code>theme</code></td>
+<td><code>dark</code> / <code>light</code></td>
+</tr>
+<tr>
+<td><code>center</code>, <code>zoom</code></td>
+<td><code>lon,lat</code> and the map zoom</td>
+</tr>
+<tr>
+<td><code>play</code></td>
+<td><code>spin</code>, <code>cycles</code> or <code>time</code>; with <code>step_days</code>, <code>cumulative=1</code>, <code>spin=1</code></td>
+</tr>
+<tr>
+<td><code>fullscreen</code></td>
+<td><code>1</code>: the map alone (Esc brings the rest back)</td>
+</tr>
+<tr>
+<td><code>gps</code></td>
+<td><code>1</code>: the UNR GPS sites</td>
+</tr>
+<tr>
+<td><code>popup</code></td>
+<td><code>0</code>: no frame popup</td>
+</tr>
+</tbody>
+</table>
+<p><code>GET $API/viewer/params</code> returns the same list. A page cannot enter the
+browser's own full screen without a click, so <code>fullscreen=1</code> fills the window
+with the map instead.</p>
+<h2 id="running-a-shared-service">Running a shared service<a class="headerlink" href="#running-a-shared-service" title="Permanent link">&para;</a></h2>
+<ol>
+<li>
+<p><strong>Make keys.</strong> Give each person or tool a key with only the scopes it needs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>python<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="s">import hashlib, json, secrets</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s">keys = {"alice": ["read", "jobs"], "dashboard": ["read"], "ops": ["admin"]}</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="s">out = []</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s">for name, scopes in keys.items():</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">    key = secrets.token_urlsafe(24)</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">    print(f"{name}: {key}")              # hand this to its owner</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">    out.append({"name": name, "sha256": hashlib.sha256(key.encode()).hexdigest(), "scopes": scopes})</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s">json.dump(out, open("api_keys.json", "w"), indent=1)</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="s">EOF</span>
+</code></pre></div>
+<p>The file keeps only the hashes. For a quick test,
+<code>NISAR_DB_API_KEYS="name:key:read+jobs,..."</code> works too.</p>
+</li>
+<li>
+<p><strong>Start the server.</strong> Give it a <code>~/.netrc</code> with an Earthdata login for the
+   QA images, corners and rebuilds:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nisar-db<span class="w"> </span>serve<span class="w"> </span>--mode<span class="w"> </span>shared<span class="w"> </span>--port<span class="w"> </span><span class="m">8797</span><span class="w"> </span>--keys-file<span class="w"> </span>api_keys.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--cache-dir<span class="w"> </span>/data/nisar_db_api<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span>--cors-origin<span class="w"> </span>https://opera-adt.github.io<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span>--rate-limit<span class="w"> </span><span class="m">60</span><span class="w"> </span>--max-jobs<span class="w"> </span><span class="m">2</span>
+</code></pre></div>
+<p>Add <code>--private-read</code> to require a key for every request, and <code>--allow-job
+download</code> to let <code>jobs</code> keys download granules.</p>
+</li>
+<li>
+<p><strong>Put TLS in front.</strong> Run a reverse proxy (nginx, Caddy) for HTTPS, so keys
+   never cross the network in clear text.</p>
+</li>
+<li>
+<p><strong>Call it with a key:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$KEY</span><span class="s2">"</span><span class="w"> </span>https://nisar-db.example.org/api/v1/jobs
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">"X-API-Key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">KEY</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span>
+</code></pre></div>
+</li>
+</ol>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Environment</th>
+<th>Default (local / shared)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--mode</code></td>
+<td><code>NISAR_DB_API_MODE</code></td>
+<td><code>local</code></td>
+</tr>
+<tr>
+<td><code>--host</code>, <code>--port</code></td>
+<td></td>
+<td><code>127.0.0.1</code> / <code>0.0.0.0</code>; <code>8797</code></td>
+</tr>
+<tr>
+<td><code>--cache-dir</code></td>
+<td></td>
+<td><code>.qa_helper_cache</code>: QA images, views, jobs</td>
+</tr>
+<tr>
+<td><code>--viewer-html</code></td>
+<td></td>
+<td>the checkout's <code>scripts/opera_nisar_db_viewer.html</code></td>
+</tr>
+<tr>
+<td><code>--trackframe-gpkg</code></td>
+<td></td>
+<td>downloaded when a rebuild needs it</td>
+</tr>
+<tr>
+<td><code>--repo-dir</code></td>
+<td></td>
+<td>the checkout the package runs from</td>
+</tr>
+<tr>
+<td><code>--keys-file</code></td>
+<td><code>NISAR_DB_API_KEYS_FILE</code>, <code>NISAR_DB_API_KEYS</code></td>
+<td>none / required</td>
+</tr>
+<tr>
+<td><code>--private-read</code></td>
+<td></td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>--cors-origin</code></td>
+<td></td>
+<td>any / none</td>
+</tr>
+<tr>
+<td><code>--rate-limit</code></td>
+<td></td>
+<td>off / 60 per minute</td>
+</tr>
+<tr>
+<td><code>--max-jobs</code></td>
+<td></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>--allow-job</code></td>
+<td></td>
+<td>all kinds / not <code>download</code>, <code>build-s3-catalog</code></td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Part of <a href="https://www.jpl.nasa.gov/go/opera/">OPERA</a> (Observational Products for End-Users from Remote Sensing Analysis), a project at NASA's Jet Propulsion Laboratory.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://www.jpl.nasa.gov/go/opera/" target="_blank" rel="noopener" title="OPERA project at JPL" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.9 17.39c-.26-.8-1.01-1.39-1.9-1.39h-1v-3a1 1 0 0 0-1-1H8v-2h2a1 1 0 0 0 1-1V7h2a2 2 0 0 0 2-2v-.41a7.984 7.984 0 0 1 2.9 12.8M11 19.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.22.21-1.79L9 15v1a2 2 0 0 0 2 2m1-16A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://github.com/opera-adt" target="_blank" rel="noopener" title="OPERA on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
