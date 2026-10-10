@@ -195,6 +195,182 @@ gdf = gpd.GeoDataFrame.from_features(geo["features"], crs="EPSG:4326")
 granules = requests.get(f"{api}/frames/34_19/granules", params={"cycle": "22-24"}).json()["items"]
 ```
 
+### QA drops and duplicates
+
+Two checks run over each frame's stack.
+
+**QA drops** flag the GUNW pairs (or GSLC acquisitions) whose QA metric falls
+far from the stack's median on the metric's bad side, and the dates behind
+them:
+
+- **Metrics:** coherence (`cm`, `ca`), valid unwrapped and largest region
+  (`v`, `l`), connected components (`n`), ionosphere (`im`, `imd`, `is`,
+  `iu`) and RFI likelihood (`rl`, compared on a log scale).
+  `GET $API/qa-metrics` lists them with which way is bad.
+- **The test:** a robust z-score, the distance from the median in units of
+  the median absolute deviation (MAD), so one bad pair cannot hide another.
+  Each metric has a smallest meaningful spread, so a stack with almost none,
+  for example one component in every pair, is not flagged for a change of one.
+- **Temporal baseline:** pairs are compared with pairs of the same baseline
+  when there are enough of them, because coherence falls with time.
+- **Dates:** a date is flagged when at least `min_pairs` of its pairs (2), and
+  `min_share` of them (half), are flagged. A bad acquisition drags down every
+  pair it is in.
+
+```bash
+curl "$API/frames/13_70/qa-drops?metric=cm"                 # one frame: flagged pairs and dates
+curl "$API/frames/13_70/qa-drops?metric=v&threshold=4"      # stricter
+curl "$API/qa-drops?metric=cm&track=13"                     # many frames; dates flagged in several frames
+curl "$API/qa-drops?metric=rl&product=gslc"                 # GSLC acquisitions by RFI likelihood
+```
+
+The scan's `dates` list counts the frames each date is flagged in. A date
+flagged in many frames points to a wider event, such as ionosphere, processing
+or weather.
+
+**Duplicates** are the same acquisition delivered more than once:
+
+- GSLC granules sharing a date, mode and coverage (the key the catalog's
+  `n_unique` counts);
+- GUNW pairs sharing both dates, mode and coverage.
+
+Each group gives a reason and the granule to keep (the newest CRID, then the
+highest product counter):
+
+- `reprocessed`: different CRIDs;
+- `split`: one acquisition delivered in pieces;
+- `repeat`: delivered again.
+
+```bash
+curl "$API/frames/12_65/duplicates"
+curl "$API/duplicates?track=12&start=2026-06-01"
+```
+
+### Browse images, and placing them on a map
+
+Each granule has a public browse PNG (GSLC backscatter, GUNW unwrapped phase).
+GUNW pairs also have the QA report's layers: `wrapped`, `coherence`,
+`coherence_wrapped`, `cc` (connected components), `unwrapped`, `rewrapped`,
+`iono` and `iono_unc`. The QA layers need the server's Earthdata login, and
+the corners need the viewer helper.
+
+```bash
+curl -o b.jpg "$API/browse/<gid>"                          # public browse, as a JPEG (max_side=768)
+curl -o c.jpg "$API/browse/<gid>?layer=coherence"          # a QA layer
+curl "$API/browse/<gid>/overlay?layer=coherence"           # viewer link + image URL + corners
+curl "$API/frames/13_70/qa-drops/images?metric=cm&n=2"     # worst flagged pairs + a typical one
+```
+
+`/overlay` returns:
+
+- `viewer_url`: opens the viewer with the image on the map;
+- `image_url`: the image itself;
+- `coordinates`: the image's corners as lon/lat (top-left, top-right,
+  bottom-right, bottom-left), ready for a MapLibre `image` source.
+
+The public browse is placed by its bounding box, and QA layers by the
+product's four corners. `qa-drops/images` runs the QA-drop check, then picks the
+worst flagged pairs and the unflagged pair closest to the median. Each comes
+with its image and overlay URLs, on the layer that shows the metric best:
+coherence for `cm` / `ca`, `cc` for `v` / `l` / `n`, `iono` for the
+ionosphere metrics.
+
+### Earthquakes and volcanoes
+
+Earthquakes come from the USGS event service, the same feed as the viewer's
+earthquake layer. Volcanoes come from the Smithsonian GVP Holocene list the
+viewer embeds.
+
+For an earthquake, the API gives:
+
+- the frames over the epicentre, or within `radius_km` of it;
+- each frame's **coseismic** GUNW pairs: reference acquisition before the
+  event, secondary after it, compared by acquisition time from the granule
+  name. Shortest temporal baseline first.
+
+For a volcano, it gives the frames over it and their pairs in a date window.
+Each pair comes with browse, overlay and viewer links.
+
+```bash
+curl "$API/events/earthquakes?bbox=-100,10,-85,20&start=2026-07-01&min_magnitude=6&order=magnitude"
+curl "$API/events/earthquakes?lon=-118.2&lat=34.0&radius_km=200&start=2026-01-01"
+curl "$API/events/earthquakes/us7000t1bu/frames?radius_km=50"     # frames + coseismic pairs
+curl "$API/events/volcanoes?name=augustine"
+curl "$API/events/volcanoes/313010/frames?start=2026-08-01&n_pairs=3"
+```
+
+When no pair spans an earthquake yet, the report says so and lists the GSLC
+acquisitions just before and after the event.
+
+### Frame health, areas and exports
+
+Several checks are offered for one frame (`/frames/{key}/...`) or as a scan
+over the filtered frames:
+
+| Question | One frame | Many frames |
+|---|---|---|
+| Missed cycles, long gaps, days since the last acquisition | `/frames/{key}/coverage` | `/coverage?stale_days=30` |
+| GUNW network: pieces, breaks no pair bridges, unpaired acquisitions | `/frames/{key}/network` | `/network` |
+| Next expected passes (12-day repeat; not the acquisition plan) | `/frames/{key}/next-passes` | `/next-passes?lon=&lat=` |
+| DISP readiness: usable consistent-mode acquisitions outside blackouts, batches of 15, next batch date | `/frames/{key}/disp-readiness` | `/disp-readiness` |
+| A QA metric before, across and after an event | `/frames/{key}/event-qa?when=` | `/events/earthquakes/{id}/compare` |
+
+Areas:
+
+- `GET /aoi?bbox=w,s,e,n` takes a box; `POST /aoi` takes a GeoJSON polygon in
+  the body.
+- Each frame comes back with the share of the area it covers, its latest
+  pair, its next pass and its DISP status. `covered_share` gives the area's
+  total coverage.
+
+Exports:
+
+- `/export/frames?format=csv|geojson|kml` writes the filtered frames.
+- `/export/entries?product=gunw` writes their GUNW pairs (or GSLC granules) as
+  CSV.
+
+```bash
+curl "$API/coverage?track=13&stale_days=24"
+curl "$API/next-passes?lon=-118.2&lat=34.0"
+curl -X POST "$API/aoi" -H 'Content-Type: application/json' -d @my_area.geojson
+curl -o frames.kml "$API/export/frames?format=kml&track=13"
+curl -o pairs.csv "$API/export/entries?product=gunw&track=13&start=2026-06-01"
+```
+
+### DISP-NISAR assets
+
+The DISP-NISAR processing inputs are the consistent-GSLC database, the
+blackout and reference dates, and the frame bounds and geometries. The API
+serves the real asset files, labelled by where they come from:
+
+- the latest GitHub release;
+- the newest `build-disp-assets` job on this server;
+- the blackout dates kept in the repo.
+
+```bash
+curl "$API/disp/assets"                              # all three sources
+curl -OJ "$API/disp/assets/consistent_gslc"          # a local build, else the release
+curl "$API/disp/consistent/34_19"                    # one frame's consistent entry
+curl "$API/disp/blackout-dates/34_19"
+curl "$API/disp/reference-dates/34_19"
+curl -X POST "$API/disp/build" -H 'Content-Type: application/json' -d '{}'   # fresh build (minutes)
+```
+
+`POST /disp/build` starts a `build-disp-assets` job, which runs the release
+workflow's own steps. It is also available as `nisar-db build-disp-assets`:
+
+1. TrackFrame DB;
+2. frame bounds;
+3. every GSLC in CMR;
+4. GSLC catalog;
+5. blackout dates;
+6. consistent-GSLC with and without blackouts;
+7. processing modes;
+8. reference dates.
+
+It needs an Earthdata login and, on a shared service, `--allow-job
+build-disp-assets`.
+
 ### 4. Run a command as a job
 
 `GET $API/jobs/kinds` lists every kind with the JSON schema of its parameters,
@@ -281,6 +457,7 @@ curl "$API/viewer/link?dataset=globe-20261009T193409&product=gunw&cycle=20-25&co
 | `fullscreen` | `1`: the map alone (Esc brings the rest back) |
 | `gps` | `1`: the UNR GPS sites |
 | `popup` | `0`: no frame popup |
+| `browse`, `browse_layer`, `browse_map` | open a granule's browse image (a layer), `browse_map=1` places it on the map |
 
 `GET $API/viewer/params` returns the same list. A page cannot enter the
 browser's own full screen without a click, so `fullscreen=1` fills the window

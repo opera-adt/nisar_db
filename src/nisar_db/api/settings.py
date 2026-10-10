@@ -26,7 +26,7 @@ SCOPES = ("read", "jobs", "admin")
 
 #: Job kinds a shared service refuses unless they are allowed explicitly:
 #: they move gigabytes or need cloud credentials of the host.
-HEAVY_JOBS = frozenset({"download", "build-s3-catalog"})
+HEAVY_JOBS = frozenset({"download", "build-s3-catalog", "build-disp-assets"})
 
 
 def _repo_root() -> Path | None:

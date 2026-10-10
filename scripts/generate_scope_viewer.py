@@ -1319,6 +1319,40 @@ APP_CSS = r"""
   #opera-btn.off .strike{display:inline;}
   #opera-btn:hover{color:var(--accent);}
   body.no-opera .opera-only{display:none !important;}
+  /* AI assistant: a chat with the user's own key, over the nisar_db MCP tools. */
+  #ai-btn{position:absolute;top:10px;right:108px;background:none;border:none;color:var(--text-dim);cursor:pointer;
+    padding:2px 4px;line-height:0;}
+  #srch-btn[hidden] ~ #ai-btn{right:84px;}
+  #ai-btn:hover,#ai-btn.active{color:var(--accent);}
+  #ai-panel{position:absolute;right:52px;bottom:30px;z-index:9;width:400px;max-width:calc(100% - 70px);height:min(620px,calc(100% - 140px));
+    display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 6px 24px rgb(0 0 0 / .4);font-size:12.5px;resize:both;overflow:hidden;min-width:300px;min-height:260px;}
+  #ai-panel[hidden]{display:none;}
+  #ai-panel .overlay-head{padding:8px 10px;border-bottom:1px solid var(--border);margin:0;}
+  #ai-setup{padding:8px 10px;border-bottom:1px solid var(--hairline);display:flex;flex-direction:column;gap:5px;}
+  #ai-setup .ai-row{display:flex;gap:6px;align-items:center;}
+  #ai-setup select,#ai-setup input{font-size:12px;padding:4px 6px;}
+  #ai-setup input[type=password]{flex:1;}
+  #ai-status{font-size:11px;color:var(--text-dim);}
+  #ai-status.ok{color:#2fbf71;}
+  #ai-status.warn{color:#ffb547;}
+  #ai-log{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:8px;}
+  .ai-msg{line-height:1.45;word-wrap:break-word;}
+  .ai-msg.user{align-self:flex-end;background:var(--accent);color:var(--bg);border-radius:10px 10px 2px 10px;padding:6px 9px;max-width:85%;}
+  .ai-msg.assistant{color:var(--text);}
+  .ai-msg.assistant p{margin:0 0 6px;}
+  .ai-msg.assistant code{background:var(--inset);padding:0 3px;border-radius:3px;font-size:11.5px;}
+  .ai-msg.assistant a{color:var(--accent);}
+  .ai-msg.tool{font-size:11px;color:var(--text-dim);font-family:ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ai-msg.tool.err{color:#ff7b72;}
+  .ai-msg.note{font-size:11.5px;color:var(--text-dim);font-style:italic;}
+  .ai-msg.error{color:#ff7b72;font-size:12px;}
+  .ai-msg.image img{max-width:100%;border-radius:6px;border:1px solid var(--border);cursor:zoom-in;display:block;}
+  #ai-form{display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border);}
+  #ai-input{flex:1;resize:none;height:38px;font:inherit;font-size:12.5px;background:var(--inset);color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:6px 8px;}
+  #ai-input:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+  body.presenting #ai-panel{display:none !important;}
   #srch-pop{position:absolute;top:40px;right:8px;z-index:30;width:290px;max-width:calc(100% - 16px);background:var(--panel);
     border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11.5px;font-weight:400;
     box-shadow:0 4px 16px rgb(0 0 0 / .35);}
@@ -1413,6 +1447,9 @@ APP_CSS = r"""
     #srch-btn{right:88px;}
     #opera-btn{right:112px;}
     #srch-btn[hidden] + #opera-btn{right:88px;}
+    #ai-btn{right:136px;}
+    #srch-btn[hidden] ~ #ai-btn{right:112px;}
+    #ai-panel{left:8px;right:8px;width:auto;max-width:none;bottom:calc(8px + env(safe-area-inset-bottom));height:70vh;resize:none;}
     #sidebar-close{display:block;position:absolute;top:9px;right:6px;background:none;border:none;
       color:var(--text-dim);font-size:22px;line-height:1;padding:2px 6px;cursor:pointer;}
     #menu-btn{display:flex;align-items:center;justify-content:center;position:absolute;top:10px;left:10px;z-index:7;
@@ -1468,6 +1505,7 @@ BODY_HTML = r"""<body>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2.5 8 12 13l9.5-5z"/><path d="m2.5 12.5 9.5 5 9.5-5"/><path d="m2.5 17 9.5 5 9.5-5"/><path class="strike" d="M3 3l18 18"/></svg>
       </button>
+      <button id="ai-btn" title="AI assistant: ask about the frames" aria-label="AI assistant" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12.5a7.5 7.5 0 0 1-11.1 6.6L4 20.5l1.4-4.6A7.5 7.5 0 1 1 20 12.5z"/><path d="M12.5 8.5v2.2M11.4 9.6h2.2M9 12.6v1.6M8.2 13.4h1.6M15.4 12.8v1.4M14.7 13.5h1.4"/></svg></button>
       <div id="srch-pop" hidden>
         <div class="overlay-head"><span>Search CMR &amp; rebuild</span>
           <button class="li-x" id="srch-close" title="Close">&times;</button></div>
@@ -1703,6 +1741,28 @@ BODY_HTML = r"""<body>
     </div>
     <div id="click-ctrl">
       <label><input type="checkbox" id="f-frame-popup" checked> Frame popup</label>
+    </div>
+    <div id="ai-panel" hidden role="dialog" aria-label="AI assistant">
+      <div class="overlay-head"><span>AI assistant &middot; nisar_db</span>
+        <span><button class="btn small" id="ai-clear" title="Start a new conversation">New</button>
+        <button class="li-x" id="ai-close" title="Close">&times;</button></span></div>
+      <div id="ai-setup">
+        <div class="ai-row">
+          <select id="ai-provider" aria-label="AI provider"><option value="anthropic">Anthropic (Claude)</option><option value="openai">OpenAI</option></select>
+          <input id="ai-model" list="ai-models" aria-label="Model" style="flex:1;">
+          <datalist id="ai-models"></datalist>
+        </div>
+        <div class="ai-row">
+          <input type="password" id="ai-key" autocomplete="off" spellcheck="false" placeholder="API key (kept in this tab only)" aria-label="API key">
+          <button class="btn small" id="ai-forget" title="Forget the key">Forget</button>
+        </div>
+        <div id="ai-status">Connecting to the nisar_db tools...</div>
+      </div>
+      <div id="ai-log" aria-live="polite"></div>
+      <form id="ai-form">
+        <textarea id="ai-input" placeholder="Ask about the frames, e.g. which frames got a 4005 acquisition in cycle 23?"></textarea>
+        <button type="submit" class="btn small primary" id="ai-send">Send</button>
+      </form>
     </div>
     <div id="anim-pop" hidden>
       <div class="overlay-head"><span>Play options</span><button class="li-x" id="anim-close" title="Close">&times;</button></div>
@@ -3314,6 +3374,39 @@ APP_JS = r"""
       placeBrowseOnMap(true);
     } else clearBrowseMap();
   });
+  // Open a granule's browse card on a layer and, if asked, place it on the
+  // map: what a link (?browse=<gid>&browse_layer=coherence&browse_map=1) and
+  // the assistant ask for. QA layers and the grid corners arrive from the local
+  // helper, so this waits for them (up to 30 s).
+  async function showBrowse(gid, layer, onMap){
+    if (!/^NISAR_L2_PR_(GSLC|GUNW)_/.test(String(gid))) return {ok: false, note: `not a GSLC or GUNW granule: ${gid}`};
+    openBrowse(gid);
+    const mine = browse;
+    const want = !layer || layer === "browse" ? "public" : layer;
+    const box = document.getElementById("browse-map");
+    const t0 = Date.now();
+    while (Date.now() - t0 < 30000 && browse === mine) {
+      const hasLayer = mine.layers.some(l=> l.name === want);
+      if (hasLayer && (!onMap || !box.disabled)) break;
+      // The report came back without this layer: no point waiting longer.
+      if (!hasLayer && want !== "public" && !mine.loading && mine.layers.length > 1) break;
+      await new Promise(r=> setTimeout(r, 250));
+    }
+    if (browse !== mine) return {ok: false, note: "another image was opened meanwhile"};
+    const hasLayer = mine.layers.some(l=> l.name === want);
+    if (hasLayer && want !== mine.cur) await showBrowseLayer(want);
+    let placed = false;
+    if (onMap && !box.disabled) {
+      if (!box.checked) { box.checked = true; box.dispatchEvent(new Event("change")); }
+      placed = true;
+    }
+    const notes = [];
+    if (!hasLayer) notes.push(`no ${layer} layer (QA layers need the local helper and an Earthdata login); showing the public browse`);
+    if (onMap && !placed) notes.push("placing it on the map needs the grid corners, which the local helper reads");
+    return {ok: true, gid, layer: hasLayer ? layer || "browse" : "browse", on_map: placed,
+            layers: mine.layers.map(l=> l.name === "public" ? "browse" : l.name),
+            note: notes.length ? notes.join("; ") : undefined};
+  }
   document.getElementById("browse-opacity").addEventListener("input", e=>{
     if (map.getLayer("browse-img")) map.setPaintProperty("browse-img", "raster-opacity", Number(e.target.value) / 100);
   });
@@ -6388,8 +6481,7 @@ APP_JS = r"""
   // ?product=gunw&opera=0&cycle=20-25&color=gunw_qa_cm&sky=space&play=spin ...
   // opens the page in that state, through the same calls the buttons make
   // (the API's /api/v1/viewer/link builds these links).
-  function applyUrlState(){
-    const q = new URLSearchParams(location.search);
+  function applyUrlState(q = new URLSearchParams(location.search)){
     if (![...q.keys()].length) return;
     const has = k=> q.has(k) && q.get(k) !== "";
     const truthy = k=> ["1", "true", "yes", "on"].includes(String(q.get(k)).toLowerCase());
@@ -6447,9 +6539,369 @@ APP_JS = r"""
     }
     // A page cannot enter the browser's full screen without a click; the map
     // alone still fills the window, and Esc brings the rest back.
+    if (has("browse")) showBrowse(q.get("browse"), q.get("browse_layer") || "browse", truthy("browse_map"));
     if (truthy("fullscreen")) setPresenting(true);
   }
   map.on("load", ()=> setTimeout(applyUrlState, 0));
+
+  // ---------- AI assistant ----------
+  // A chat that answers from the nisar_db MCP tools of a running
+  // `nisar-db serve` (/mcp, here or on 127.0.0.1) and acts on this map with a
+  // few page tools. It calls Claude or OpenAI straight from the browser with the
+  // user's own key, which stays in this tab (sessionStorage) and goes only to
+  // that provider. The provider SDK loads from the CDN when first used.
+  const AI_SDK = {
+    anthropic: "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.128.0/+esm",
+    openai: "https://cdn.jsdelivr.net/npm/openai@7.23.0/+esm",
+  };
+  const AI_MODELS = {
+    anthropic: ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"],
+    openai: ["gpt-5", "gpt-5-mini"],
+  };
+  const AI_MAX_STEPS = 16;
+  const AI_RESULT_CHARS = 24000;
+  const AI_SYSTEM = [
+    "You are the assistant inside the OPERA NISAR-DB frame viewer. The user sees a map of NISAR frames",
+    "(track/frame cells) next to this chat. Each frame has GSLC acquisitions (granules) and GUNW",
+    "interferograms (pairs), a consistent mode used by OPERA DISP, seasonal blackout windows and",
+    "rollout options. Answer from the nisar_db tools, never from memory; give the numbers they return.",
+    "Show what you find on the map: show_frames_on_map highlights frames (and zooms to them),",
+    "set_view_state switches product, filters (cycle, dates, track, modes), colouring, basemap, sky or",
+    "play mode, clear_map_selection removes highlights. Frame keys are a frame_idx ('8109') or a",
+    "track_frame ('34_19'). Each user message starts with the map's current state; the dataset named",
+    "there is the one this page shows - pass it to the catalog tools. Keep answers short and concrete.",
+    "For questions about bad dates or quality (coherence, unwrapping, ionosphere, RFI) use frame_qa_drops",
+    "or scan_qa_drops; for granules delivered twice use frame_duplicates or scan_duplicates; then show",
+    "the frames on the map. To look at a flagged pair, qa_drop_images returns its images (and a typical",
+    "pair's); show_browse_image opens one in the viewer and places it on the map.",
+    "For an earthquake or volcano, find it (find_earthquakes / find_volcanoes), then earthquake_frames /",
+    "volcano_frames give the frames over it and the GUNW pairs (coseismic for earthquakes) to look at.",
+  ].join(" ");
+
+  // Tools that act on this page, in the MCP tool shape.
+  const AI_PAGE_TOOLS = [
+    {name: "show_frames_on_map",
+     description: "Highlight frames on the map (adds them to the selection) and zoom to them.",
+     inputSchema: {type: "object", properties: {
+       frames: {type: "array", items: {type: "string"}, description: "frame_idx or track_frame keys"},
+       color: {type: "string", description: "CSS colour, e.g. #ff5d5d"},
+       only_these: {type: "boolean", description: "hide every other frame"},
+       zoom: {type: "boolean", description: "zoom to them (default true)"}},
+       required: ["frames"]}},
+    {name: "show_browse_image",
+     description: "Open a granule's browse card in the viewer on a layer and place the image on the map " +
+       "(browse, or a GUNW QA layer: wrapped, coherence, cc, unwrapped, rewrapped, iono, iono_unc).",
+     inputSchema: {type: "object", properties: {
+       gid: {type: "string", description: "GSLC or GUNW granule name (gid)"},
+       layer: {type: "string", description: "browse (default) or a QA layer"},
+       on_map: {type: "boolean", description: "place it on the map (default true)"}},
+       required: ["gid"]}},
+    {name: "clear_map_selection", description: "Remove all highlighted frames and show every frame again.",
+     inputSchema: {type: "object", properties: {}}},
+    {name: "zoom_to_frames", description: "Zoom the map to frames without highlighting them.",
+     inputSchema: {type: "object", properties: {frames: {type: "array", items: {type: "string"}}}, required: ["frames"]}},
+    {name: "set_view_state",
+     description: "Change what the map shows: product, OPERA switch, filters, colouring, basemap, background, play.",
+     inputSchema: {type: "object", properties: {
+       product: {type: "string", enum: ["gslc", "gunw"]}, opera: {type: "boolean"},
+       track: {type: "string"}, frame: {type: "string"}, id: {type: "string"}, cycle: {type: "string"},
+       start: {type: "string", description: "YYYY-MM-DD"}, end: {type: "string", description: "YYYY-MM-DD"},
+       pass: {type: "string", enum: ["all", "asc", "desc"]}, modes: {type: "string"}, pols: {type: "string"},
+       color: {type: "string", description: "a Color frames by option, e.g. gslc_count, cons_mode, gunw_net"},
+       basemap: {type: "string", enum: ["light", "dark", "sat", "sat2"]},
+       sky: {type: "string", enum: ["theme", "white", "black", "space"]},
+       center: {type: "string", description: "lon,lat"}, zoom: {type: "number"},
+       play: {type: "string", enum: ["spin", "cycles", "time"]}, spin: {type: "boolean"},
+       step_days: {type: "integer"}, cumulative: {type: "boolean"}, gps: {type: "boolean"}}}},
+  ];
+
+  // MCP tools in each provider's tool format.
+  function aiToolsFor(provider, tools){
+    return tools.map(t=> provider === "openai"
+      ? {type: "function", function: {name: t.name, description: t.description || "", parameters: t.inputSchema || {type: "object", properties: {}}}}
+      : {name: t.name, description: t.description || "", input_schema: t.inputSchema || {type: "object", properties: {}}});
+  }
+  // What a tool call hands back to the model: its JSON, capped.
+  function aiResultText(value){
+    const text = typeof value === "string" ? value : JSON.stringify(value);
+    return text.length > AI_RESULT_CHARS ? `${text.slice(0, AI_RESULT_CHARS)}... [truncated, ${text.length} characters]` : text;
+  }
+  // set_view_state arguments as the query string applyUrlState reads.
+  function aiViewQuery(args){
+    const q = new URLSearchParams();
+    Object.entries(args || {}).forEach(([k, v])=>{
+      if (v === null || v === undefined || v === "") return;
+      q.set(k, typeof v === "boolean" ? (v ? "1" : "0") : String(v));
+    });
+    return q;
+  }
+  // A small, safe markdown subset: escaped text, **bold**, `code`, links, lines.
+  function aiMarkdown(text){
+    const esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return esc
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .split(/\n{2,}/).map(p=> `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+  }
+  // A frame of this page by frame_idx or track_frame (34_19, T34_F19).
+  function aiFindFrame(key){
+    const k = String(key).trim().toUpperCase().replace(/^T/, "").replace(/_?F/, "_");
+    return FRAME_DATA.features.find(f=> String(f.properties.frame_idx) === k || String(f.properties.id).toUpperCase() === k);
+  }
+
+  const ai = {provider: "anthropic", history: [], busy: false, stop: false, tools: null, mcpUrl: null, rpcId: 0};
+  const aiEl = id=> document.getElementById(id);
+
+  async function mcpRpc(method, params){
+    const r = await fetch(ai.mcpUrl, {method: "POST",
+      headers: {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
+      body: JSON.stringify({jsonrpc: "2.0", id: ++ai.rpcId, method, params: params || {}})});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || "MCP error");
+    return j.result;
+  }
+  async function aiConnect(){
+    const status = aiEl("ai-status");
+    ai.mcpUrl = `${qaHelper}/mcp`;
+    try {
+      await mcpRpc("initialize", {protocolVersion: "2025-06-18", capabilities: {},
+                                  clientInfo: {name: "nisar_db viewer", version: "1"}});
+      ai.tools = (await mcpRpc("tools/list")).tools;
+      status.className = "ok";
+      status.textContent = `Connected to nisar_db at ${ai.mcpUrl.replace(/^https?:\/\//, "")} (${ai.tools.length} tools)`;
+    } catch (e) {
+      ai.tools = null;
+      status.className = "warn";
+      status.innerHTML = "The nisar_db tools need <code>nisar-db serve</code> running on this machine " +
+        "(<code>pixi run nisar_db-api</code>). <a href='#' id='ai-retry'>Retry</a>";
+      aiEl("ai-retry").onclick = ev=>{ ev.preventDefault(); aiConnect(); };
+    }
+  }
+
+  function aiAdd(kind, html){
+    const el = document.createElement("div");
+    el.className = `ai-msg ${kind}`;
+    el.innerHTML = html;
+    aiEl("ai-log").appendChild(el);
+    aiEl("ai-log").scrollTop = aiEl("ai-log").scrollHeight;
+    return el;
+  }
+  function aiState(){
+    const view = location.pathname.match(/\/view\/([^/?#]+)/);
+    const parts = [`dataset=${view ? view[1] : "published"}`, `product=${product}`, `opera=${operaOn ? "on" : "off"}`,
+                   `frames shown=${shownFeatures.length}`];
+    [["cycle", "f-cycle"], ["track", "f-track"], ["start", "f-date-start"], ["end", "f-date-end"]].forEach(([k, id])=>{
+      const v = document.getElementById(id).value;
+      if (v) parts.push(`${k}=${v}`);
+    });
+    parts.push(`colouring=${document.getElementById("color-by").value}`, `selected=${selected.size}`);
+    return `[map state: ${parts.join(", ")}]`;
+  }
+
+  // Page tools run here; everything else goes to the MCP server.
+  async function aiRunTool(name, args){
+    args = args || {};
+    if (name === "show_frames_on_map" || name === "zoom_to_frames") {
+      const found = [], missing = [];
+      (args.frames || []).forEach(k=>{ const f = aiFindFrame(k); if (f) found.push(f); else missing.push(k); });
+      if (name === "show_frames_on_map") {
+        found.forEach(f=> selectFrame(f, args.color || currentColor));
+        if (args.only_these) document.getElementById("f-selected-only").checked = true;
+        selectionChanged();
+        applyFilters();
+      }
+      if (found.length && args.zoom !== false) {
+        const lons = [], lats = [];
+        const walk = c=>{ if (typeof c[0] === "number") { lons.push(c[0]); lats.push(c[1]); } else c.forEach(walk); };
+        found.forEach(f=> walk(f.geometry.coordinates));
+        const west = lons.filter(x=> x < 0).length >= lons.length / 2;
+        const xs = lons.map(x=> west ? (x > 0 ? x - 360 : x) : (x < 0 ? x + 360 : x));
+        map.fitBounds([[Math.min(...xs), Math.min(...lats)], [Math.max(...xs), Math.max(...lats)]],
+                      {padding: 60, maxZoom: 8, duration: 900});
+      }
+      return {ok: true, result: {shown: found.length, missing: missing.length ? missing : undefined,
+                                 note: missing.length ? "frames not on this page's dataset" : undefined}};
+    }
+    if (name === "show_browse_image") {
+      const out = await showBrowse(args.gid, args.layer, args.on_map !== false);
+      return {ok: out.ok, result: out};
+    }
+    if (name === "clear_map_selection") {
+      selected.clear();
+      document.getElementById("f-selected-only").checked = false;
+      selectionChanged();
+      applyFilters();
+      return {ok: true, result: {cleared: true}};
+    }
+    if (name === "set_view_state") {
+      applyUrlState(aiViewQuery(args));
+      return {ok: true, result: {applied: Object.keys(args), frames_shown: shownFeatures.length}};
+    }
+    const res = await mcpRpc("tools/call", {name, arguments: args});
+    const text = res.structuredContent !== undefined ? JSON.stringify(res.structuredContent)
+      : (res.content || []).filter(c=> c.type === "text").map(c=> c.text).join("\n");
+    const images = (res.content || []).filter(c=> c.type === "image" && c.data);
+    return {ok: !res.isError, result: text, images};
+  }
+
+  // Images a tool returned: shown in the chat, and handed to Claude.
+  function aiShowImages(images){
+    (images || []).forEach(im=>{
+      const el = aiAdd("image", "");
+      const img = document.createElement("img");
+      img.src = `data:${im.mimeType || "image/jpeg"};base64,${im.data}`;
+      img.alt = "tool image";
+      img.onclick = ()=> window.open(img.src, "_blank");
+      el.appendChild(img);
+    });
+  }
+  function aiToolLine(name, args, ok){
+    const brief = JSON.stringify(args || {});
+    aiAdd(ok ? "tool" : "tool err", `${ok ? "&#8627;" : "&#9888;"} ${escHtml(name)}(${escHtml(brief.length > 90 ? brief.slice(0, 90) + "..." : brief)})`);
+  }
+
+  async function aiClient(){
+    const key = aiEl("ai-key").value.trim();
+    if (!key) throw new Error("Paste an API key first; it stays in this tab.");
+    const mod = await import(AI_SDK[ai.provider]);
+    const Client = mod.default;
+    return new Client({apiKey: key, dangerouslyAllowBrowser: true});
+  }
+
+  // One user turn: call the model, run the tools it asks for, repeat.
+  async function aiTurnAnthropic(client, tools){
+    const model = aiEl("ai-model").value.trim() || AI_MODELS.anthropic[0];
+    for (let step = 0; step < AI_MAX_STEPS && !ai.stop; step++) {
+      const params = {model, max_tokens: 16000, system: AI_SYSTEM, tools, messages: ai.history,
+                      output_config: {effort: "medium"}};
+      // Server-side fallback on a declined request; Haiku has none.
+      if (!model.startsWith("claude-haiku")) Object.assign(params, {betas: ["server-side-fallback-2026-07-01"], fallbacks: "default"});
+      const resp = await client.beta.messages.create(params);
+      ai.history.push({role: "assistant", content: resp.content});
+      resp.content.filter(b=> b.type === "text" && b.text.trim()).forEach(b=> aiAdd("assistant", aiMarkdown(b.text)));
+      if (resp.stop_reason === "refusal") { aiAdd("note", "The model declined this request."); return; }
+      if (resp.stop_reason === "max_tokens") { aiAdd("note", "The answer hit its length limit."); return; }
+      if (resp.stop_reason === "pause_turn") continue;
+      const calls = resp.content.filter(b=> b.type === "tool_use");
+      if (!calls.length) return;
+      const results = [];
+      for (const call of calls) {
+        let out;
+        try { out = await aiRunTool(call.name, call.input); } catch (e) { out = {ok: false, result: String(e.message || e)}; }
+        aiToolLine(call.name, call.input, out.ok);
+        aiShowImages(out.images);
+        const content = out.images && out.images.length
+          ? [{type: "text", text: aiResultText(out.result)},
+             ...out.images.map(im=> ({type: "image", source: {type: "base64", media_type: im.mimeType || "image/jpeg", data: im.data}}))]
+          : aiResultText(out.result);
+        results.push({type: "tool_result", tool_use_id: call.id, content, is_error: !out.ok});
+      }
+      ai.history.push({role: "user", content: results});
+    }
+    if (!ai.stop) aiAdd("note", "Stopped after many tool calls; ask again to continue.");
+  }
+  async function aiTurnOpenAI(client, tools){
+    const model = aiEl("ai-model").value.trim() || AI_MODELS.openai[0];
+    for (let step = 0; step < AI_MAX_STEPS && !ai.stop; step++) {
+      const resp = await client.chat.completions.create({model, tools,
+        messages: [{role: "system", content: AI_SYSTEM}, ...ai.history]});
+      const msg = resp.choices[0].message;
+      ai.history.push(msg);
+      if (msg.content && msg.content.trim()) aiAdd("assistant", aiMarkdown(msg.content));
+      if (!msg.tool_calls || !msg.tool_calls.length) return;
+      for (const call of msg.tool_calls) {
+        let args = {}, out;
+        try { args = JSON.parse(call.function.arguments || "{}"); out = await aiRunTool(call.function.name, args); }
+        catch (e) { out = {ok: false, result: String(e.message || e)}; }
+        aiToolLine(call.function.name, args, out.ok);
+        aiShowImages(out.images);
+        // OpenAI tool messages take text only; the images still show in the chat.
+        const seen = out.images && out.images.length ? ` [${out.images.length} image(s) shown to the user]` : "";
+        ai.history.push({role: "tool", tool_call_id: call.id, content: aiResultText(out.result) + seen});
+      }
+    }
+    if (!ai.stop) aiAdd("note", "Stopped after many tool calls; ask again to continue.");
+  }
+
+  async function aiSend(text){
+    if (ai.busy || !text.trim()) return;
+    if (!ai.tools) await aiConnect();
+    if (!ai.tools) { aiAdd("error", "The nisar_db tools are not reachable; start <code>nisar-db serve</code> and retry."); return; }
+    aiAdd("user", escHtml(text));
+    const thinking = aiAdd("note", "Thinking...");
+    ai.busy = true; ai.stop = false;
+    aiEl("ai-send").textContent = "Stop";
+    try {
+      const client = await aiClient();
+      const tools = aiToolsFor(ai.provider, [...ai.tools, ...AI_PAGE_TOOLS]);
+      ai.history.push({role: "user", content: `${aiState()}\n${text}`});
+      thinking.remove();
+      await (ai.provider === "openai" ? aiTurnOpenAI(client, tools) : aiTurnAnthropic(client, tools));
+    } catch (e) {
+      thinking.remove();
+      const status = e && e.status ? ` (HTTP ${e.status})` : "";
+      aiAdd("error", escHtml(`${e && e.message ? e.message : e}${status}`));
+      // Keep the history valid: drop a user turn the model never answered.
+      while (ai.history.length && ai.history[ai.history.length - 1].role === "user"
+             && typeof ai.history[ai.history.length - 1].content === "string") ai.history.pop();
+    } finally {
+      ai.busy = false;
+      aiEl("ai-send").textContent = "Send";
+    }
+  }
+
+  // Keys stay in this tab only; a store that refuses (private mode) is fine.
+  const aiKeyName = ()=> `nisar-ai-key-${ai.provider}`;
+  function aiLoadSetup(){
+    let key = "";
+    try { key = sessionStorage.getItem(aiKeyName()) || ""; } catch (e) { key = ""; }
+    aiEl("ai-key").value = key;
+    aiEl("ai-models").innerHTML = AI_MODELS[ai.provider].map(m=> `<option value="${m}">`).join("");
+    aiEl("ai-model").value = AI_MODELS[ai.provider][0];
+    aiEl("ai-key").placeholder = `${ai.provider === "openai" ? "OpenAI" : "Anthropic"} API key (kept in this tab only)`;
+  }
+  aiEl("ai-key").addEventListener("change", ()=>{
+    try { sessionStorage.setItem(aiKeyName(), aiEl("ai-key").value.trim()); } catch (e) { /* this tab only */ }
+  });
+  aiEl("ai-forget").addEventListener("click", ()=>{
+    try { sessionStorage.removeItem(aiKeyName()); } catch (e) { /* nothing kept */ }
+    aiEl("ai-key").value = "";
+  });
+  aiEl("ai-provider").addEventListener("change", e=>{
+    ai.provider = e.target.value;
+    ai.history = [];
+    aiEl("ai-log").innerHTML = "";
+    aiLoadSetup();
+  });
+  aiEl("ai-clear").addEventListener("click", ()=>{ ai.history = []; aiEl("ai-log").innerHTML = ""; });
+  aiEl("ai-form").addEventListener("submit", ev=>{
+    ev.preventDefault();
+    if (ai.busy) { ai.stop = true; return; }
+    const text = aiEl("ai-input").value;
+    aiEl("ai-input").value = "";
+    aiSend(text);
+  });
+  aiEl("ai-input").addEventListener("keydown", ev=>{
+    if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); aiEl("ai-form").requestSubmit(); }
+  });
+  function aiOpen(open){
+    aiEl("ai-panel").hidden = !open;
+    aiEl("ai-btn").classList.toggle("active", open);
+    aiEl("ai-btn").setAttribute("aria-expanded", String(open));
+    if (open) {
+      if (!ai.tools) aiConnect();
+      if (!aiEl("ai-log").children.length) aiAdd("note",
+        "Ask about the NISAR frames - acquisitions, interferograms, cycles, blackouts, consistent modes. " +
+        "I can also show what I find on the map.");
+      aiEl("ai-input").focus();
+    }
+  }
+  aiEl("ai-btn").addEventListener("click", ()=> aiOpen(aiEl("ai-panel").hidden));
+  aiEl("ai-close").addEventListener("click", ()=> aiOpen(false));
+  aiLoadSetup();
 
   renderSelectedList();
 })();

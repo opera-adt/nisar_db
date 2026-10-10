@@ -231,7 +231,7 @@ def test_stdio_server(tmp_path, viewer_page):
             return len(tools.tools), json.loads(res.content[0].text)
 
     n_tools, frame = asyncio.run(session())
-    assert n_tools == 13 and frame["id"] == "34_19"
+    assert n_tools == 42 and frame["id"] == "34_19"
 
 
 def test_viewer_links_point_where_clients_reach_the_server():
@@ -243,3 +243,17 @@ def test_viewer_links_point_where_clients_reach_the_server():
         viewer_url(Settings.for_mode("shared", public_url="https://x.org/nisar"))
         == "https://x.org/nisar"
     )
+
+
+@pytest.mark.parametrize(
+    ("origin", "status"),
+    [("https://opera-adt.github.io", 200), ("https://evil.example", 403)],
+)
+def test_local_mcp_accepts_the_published_viewer_only(local_rpc, origin, status):
+    """The published page's assistant reaches a local /mcp; other sites don't."""
+    r = local_rpc.client.post(
+        "/mcp",
+        headers={**HEADERS, "Origin": origin},
+        json={"jsonrpc": "2.0", "id": 99, "method": "tools/list", "params": {}},
+    )
+    assert r.status_code == status

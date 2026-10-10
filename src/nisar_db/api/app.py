@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,7 +11,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from nisar_db.api import helper as helper_routes
-from nisar_db.api import routes, viewer
+from nisar_db.api import routes, routes_more, viewer
 from nisar_db.api.jobs import Jobs, Launcher
 from nisar_db.api.security import RateLimiter
 from nisar_db.api.settings import HEAVY_JOBS, Settings
@@ -49,7 +50,8 @@ class PrivateNetworkAccess:
 
         async def send_with_header(message: Message) -> None:
             if message["type"] == "http.response.start":
-                MutableHeaders(scope=message).append(
+                # A newer Starlette's CORS answer already carries it.
+                MutableHeaders(scope=message).setdefault(
                     "Access-Control-Allow-Private-Network", "true"
                 )
             await send(message)
@@ -108,17 +110,22 @@ def create_app(
         app.state.helper, app.state.helper_error = None, str(exc)
 
     if settings.cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=list(settings.cors_origins),
-            allow_methods=["GET", "POST", "DELETE"],
-            allow_headers=["*"],
-            allow_credentials="*" not in settings.cors_origins,
-        )
+        cors: dict = {
+            "allow_origins": list(settings.cors_origins),
+            "allow_methods": ["GET", "POST", "DELETE"],
+            "allow_headers": ["*"],
+            "allow_credentials": "*" not in settings.cors_origins,
+        }
+        # A Starlette that knows private-network preflights refuses them (400)
+        # unless told otherwise; older ones ignore the request header.
+        if "allow_private_network" in inspect.signature(CORSMiddleware).parameters:
+            cors["allow_private_network"] = not settings.shared
+        app.add_middleware(CORSMiddleware, **cors)
     if not settings.shared:
         # Outermost, so CORS preflight answers carry it too.
         app.add_middleware(PrivateNetworkAccess)
     app.include_router(routes.router)
+    app.include_router(routes_more.router)
     app.include_router(viewer.router)
     app.include_router(helper_routes.router)
     try:

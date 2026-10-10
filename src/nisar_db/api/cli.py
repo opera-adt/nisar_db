@@ -90,7 +90,7 @@ import click
     "--allow-job",
     "allow_jobs",
     multiple=True,
-    type=click.Choice(["download", "build-s3-catalog"]),
+    type=click.Choice(["download", "build-s3-catalog", "build-disp-assets"]),
     help="Shared mode: also run this heavy job kind (repeatable).",
 )
 def serve(

@@ -25,7 +25,7 @@ def _app_js() -> str:
 
 def _url_state_names(js: str) -> set[str]:
     body = js[
-        js.index("function applyUrlState()") : js.index(
+        js.index("function applyUrlState(") : js.index(
             'map.on("load", ()=> setTimeout(applyUrlState'
         )
     ]

@@ -11,6 +11,7 @@ from nisar_db.api.cli import serve as serve_cmd
 from nisar_db.api.mcp_cli import mcp as mcp_cmd
 from nisar_db.blackout import main as append_blackout_dates_cmd
 from nisar_db.consistent_gslc import main as create_consistent_cmd
+from nisar_db.disp_assets import main as build_disp_assets_cmd
 from nisar_db.frame_to_bound import main as create_frame_to_bound_cmd
 from nisar_db.gslc_catalog import main as create_catalog_cmd
 from nisar_db.processing_mode import main as label_processing_mode_cmd
@@ -58,6 +59,7 @@ cli_app.add_command(create_reference_dates_cmd, name="create-reference-dates")
 cli_app.add_command(label_processing_mode_cmd, name="label-processing-mode")
 cli_app.add_command(serve_cmd, name="serve")
 cli_app.add_command(mcp_cmd, name="mcp")
+cli_app.add_command(build_disp_assets_cmd, name="build-disp-assets")
 
 # ``create-catalog`` was renamed to disambiguate it from ``create-nisar-catalog``.
 cli_app.add_command(

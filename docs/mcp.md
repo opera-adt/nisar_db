@@ -8,6 +8,14 @@ Desktop, can answer questions about the NISAR frames by calling it:
 - "List the GUNW pairs over frame 34_19 since June."
 - "When is frame 28533 blacked out?"
 - "Search CMR for all GSLC granules on track 163 and give me the CSV."
+- "Which dates have coherence drops on track 13?"
+- "Which frames have duplicate granules, and which should I keep?"
+- "Why did coherence drop on frame 13_70? Show me the flagged pair next to a typical one."
+- "Find the biggest earthquake in Mexico in July 2026 and show me a coseismic interferogram on the map."
+- "Which frames cover Augustine volcano, and what are the latest pairs there?"
+- "When will NISAR next image Los Angeles, and which frames are ready for DISP?"
+- "Which frames on track 13 missed cycles or have a broken GUNW network?"
+- "Export the frames over my area as KML."
 
 It can also give you a link that opens the viewer on what it found.
 
@@ -87,6 +95,27 @@ claude mcp add --transport http nisar-db https://nisar-db.example.org/mcp \
 | `list_cycles` | Every cycle with its dates and frame count |
 | `summarize` | Consistent-mode and rollout counts over filtered frames |
 | `viewer_link` | A URL that opens the viewer in a given state |
+| `list_qa_metrics` | The QA metrics, their products and which way is bad |
+| `frame_qa_drops` | A frame's pairs (or acquisitions) whose QA metric drops from the stack median, and the dates behind them |
+| `scan_qa_drops` | The same over many frames, with the dates flagged in several frames |
+| `frame_duplicates` | A frame's duplicate granules, why they repeat, and which to keep |
+| `scan_duplicates` | The frames that hold duplicates, with totals by reason |
+| `browse_image` | A granule's browse image or QA layer (coherence, connected components, ionosphere, ...), returned as an image the assistant can look at |
+| `browse_on_map` | A viewer link that opens the image on the map, plus its URL and corners for any other map |
+| `qa_drop_images` | QA-drop check plus images: the worst flagged pairs and a typical pair, on the layer that shows the metric |
+| `find_earthquakes` | USGS earthquakes by box or circle, dates and magnitude |
+| `earthquake_frames` | The frames over an epicentre and their coseismic GUNW pairs (optionally with the best pair's browse image) |
+| `find_volcanoes` | Smithsonian GVP Holocene volcanoes by name, box, country or last eruption |
+| `volcano_frames` | The frames over a volcano and their GUNW pairs in a date window |
+| `frame_coverage`, `scan_coverage` | Missed cycles, long gaps, stale frames |
+| `frame_network`, `scan_network` | GUNW network health: breaks and disconnected frames |
+| `next_passes` | Next expected passes for a frame or over a point |
+| `frame_disp_readiness`, `scan_disp_readiness` | Progress towards DISP-NISAR batches |
+| `frames_in_area` | The frames over a box or GeoJSON polygon, with coverage and status |
+| `event_qa`, `earthquake_compare` | A QA metric before, across and after an event |
+| `export_frames`, `export_entries` | CSV / GeoJSON / KML exports (or a download link) |
+| `list_disp_assets`, `disp_consistent`, `disp_blackout_dates`, `disp_reference_dates` | The DISP-NISAR assets and one frame's entries |
+| `build_disp_assets` | Start a fresh DISP-NISAR asset build from CMR (needs the jobs scope) |
 | `list_job_kinds` | The `nisar-db` commands that run as jobs, with their parameters |
 | `start_job` | Start one (CMR search, consistent-GSLC, blackout or reference dates, catalogs, ...) |
 | `job_status` | A job's state, outputs and last log lines, or the recent jobs |

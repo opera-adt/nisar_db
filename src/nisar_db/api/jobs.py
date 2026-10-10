@@ -127,6 +127,24 @@ class DownloadParams(_Params):
     timeout: int = 60
 
 
+class DispAssetsParams(_Params):
+    """``nisar-db build-disp-assets``: the DISP-NISAR release assets (heavy)."""
+
+    max_results: int = Field(0, ge=0, description="cap on CMR results; 0 = all")
+    blackout_file: str | None = Field(
+        None, description="blackout JSON (default: the repo's)"
+    )
+    snow_geojson: str | None = Field(
+        None, description="derive the blackout dates from this instead"
+    )
+    previous_consistent: str | None = Field(
+        None, description="previous consistent-GSLC JSON"
+    )
+    trackframe_gpkg: str | None = Field(
+        None, description="reuse a TrackFrame GeoPackage"
+    )
+
+
 class S3CatalogParams(_Params):
     """``nisar-db build-s3-catalog`` -> ``catalog.parquet`` (heavy)."""
 
@@ -305,6 +323,19 @@ def _download(p: DownloadParams, _r: Callable[[str], str]) -> list[str]:
     ]
 
 
+def _disp_assets(p: DispAssetsParams, r: Callable[[str], str]) -> list[str]:
+    a = ["build-disp-assets", "--out-dir", ".", "--max-results", str(p.max_results)]
+    for flag, v in (
+        ("--blackout-file", p.blackout_file),
+        ("--snow-geojson", p.snow_geojson),
+        ("--previous-consistent", p.previous_consistent),
+        ("--trackframe-gpkg", p.trackframe_gpkg),
+    ):
+        if v:
+            a += [flag, r(v)]
+    return a
+
+
 def _s3_catalog(p: S3CatalogParams, _r: Callable[[str], str]) -> list[str]:
     a = [
         "build-s3-catalog",
@@ -397,6 +428,14 @@ KINDS: dict[str, JobKind] = {
             _download,
             ("*.h5",),
             "Download granules (heavy)",
+        ),
+        JobKind(
+            "build-disp-assets",
+            DispAssetsParams,
+            ("blackout_file", "snow_geojson", "previous_consistent", "trackframe_gpkg"),
+            _disp_assets,
+            ("opera-nisar-disp-*", "gslc_catalog.csv"),
+            "DISP-NISAR release assets from CMR (heavy)",
         ),
         JobKind(
             "build-s3-catalog",

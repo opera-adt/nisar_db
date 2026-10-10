@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -108,6 +109,7 @@ class FrameStore:
         self.views_dir = views_dir
         self._cache: dict[str, Dataset] = {}
         self._lock = threading.Lock()
+        self._volcanoes: list[dict] | None = None
 
     def paths(self) -> dict[str, Path]:
         """Return every dataset id with its page, the published one first."""
@@ -140,6 +142,22 @@ class FrameStore:
             return cached.summary()
         meta = _embedded(path.read_text(), "META")
         return summarize_meta(dataset_id, path, meta, meta.get("n_frames"))
+
+    def volcanoes(self) -> list[dict]:
+        """Return the GVP volcano list the published page embeds (empty if none)."""
+        if self._volcanoes is None:
+            from nisar_db.events import volcano_list
+
+            feats: list[dict] = []
+            if self.published is not None and self.published.exists():
+                try:
+                    feats = _embedded(self.published.read_text(), "VOLCANO_DATA")[
+                        "features"
+                    ]
+                except (ValueError, KeyError):
+                    feats = []
+            self._volcanoes = volcano_list(feats)
+        return self._volcanoes
 
     def get(self, dataset_id: str = "published") -> Dataset:
         """Return a dataset, parsing (or re-parsing) its page when needed.
@@ -455,3 +473,240 @@ def blackout(f: dict) -> dict:
         ),
         "reference_dates": as_list(p.get("reference_dates")),
     }
+
+
+def qa_drops_scan(
+    ds: Dataset,
+    query: FrameQuery,
+    metric: str,
+    *,
+    limit: int = 50,
+    **opts: Any,
+) -> dict:
+    """Run :func:`nisar_db.qa_drops.find_drops` over every frame ``query`` keeps.
+
+    Each frame's stack is the granules or pairs the query's entry filters
+    (cycle, dates, modes, polarizations) leave. Frames come back worst first
+    (most flagged dates, then pairs); ``dates`` counts in how many frames each
+    date was flagged, which picks out events wider than one frame.
+    """
+    from nisar_db.qa_drops import find_drops
+
+    frames, by_date = [], defaultdict(list)
+    judged = 0
+    for f in select(ds, query):
+        p = f["properties"]
+        report = find_drops(
+            query.entries(p),
+            metric,
+            product=query.product,  # type: ignore[arg-type]
+            granules=p.get("granules"),
+            **opts,
+        )
+        if report["status"] != "ok":
+            continue
+        judged += 1
+        if not report["flagged"]:
+            continue
+        for d in report["dates"]:
+            by_date[d["date"]].append(p["id"])
+        frames.append(
+            {
+                "id": p["id"],
+                "frame_idx": p["frame_idx"],
+                "n": report["n"],
+                "median": report["median"],
+                "n_flagged": len(report["flagged"]),
+                "dates": [d["date"] for d in report["dates"]],
+                "worst": report["flagged"][0],
+            }
+        )
+    frames.sort(key=lambda r: (-len(r["dates"]), -r["n_flagged"], -r["worst"]["score"]))
+    dates = sorted(
+        (
+            {"date": d, "n_frames": len(ids), "frames": ids[:20]}
+            for d, ids in by_date.items()
+        ),
+        key=lambda r: (-r["n_frames"], r["date"]),
+    )
+    return {
+        "metric": metric,
+        "product": query.product,
+        "frames_judged": judged,
+        "frames_flagged": len(frames),
+        "dates": dates[:limit],
+        "frames": frames[:limit],
+    }
+
+
+def duplicates_scan(ds: Dataset, query: FrameQuery, *, limit: int = 50) -> dict:
+    """List the frames ``query`` keeps that hold duplicate granules (or pairs).
+
+    The duplicate test runs on what the query's entry filters (cycle, dates,
+    modes, polarizations) leave. Frames come back with the most extra granules
+    first, with totals by reason (reprocessed, split, repeat).
+    """
+    from nisar_db.duplicates import duplicate_groups, summarize
+
+    frames: list[dict] = []
+    n_groups = n_extra = judged = 0
+    by_reason: dict[str, int] = defaultdict(int)
+    for f in select(ds, query):
+        p = f["properties"]
+        judged += 1
+        groups = duplicate_groups(query.entries(p), query.product)  # type: ignore[arg-type]
+        if not groups:
+            continue
+        s = summarize(groups)
+        n_groups += s["groups"]
+        n_extra += s["extra_granules"]
+        for reason, n in s["by_reason"].items():
+            by_reason[reason] += n
+        frames.append(
+            {
+                "id": p["id"],
+                "frame_idx": p["frame_idx"],
+                **s,
+                "dates": sorted({str(g.get("date") or g.get("ref")) for g in groups}),
+            }
+        )
+    frames.sort(key=lambda r: (-r["extra_granules"], r["id"]))
+    return {
+        "product": query.product,
+        "frames_judged": judged,
+        "frames_with_duplicates": len(frames),
+        "groups": n_groups,
+        "extra_granules": n_extra,
+        "by_reason": dict(sorted(by_reason.items())),
+        "frames": frames[:limit],
+    }
+
+
+def _pair_links(pair: dict, base: str | None, dataset: str) -> dict:
+    """Return a pair's summary with links to its browse image, overlay and viewer."""
+    from urllib.parse import urlencode
+
+    out = {
+        k: pair.get(k)
+        for k in ("gid", "ref", "sec", "dt", "mode", "pol")
+        if pair.get(k) is not None
+    }
+    qa = pair.get("qa") or {}
+    if qa:
+        out["coherence_median"] = qa.get("cm")
+        out["valid_pct"] = qa.get("v")
+    if base and pair.get("gid"):
+        gid = pair["gid"]
+        path = "/" if dataset == "published" else f"/view/{dataset}"
+        out["browse_url"] = f"{base}/api/v1/browse/{gid}"
+        out["overlay_url"] = f"{base}/api/v1/browse/{gid}/overlay?dataset={dataset}"
+        out["viewer_url"] = f"{base}{path}?" + urlencode(
+            {"product": "gunw", "browse": gid, "browse_map": 1}
+        )
+    return out
+
+
+def earthquake_report(
+    ds: Dataset,
+    quake: dict,
+    *,
+    radius_km: float = 0.0,
+    max_dt: int | None = None,
+    n_pairs: int = 3,
+    base: str | None = None,
+) -> dict:
+    """Return the frames over an earthquake and, in each, its coseismic GUNW pairs.
+
+    Pairs come shortest temporal baseline first; the GSLC acquisitions just
+    before and after the event are listed too, for when no pair spans it yet.
+    """
+    from urllib.parse import urlencode
+
+    from nisar_db.events import acquisitions_around, coseismic_pairs, frames_at
+
+    frames = []
+    for f in frames_at(ds.features, quake["lon"], quake["lat"], radius_km):
+        p = f["properties"]
+        pairs = coseismic_pairs(p.get("gunw_ifgs") or [], quake["time"], max_dt=max_dt)
+        frames.append(
+            {
+                "id": p["id"],
+                "frame_idx": p["frame_idx"],
+                "passDirection": p.get("passDirection"),
+                "n_coseismic": len(pairs),
+                "coseismic_pairs": [
+                    _pair_links(x, base, ds.id) for x in pairs[: max(0, n_pairs)]
+                ],
+                "gslc": acquisitions_around(p.get("granules") or [], quake["time"]),
+            }
+        )
+    frames.sort(key=lambda r: (-r["n_coseismic"], r["id"]))
+    out: dict[str, Any] = {
+        "event": quake,
+        "dataset": ds.id,
+        "frames": frames,
+        "status": (
+            "coseismic pairs found"
+            if any(r["n_coseismic"] for r in frames)
+            else (
+                "no GUNW pair spans the event in this dataset"
+                if frames
+                else "no frame of this dataset covers the epicentre"
+            )
+        ),
+    }
+    if base:
+        path = "/" if ds.id == "published" else f"/view/{ds.id}"
+        out["viewer_url"] = f"{base}{path}?" + urlencode(
+            {"product": "gunw", "center": f"{quake['lon']},{quake['lat']}", "zoom": 7}
+        )
+    return out
+
+
+def volcano_report(
+    ds: Dataset,
+    volcano: dict,
+    *,
+    radius_km: float = 10.0,
+    start: date | None = None,
+    end: date | None = None,
+    n_pairs: int = 5,
+    base: str | None = None,
+) -> dict:
+    """Return the frames over a volcano and their GUNW pairs in a date window."""
+    from urllib.parse import urlencode
+
+    from nisar_db.events import frames_at
+
+    q = FrameQuery(product="gunw", start=start, end=end)
+    frames = []
+    for f in frames_at(ds.features, volcano["lon"], volcano["lat"], radius_km):
+        p = f["properties"]
+        pairs = sorted(
+            q.entries(p),
+            key=lambda x: (str(x.get("sec")), -(x.get("dt") or 0)),
+            reverse=True,
+        )
+        frames.append(
+            {
+                "id": p["id"],
+                "frame_idx": p["frame_idx"],
+                "passDirection": p.get("passDirection"),
+                "n_pairs": len(pairs),
+                "pairs": [
+                    _pair_links(x, base, ds.id) for x in pairs[: max(0, n_pairs)]
+                ],
+            }
+        )
+    frames.sort(key=lambda r: (-r["n_pairs"], r["id"]))
+    out: dict[str, Any] = {"volcano": volcano, "dataset": ds.id, "frames": frames}
+    if base:
+        path = "/" if ds.id == "published" else f"/view/{ds.id}"
+        out["viewer_url"] = f"{base}{path}?" + urlencode(
+            {
+                "product": "gunw",
+                "center": f"{volcano['lon']},{volcano['lat']}",
+                "zoom": 8,
+            }
+        )
+    return out

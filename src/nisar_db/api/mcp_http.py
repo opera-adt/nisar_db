@@ -20,6 +20,9 @@ from nisar_db.api.mcp_tools import CALLER, McpContext, build_mcp
 from nisar_db.api.security import Caller, match_key, presented_key
 from nisar_db.api.settings import Settings
 
+#: Where the published viewer lives; its assistant calls a local `/mcp`.
+PUBLISHED_VIEWER_ORIGIN = "https://opera-adt.github.io"
+
 
 def viewer_url(settings: Settings) -> str:
     """Return the base URL viewer links point to."""
@@ -65,7 +68,9 @@ def mount_mcp(app: FastAPI) -> None:
     state = app.state
     settings: Settings = state.settings
     server = build_mcp(
-        McpContext(settings, state.store, state.jobs, viewer_url(settings))
+        McpContext(
+            settings, state.store, state.jobs, viewer_url(settings), state.helper
+        )
     )
     # Local mode keeps the SDK's DNS-rebinding check (a web page must not reach
     # a 127.0.0.1 server through a hostile name); a shared service is reached
@@ -75,7 +80,12 @@ def mount_mcp(app: FastAPI) -> None:
         if settings.shared
         else TransportSecuritySettings(
             allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
-            allowed_origins=["http://127.0.0.1:*", "http://localhost:*"],
+            # The published viewer calls a local server's tools too.
+            allowed_origins=[
+                "http://127.0.0.1:*",
+                "http://localhost:*",
+                PUBLISHED_VIEWER_ORIGIN,
+            ],
         )
     )
     mcp_app = server.streamable_http_app(

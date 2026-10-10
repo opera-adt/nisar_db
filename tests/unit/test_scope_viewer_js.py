@@ -811,3 +811,75 @@ def test_in_area_wraps_round_the_antimeridian() -> None:
         " inArea(150, 52, a), inArea(-80, 80, a)];",
     )
     assert result == [True, True, False, False]
+
+
+MCP_TOOL = {
+    "name": "find_frames",
+    "description": "Find frames.",
+    "inputSchema": {"type": "object", "properties": {"cycle": {"type": "string"}}},
+}
+
+
+def test_ai_tools_take_each_providers_shape() -> None:
+    result = run_js(
+        ["aiToolsFor"],
+        f"const t = [{json.dumps(MCP_TOOL)}];"
+        " return [aiToolsFor('anthropic', t)[0], aiToolsFor('openai', t)[0]];",
+    )
+    claude, openai = result
+    assert claude == {
+        "name": "find_frames",
+        "description": "Find frames.",
+        "input_schema": MCP_TOOL["inputSchema"],
+    }
+    assert openai == {
+        "type": "function",
+        "function": {
+            "name": "find_frames",
+            "description": "Find frames.",
+            "parameters": MCP_TOOL["inputSchema"],
+        },
+    }
+
+
+def test_ai_result_text_is_capped() -> None:
+    result = run_js(
+        ["aiResultText"],
+        "globalThis.AI_RESULT_CHARS = 10;"
+        " return [aiResultText({a: 1}), aiResultText('x'.repeat(25))];",
+    )
+    assert result == ['{"a":1}', "xxxxxxxxxx... [truncated, 25 characters]"]
+
+
+def test_ai_view_query_is_what_apply_url_state_reads() -> None:
+    query = run_js(
+        ["aiViewQuery"],
+        "return aiViewQuery({product: 'gunw', opera: false, gps: true,"
+        " cycle: '20-25', zoom: 3, color: null, track: ''}).toString();",
+    )
+    assert query == "product=gunw&opera=0&gps=1&cycle=20-25&zoom=3"
+
+
+def test_ai_markdown_escapes_html_and_links_only_http() -> None:
+    html = run_js(
+        ["aiMarkdown"],
+        "return aiMarkdown('**955** frames <script>x</script> `c`\\n"
+        "[map](https://x.org/v?a=1) [bad](javascript:alert(1))');",
+    )
+    assert "<script>" not in html and "&lt;script&gt;" in html
+    assert "<b>955</b>" in html and "<code>c</code>" in html
+    assert (
+        '<a href="https://x.org/v?a=1" target="_blank" rel="noopener">map</a>' in html
+    )
+    assert 'href="javascript' not in html
+
+
+def test_ai_finds_frames_by_index_or_track_frame() -> None:
+    frames = [{"properties": {"id": "34_19", "frame_idx": 5826}}]
+    result = run_js(
+        ["aiFindFrame"],
+        "return ['5826', '34_19', 'T34_F19', 't34_f19', '1_1']"
+        ".map(k => (aiFindFrame(k) || {properties: {}}).properties.frame_idx || null);",
+        frames,
+    )
+    assert result == [5826, 5826, 5826, 5826, None]

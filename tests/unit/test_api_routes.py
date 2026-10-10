@@ -283,3 +283,20 @@ def test_local_mode_answers_private_network_preflights(local):
 
 def test_shared_mode_does_not_open_the_private_network(shared):
     assert "access-control-allow-private-network" not in shared.get("/health").headers
+
+
+def test_local_preflight_from_the_published_page_is_allowed(local):
+    """Regression: Starlette's CORS refused (400) a preflight asking for
+    private-network access, so the published viewer could not reach a local
+    server's /mcp or QA routes."""
+    r = local.options(
+        "/mcp",
+        headers={
+            "Origin": "https://opera-adt.github.io",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+            "Access-Control-Request-Private-Network": "true",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers["access-control-allow-private-network"] == "true"

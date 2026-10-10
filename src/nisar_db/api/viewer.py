@@ -50,6 +50,12 @@ VIEWER_PARAMS: dict[str, str] = {
     ),
     "gps": "1: show the UNR GPS sites",
     "popup": "0: turn the frame popup off",
+    "browse": "a GSLC / GUNW granule name: open its browse image",
+    "browse_layer": (
+        "browse (default) or a GUNW QA layer: wrapped, coherence, cc, "
+        "unwrapped, iono, ..."
+    ),
+    "browse_map": "1: place that image on the map",
 }
 
 _GZIP: OrderedDict[str, bytes] = OrderedDict()
@@ -107,6 +113,9 @@ def link(
     fullscreen: bool | None = None,
     gps: bool | None = None,
     popup: bool | None = None,
+    browse: str | None = None,
+    browse_layer: str | None = None,
+    browse_map: bool | None = None,
     _: Caller = Depends(READ),
 ) -> dict[str, str]:
     """Return a URL that opens the viewer in the state these parameters describe."""
@@ -144,6 +153,9 @@ def link(
         "fullscreen": fullscreen,
         "gps": gps,
         "popup": popup,
+        "browse": browse,
+        "browse_layer": browse_layer,
+        "browse_map": browse_map,
     }
     query = {
         k: (
