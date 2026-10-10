@@ -1030,6 +1030,14 @@ Desktop, can answer questions about the NISAR frames by calling it:</p>
 <li>"List the GUNW pairs over frame 34_19 since June."</li>
 <li>"When is frame 28533 blacked out?"</li>
 <li>"Search CMR for all GSLC granules on track 163 and give me the CSV."</li>
+<li>"Which dates have coherence drops on track 13?"</li>
+<li>"Which frames have duplicate granules, and which should I keep?"</li>
+<li>"Why did coherence drop on frame 13_70? Show me the flagged pair next to a typical one."</li>
+<li>"Find the biggest earthquake in Mexico in July 2026 and show me a coseismic interferogram on the map."</li>
+<li>"Which frames cover Augustine volcano, and what are the latest pairs there?"</li>
+<li>"When will NISAR next image Los Angeles, and which frames are ready for DISP?"</li>
+<li>"Which frames on track 13 missed cycles or have a broken GUNW network?"</li>
+<li>"Export the frames over my area as KML."</li>
 </ul>
 <p>It can also give you a link that opens the viewer on what it found.</p>
 <p>The tools answer from the same frames as the <a href="api.html">REST API</a> and the
@@ -1140,6 +1148,90 @@ Config), using absolute paths:</p>
 <tr>
 <td><code>viewer_link</code></td>
 <td>A URL that opens the viewer in a given state</td>
+</tr>
+<tr>
+<td><code>list_qa_metrics</code></td>
+<td>The QA metrics, their products and which way is bad</td>
+</tr>
+<tr>
+<td><code>frame_qa_drops</code></td>
+<td>A frame's pairs (or acquisitions) whose QA metric drops from the stack median, and the dates behind them</td>
+</tr>
+<tr>
+<td><code>scan_qa_drops</code></td>
+<td>The same over many frames, with the dates flagged in several frames</td>
+</tr>
+<tr>
+<td><code>frame_duplicates</code></td>
+<td>A frame's duplicate granules, why they repeat, and which to keep</td>
+</tr>
+<tr>
+<td><code>scan_duplicates</code></td>
+<td>The frames that hold duplicates, with totals by reason</td>
+</tr>
+<tr>
+<td><code>browse_image</code></td>
+<td>A granule's browse image or QA layer (coherence, connected components, ionosphere, ...), returned as an image the assistant can look at</td>
+</tr>
+<tr>
+<td><code>browse_on_map</code></td>
+<td>A viewer link that opens the image on the map, plus its URL and corners for any other map</td>
+</tr>
+<tr>
+<td><code>qa_drop_images</code></td>
+<td>QA-drop check plus images: the worst flagged pairs and a typical pair, on the layer that shows the metric</td>
+</tr>
+<tr>
+<td><code>find_earthquakes</code></td>
+<td>USGS earthquakes by box or circle, dates and magnitude</td>
+</tr>
+<tr>
+<td><code>earthquake_frames</code></td>
+<td>The frames over an epicentre and their coseismic GUNW pairs (optionally with the best pair's browse image)</td>
+</tr>
+<tr>
+<td><code>find_volcanoes</code></td>
+<td>Smithsonian GVP Holocene volcanoes by name, box, country or last eruption</td>
+</tr>
+<tr>
+<td><code>volcano_frames</code></td>
+<td>The frames over a volcano and their GUNW pairs in a date window</td>
+</tr>
+<tr>
+<td><code>frame_coverage</code>, <code>scan_coverage</code></td>
+<td>Missed cycles, long gaps, stale frames</td>
+</tr>
+<tr>
+<td><code>frame_network</code>, <code>scan_network</code></td>
+<td>GUNW network health: breaks and disconnected frames</td>
+</tr>
+<tr>
+<td><code>next_passes</code></td>
+<td>Next expected passes for a frame or over a point</td>
+</tr>
+<tr>
+<td><code>frame_disp_readiness</code>, <code>scan_disp_readiness</code></td>
+<td>Progress towards DISP-NISAR batches</td>
+</tr>
+<tr>
+<td><code>frames_in_area</code></td>
+<td>The frames over a box or GeoJSON polygon, with coverage and status</td>
+</tr>
+<tr>
+<td><code>event_qa</code>, <code>earthquake_compare</code></td>
+<td>A QA metric before, across and after an event</td>
+</tr>
+<tr>
+<td><code>export_frames</code>, <code>export_entries</code></td>
+<td>CSV / GeoJSON / KML exports (or a download link)</td>
+</tr>
+<tr>
+<td><code>list_disp_assets</code>, <code>disp_consistent</code>, <code>disp_blackout_dates</code>, <code>disp_reference_dates</code></td>
+<td>The DISP-NISAR assets and one frame's entries</td>
+</tr>
+<tr>
+<td><code>build_disp_assets</code></td>
+<td>Start a fresh DISP-NISAR asset build from CMR (needs the jobs scope)</td>
 </tr>
 <tr>
 <td><code>list_job_kinds</code></td>

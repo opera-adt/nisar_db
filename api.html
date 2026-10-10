@@ -845,6 +845,61 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#qa-drops-and-duplicates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QA drops and duplicates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browse-images-and-placing-them-on-a-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browse images, and placing them on a map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#earthquakes-and-volcanoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earthquakes and volcanoes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-health-areas-and-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame health, areas and exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disp-nisar-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DISP-NISAR assets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#4-run-a-command-as-a-job" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1070,6 +1125,61 @@
     <span class="md-ellipsis">
       
         3. Query frames
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#qa-drops-and-duplicates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QA drops and duplicates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#browse-images-and-placing-them-on-a-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Browse images, and placing them on a map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#earthquakes-and-volcanoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Earthquakes and volcanoes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frame-health-areas-and-exports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frame health, areas and exports
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#disp-nisar-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DISP-NISAR assets
       
     </span>
   </a>
@@ -1392,6 +1502,184 @@ each listed frame's <code>n_selected</code> counts what is left. Results come in
 <a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># One frame's granules</span>
 <a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">granules</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/frames/34_19/granules"</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"cycle"</span><span class="p">:</span> <span class="s2">"22-24"</span><span class="p">})</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">"items"</span><span class="p">]</span>
 </code></pre></div>
+<h3 id="qa-drops-and-duplicates">QA drops and duplicates<a class="headerlink" href="#qa-drops-and-duplicates" title="Permanent link">&para;</a></h3>
+<p>Two checks run over each frame's stack.</p>
+<p><strong>QA drops</strong> flag the GUNW pairs (or GSLC acquisitions) whose QA metric falls
+far from the stack's median on the metric's bad side, and the dates behind
+them:</p>
+<ul>
+<li><strong>Metrics:</strong> coherence (<code>cm</code>, <code>ca</code>), valid unwrapped and largest region
+  (<code>v</code>, <code>l</code>), connected components (<code>n</code>), ionosphere (<code>im</code>, <code>imd</code>, <code>is</code>,
+  <code>iu</code>) and RFI likelihood (<code>rl</code>, compared on a log scale).
+  <code>GET $API/qa-metrics</code> lists them with which way is bad.</li>
+<li><strong>The test:</strong> a robust z-score, the distance from the median in units of
+  the median absolute deviation (MAD), so one bad pair cannot hide another.
+  Each metric has a smallest meaningful spread, so a stack with almost none,
+  for example one component in every pair, is not flagged for a change of one.</li>
+<li><strong>Temporal baseline:</strong> pairs are compared with pairs of the same baseline
+  when there are enough of them, because coherence falls with time.</li>
+<li><strong>Dates:</strong> a date is flagged when at least <code>min_pairs</code> of its pairs (2), and
+  <code>min_share</code> of them (half), are flagged. A bad acquisition drags down every
+  pair it is in.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/13_70/qa-drops?metric=cm"</span><span class="w">                 </span><span class="c1"># one frame: flagged pairs and dates</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/13_70/qa-drops?metric=v&amp;threshold=4"</span><span class="w">      </span><span class="c1"># stricter</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/qa-drops?metric=cm&amp;track=13"</span><span class="w">                     </span><span class="c1"># many frames; dates flagged in several frames</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/qa-drops?metric=rl&amp;product=gslc"</span><span class="w">                 </span><span class="c1"># GSLC acquisitions by RFI likelihood</span>
+</code></pre></div>
+<p>The scan's <code>dates</code> list counts the frames each date is flagged in. A date
+flagged in many frames points to a wider event, such as ionosphere, processing
+or weather.</p>
+<p><strong>Duplicates</strong> are the same acquisition delivered more than once:</p>
+<ul>
+<li>GSLC granules sharing a date, mode and coverage (the key the catalog's
+  <code>n_unique</code> counts);</li>
+<li>GUNW pairs sharing both dates, mode and coverage.</li>
+</ul>
+<p>Each group gives a reason and the granule to keep (the newest CRID, then the
+highest product counter):</p>
+<ul>
+<li><code>reprocessed</code>: different CRIDs;</li>
+<li><code>split</code>: one acquisition delivered in pieces;</li>
+<li><code>repeat</code>: delivered again.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/12_65/duplicates"</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/duplicates?track=12&amp;start=2026-06-01"</span>
+</code></pre></div>
+<h3 id="browse-images-and-placing-them-on-a-map">Browse images, and placing them on a map<a class="headerlink" href="#browse-images-and-placing-them-on-a-map" title="Permanent link">&para;</a></h3>
+<p>Each granule has a public browse PNG (GSLC backscatter, GUNW unwrapped phase).
+GUNW pairs also have the QA report's layers: <code>wrapped</code>, <code>coherence</code>,
+<code>coherence_wrapped</code>, <code>cc</code> (connected components), <code>unwrapped</code>, <code>rewrapped</code>,
+<code>iono</code> and <code>iono_unc</code>. The QA layers need the server's Earthdata login, and
+the corners need the viewer helper.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-o<span class="w"> </span>b.jpg<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/browse/&lt;gid&gt;"</span><span class="w">                          </span><span class="c1"># public browse, as a JPEG (max_side=768)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>curl<span class="w"> </span>-o<span class="w"> </span>c.jpg<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/browse/&lt;gid&gt;?layer=coherence"</span><span class="w">          </span><span class="c1"># a QA layer</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/browse/&lt;gid&gt;/overlay?layer=coherence"</span><span class="w">           </span><span class="c1"># viewer link + image URL + corners</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/frames/13_70/qa-drops/images?metric=cm&amp;n=2"</span><span class="w">     </span><span class="c1"># worst flagged pairs + a typical one</span>
+</code></pre></div>
+<p><code>/overlay</code> returns:</p>
+<ul>
+<li><code>viewer_url</code>: opens the viewer with the image on the map;</li>
+<li><code>image_url</code>: the image itself;</li>
+<li><code>coordinates</code>: the image's corners as lon/lat (top-left, top-right,
+  bottom-right, bottom-left), ready for a MapLibre <code>image</code> source.</li>
+</ul>
+<p>The public browse is placed by its bounding box, and QA layers by the
+product's four corners. <code>qa-drops/images</code> runs the QA-drop check, then picks the
+worst flagged pairs and the unflagged pair closest to the median. Each comes
+with its image and overlay URLs, on the layer that shows the metric best:
+coherence for <code>cm</code> / <code>ca</code>, <code>cc</code> for <code>v</code> / <code>l</code> / <code>n</code>, <code>iono</code> for the
+ionosphere metrics.</p>
+<h3 id="earthquakes-and-volcanoes">Earthquakes and volcanoes<a class="headerlink" href="#earthquakes-and-volcanoes" title="Permanent link">&para;</a></h3>
+<p>Earthquakes come from the USGS event service, the same feed as the viewer's
+earthquake layer. Volcanoes come from the Smithsonian GVP Holocene list the
+viewer embeds.</p>
+<p>For an earthquake, the API gives:</p>
+<ul>
+<li>the frames over the epicentre, or within <code>radius_km</code> of it;</li>
+<li>each frame's <strong>coseismic</strong> GUNW pairs: reference acquisition before the
+  event, secondary after it, compared by acquisition time from the granule
+  name. Shortest temporal baseline first.</li>
+</ul>
+<p>For a volcano, it gives the frames over it and their pairs in a date window.
+Each pair comes with browse, overlay and viewer links.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/events/earthquakes?bbox=-100,10,-85,20&amp;start=2026-07-01&amp;min_magnitude=6&amp;order=magnitude"</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/events/earthquakes?lon=-118.2&amp;lat=34.0&amp;radius_km=200&amp;start=2026-01-01"</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/events/earthquakes/us7000t1bu/frames?radius_km=50"</span><span class="w">     </span><span class="c1"># frames + coseismic pairs</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/events/volcanoes?name=augustine"</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/events/volcanoes/313010/frames?start=2026-08-01&amp;n_pairs=3"</span>
+</code></pre></div>
+<p>When no pair spans an earthquake yet, the report says so and lists the GSLC
+acquisitions just before and after the event.</p>
+<h3 id="frame-health-areas-and-exports">Frame health, areas and exports<a class="headerlink" href="#frame-health-areas-and-exports" title="Permanent link">&para;</a></h3>
+<p>Several checks are offered for one frame (<code>/frames/{key}/...</code>) or as a scan
+over the filtered frames:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>One frame</th>
+<th>Many frames</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Missed cycles, long gaps, days since the last acquisition</td>
+<td><code>/frames/{key}/coverage</code></td>
+<td><code>/coverage?stale_days=30</code></td>
+</tr>
+<tr>
+<td>GUNW network: pieces, breaks no pair bridges, unpaired acquisitions</td>
+<td><code>/frames/{key}/network</code></td>
+<td><code>/network</code></td>
+</tr>
+<tr>
+<td>Next expected passes (12-day repeat; not the acquisition plan)</td>
+<td><code>/frames/{key}/next-passes</code></td>
+<td><code>/next-passes?lon=&amp;lat=</code></td>
+</tr>
+<tr>
+<td>DISP readiness: usable consistent-mode acquisitions outside blackouts, batches of 15, next batch date</td>
+<td><code>/frames/{key}/disp-readiness</code></td>
+<td><code>/disp-readiness</code></td>
+</tr>
+<tr>
+<td>A QA metric before, across and after an event</td>
+<td><code>/frames/{key}/event-qa?when=</code></td>
+<td><code>/events/earthquakes/{id}/compare</code></td>
+</tr>
+</tbody>
+</table>
+<p>Areas:</p>
+<ul>
+<li><code>GET /aoi?bbox=w,s,e,n</code> takes a box; <code>POST /aoi</code> takes a GeoJSON polygon in
+  the body.</li>
+<li>Each frame comes back with the share of the area it covers, its latest
+  pair, its next pass and its DISP status. <code>covered_share</code> gives the area's
+  total coverage.</li>
+</ul>
+<p>Exports:</p>
+<ul>
+<li><code>/export/frames?format=csv|geojson|kml</code> writes the filtered frames.</li>
+<li><code>/export/entries?product=gunw</code> writes their GUNW pairs (or GSLC granules) as
+  CSV.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/coverage?track=13&amp;stale_days=24"</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/next-passes?lon=-118.2&amp;lat=34.0"</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/aoi"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span>@my_area.geojson
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>curl<span class="w"> </span>-o<span class="w"> </span>frames.kml<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/export/frames?format=kml&amp;track=13"</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>curl<span class="w"> </span>-o<span class="w"> </span>pairs.csv<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/export/entries?product=gunw&amp;track=13&amp;start=2026-06-01"</span>
+</code></pre></div>
+<h3 id="disp-nisar-assets">DISP-NISAR assets<a class="headerlink" href="#disp-nisar-assets" title="Permanent link">&para;</a></h3>
+<p>The DISP-NISAR processing inputs are the consistent-GSLC database, the
+blackout and reference dates, and the frame bounds and geometries. The API
+serves the real asset files, labelled by where they come from:</p>
+<ul>
+<li>the latest GitHub release;</li>
+<li>the newest <code>build-disp-assets</code> job on this server;</li>
+<li>the blackout dates kept in the repo.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/assets"</span><span class="w">                              </span><span class="c1"># all three sources</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>curl<span class="w"> </span>-OJ<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/assets/consistent_gslc"</span><span class="w">          </span><span class="c1"># a local build, else the release</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/consistent/34_19"</span><span class="w">                    </span><span class="c1"># one frame's consistent entry</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/blackout-dates/34_19"</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/reference-dates/34_19"</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/disp/build"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{}'</span><span class="w">   </span><span class="c1"># fresh build (minutes)</span>
+</code></pre></div>
+<p><code>POST /disp/build</code> starts a <code>build-disp-assets</code> job, which runs the release
+workflow's own steps. It is also available as <code>nisar-db build-disp-assets</code>:</p>
+<ol>
+<li>TrackFrame DB;</li>
+<li>frame bounds;</li>
+<li>every GSLC in CMR;</li>
+<li>GSLC catalog;</li>
+<li>blackout dates;</li>
+<li>consistent-GSLC with and without blackouts;</li>
+<li>processing modes;</li>
+<li>reference dates.</li>
+</ol>
+<p>It needs an Earthdata login and, on a shared service, <code>--allow-job
+build-disp-assets</code>.</p>
 <h3 id="4-run-a-command-as-a-job">4. Run a command as a job<a class="headerlink" href="#4-run-a-command-as-a-job" title="Permanent link">&para;</a></h3>
 <p><code>GET $API/jobs/kinds</code> lists every kind with the JSON schema of its parameters,
 and whether this server runs it:</p>
@@ -1457,32 +1745,32 @@ and whether this server runs it:</p>
 </tbody>
 </table>
 <p>Start one, follow it, and fetch its output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">     </span>-d<span class="w"> </span><span class="s1">'{"kind": "search", "params": {"product_type": "GSLC", "track": 163, "frame": 22, "max_results": 0}}'</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># {"id": "search-20261009T142435-1c7af5", "state": "running", "argv": ["search", ...], ...}</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>curl<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="c1"># {"state": "done", "returncode": 0, "outputs": ["results.csv"], "log": [...]}</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>curl<span class="w"> </span>-O<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5/files/results.csv
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">     </span>-d<span class="w"> </span><span class="s1">'{"kind": "search", "params": {"product_type": "GSLC", "track": 163, "frame": 22, "max_results": 0}}'</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="c1"># {"id": "search-20261009T142435-1c7af5", "state": "running", "argv": ["search", ...], ...}</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>curl<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="c1"># {"state": "done", "returncode": 0, "outputs": ["results.csv"], "log": [...]}</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>curl<span class="w"> </span>-O<span class="w"> </span><span class="nv">$API</span>/jobs/search-20261009T142435-1c7af5/files/results.csv
 </code></pre></div>
 <p>Chain jobs by naming an earlier job's output:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="s1">  "kind": "create-reference-dates",</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s1">  "params": {"consistent_json": "job:create-consistent-20261009T150000-ab12cd/consistent.json",</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s1">             "interval": 1.0}}'</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$API</span>/jobs<span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="s1">  "kind": "create-reference-dates",</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="s1">  "params": {"consistent_json": "job:create-consistent-20261009T150000-ab12cd/consistent.json",</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="s1">             "interval": 1.0}}'</span>
 </code></pre></div>
 <p>From Python:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">api</span> <span class="o">=</span> <span class="s2">"http://127.0.0.1:8797/api/v1"</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">job</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>                                          <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"product_type"</span><span class="p">:</span> <span class="s2">"GUNW"</span><span class="p">,</span> <span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="k">while</span> <span class="p">(</span><span class="n">state</span> <span class="o">:=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">())[</span><span class="s2">"state"</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"queued"</span><span class="p">,</span> <span class="s2">"running"</span><span class="p">):</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"state"</span><span class="p">],</span> <span class="n">state</span><span class="p">[</span><span class="s2">"outputs"</span><span class="p">])</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">csv</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">/files/results.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">api</span> <span class="o">=</span> <span class="s2">"http://127.0.0.1:8797/api/v1"</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">job</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>                                          <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"product_type"</span><span class="p">:</span> <span class="s2">"GUNW"</span><span class="p">,</span> <span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="k">while</span> <span class="p">(</span><span class="n">state</span> <span class="o">:=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">())[</span><span class="s2">"state"</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"queued"</span><span class="p">,</span> <span class="s2">"running"</span><span class="p">):</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="nb">print</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"state"</span><span class="p">],</span> <span class="n">state</span><span class="p">[</span><span class="s2">"outputs"</span><span class="p">])</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="n">csv</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs/</span><span class="si">{</span><span class="n">job</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">/files/results.csv"</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
 </code></pre></div>
 <p>Rebuilding the viewer for North America, the globe or a box keeps its own
 route, <code>POST /build</code>, with the payload the viewer's magnifier sends (for
@@ -1492,8 +1780,8 @@ example <code>{"scope": "globe", "flags": true, "qa": true}</code>). Poll it wit
 <h3 id="5-open-the-viewer-in-a-given-state">5. Open the viewer in a given state<a class="headerlink" href="#5-open-the-viewer-in-a-given-state" title="Permanent link">&para;</a></h3>
 <p>The viewer reads its state from the query string when it loads. <code>GET
 $API/viewer/link</code> checks the parameters and returns the URL:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/viewer/link?dataset=globe-20261009T193409&amp;product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1"</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="c1"># {"url": "http://127.0.0.1:8797/view/globe-20261009T193409?product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1", ...}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>curl<span class="w"> </span><span class="s2">"</span><span class="nv">$API</span><span class="s2">/viewer/link?dataset=globe-20261009T193409&amp;product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1"</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1"># {"url": "http://127.0.0.1:8797/view/globe-20261009T193409?product=gunw&amp;cycle=20-25&amp;color=gunw_qa_cm&amp;sky=space&amp;play=spin&amp;fullscreen=1", ...}</span>
 </code></pre></div>
 <table>
 <thead>
@@ -1555,6 +1843,10 @@ $API/viewer/link</code> checks the parameters and returns the URL:</p>
 <td><code>popup</code></td>
 <td><code>0</code>: no frame popup</td>
 </tr>
+<tr>
+<td><code>browse</code>, <code>browse_layer</code>, <code>browse_map</code></td>
+<td>open a granule's browse image (a layer), <code>browse_map=1</code> places it on the map</td>
+</tr>
 </tbody>
 </table>
 <p><code>GET $API/viewer/params</code> returns the same list. A page cannot enter the
@@ -1564,16 +1856,16 @@ with the map instead.</p>
 <ol>
 <li>
 <p><strong>Make keys.</strong> Give each person or tool a key with only the scopes it needs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>python<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="s">import hashlib, json, secrets</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="s">keys = {"alice": ["read", "jobs"], "dashboard": ["read"], "ops": ["admin"]}</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="s">out = []</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="s">for name, scopes in keys.items():</span>
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="s">    key = secrets.token_urlsafe(24)</span>
-<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s">    print(f"{name}: {key}")              # hand this to its owner</span>
-<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s">    out.append({"name": name, "sha256": hashlib.sha256(key.encode()).hexdigest(), "scopes": scopes})</span>
-<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="s">json.dump(out, open("api_keys.json", "w"), indent=1)</span>
-<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="s">EOF</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python<span class="w"> </span>-<span class="w"> </span><span class="s">&lt;&lt;'EOF'</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="s">import hashlib, json, secrets</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="s">keys = {"alice": ["read", "jobs"], "dashboard": ["read"], "ops": ["admin"]}</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="s">out = []</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="s">for name, scopes in keys.items():</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="s">    key = secrets.token_urlsafe(24)</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="s">    print(f"{name}: {key}")              # hand this to its owner</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="s">    out.append({"name": name, "sha256": hashlib.sha256(key.encode()).hexdigest(), "scopes": scopes})</span>
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="s">json.dump(out, open("api_keys.json", "w"), indent=1)</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="s">EOF</span>
 </code></pre></div>
 <p>The file keeps only the hashes. For a quick test,
 <code>NISAR_DB_API_KEYS="name:key:read+jobs,..."</code> works too.</p>
@@ -1581,10 +1873,10 @@ with the map instead.</p>
 <li>
 <p><strong>Start the server.</strong> Give it a <code>~/.netrc</code> with an Earthdata login for the
    QA images, corners and rebuilds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>nisar-db<span class="w"> </span>serve<span class="w"> </span>--mode<span class="w"> </span>shared<span class="w"> </span>--port<span class="w"> </span><span class="m">8797</span><span class="w"> </span>--keys-file<span class="w"> </span>api_keys.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">    </span>--cache-dir<span class="w"> </span>/data/nisar_db_api<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">    </span>--cors-origin<span class="w"> </span>https://opera-adt.github.io<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">    </span>--rate-limit<span class="w"> </span><span class="m">60</span><span class="w"> </span>--max-jobs<span class="w"> </span><span class="m">2</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>nisar-db<span class="w"> </span>serve<span class="w"> </span>--mode<span class="w"> </span>shared<span class="w"> </span>--port<span class="w"> </span><span class="m">8797</span><span class="w"> </span>--keys-file<span class="w"> </span>api_keys.json<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">    </span>--cache-dir<span class="w"> </span>/data/nisar_db_api<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span>--cors-origin<span class="w"> </span>https://opera-adt.github.io<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span>--rate-limit<span class="w"> </span><span class="m">60</span><span class="w"> </span>--max-jobs<span class="w"> </span><span class="m">2</span>
 </code></pre></div>
 <p>Add <code>--private-read</code> to require a key for every request, and <code>--allow-job
 download</code> to let <code>jobs</code> keys download granules.</p>
@@ -1595,11 +1887,11 @@ download</code> to let <code>jobs</code> keys download granules.</p>
 </li>
 <li>
 <p><strong>Call it with a key:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$KEY</span><span class="s2">"</span><span class="w"> </span>https://nisar-db.example.org/api/v1/jobs
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$KEY</span><span class="s2">"</span><span class="w"> </span>https://nisar-db.example.org/api/v1/jobs
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">"X-API-Key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">KEY</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">s</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">s</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">"X-API-Key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">KEY</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="n">s</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">api</span><span class="si">}</span><span class="s2">/jobs"</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"search"</span><span class="p">,</span> <span class="s2">"params"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"track"</span><span class="p">:</span> <span class="mi">34</span><span class="p">}})</span>
 </code></pre></div>
 </li>
 </ol>
