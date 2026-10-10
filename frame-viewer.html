@@ -729,6 +729,33 @@
   
   
     <li class="md-nav__item">
+      <a href="mcp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="https://www.jpl.nasa.gov/go/opera/" class="md-nav__link">
         
   
@@ -884,6 +911,11 @@ and its frames; stopping restores the cycle filter and the date range. The
 button beside it fills the screen with the map alone; Esc brings the sidebar and
 the controls back. The third, a moon with stars, sets what shows behind the globe: the
 theme's colour, white, black, or space (a starfield with the atmosphere's glow).</p>
+<p><strong>Links and the API.</strong> The page reads its state from the URL, so a link can
+open it on a product, filters, colouring, background and play mode: for example
+<code>?product=gunw&amp;cycle=20-25&amp;sky=space&amp;play=spin</code>. The <a href="api.html">REST API</a> builds
+such links (<code>/api/v1/viewer/link</code>) and answers the same queries from code; the
+<a href="mcp.html">MCP server</a> gives them to AI assistants.</p>
 <p><strong>Per-granule flags.</strong> When the viewer is built with <code>--granule-flags</code>, six
 <strong>Color frames by</strong> options paint each frame by a flag read from every product's
 HDF5 metadata. The flags are joint observation, full frame, orbit type, RFI

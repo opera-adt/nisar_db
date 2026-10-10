@@ -10,31 +10,29 @@
       
       
       
-        <link rel="canonical" href="https://opera-adt.github.io/nisar_db/background/processing-modes.html">
+        <link rel="canonical" href="https://opera-adt.github.io/nisar_db/mcp.html">
       
       
-        <link rel="prev" href="reference-dates.html">
+        <link rel="prev" href="api.html">
       
-      
-        <link rel="next" href="../tutorials/consistent-mode-database.html">
       
       
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Processing modes - OPERA NISAR-DB</title>
+        <title>MCP server (AI) - OPERA NISAR-DB</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/opera.css">
+      <link rel="stylesheet" href="stylesheets/opera.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -80,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#background-processing-modes-historical-forward" class="md-skip">
+        <a href="#mcp-server-for-ai-assistants" class="md-skip">
           Skip to content
         </a>
       
@@ -96,7 +94,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../index.html" title="OPERA NISAR-DB" class="md-header__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
+    <a href="index.html" title="OPERA NISAR-DB" class="md-header__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -116,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Processing modes
+              MCP server (AI)
             
           </span>
         </div>
@@ -232,7 +230,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../index.html" title="OPERA NISAR-DB" class="md-nav__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
+    <a href="index.html" title="OPERA NISAR-DB" class="md-nav__button md-logo" aria-label="OPERA NISAR-DB" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -262,7 +260,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../index.html" class="md-nav__link">
+      <a href="index.html" class="md-nav__link">
         
   
   
@@ -286,8 +284,6 @@
       
   
   
-    
-  
   
   
     
@@ -300,11 +296,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -325,7 +321,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -343,7 +339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="consistent-mode.html" class="md-nav__link">
+      <a href="background/consistent-mode.html" class="md-nav__link">
         
   
   
@@ -371,7 +367,7 @@
   
   
     <li class="md-nav__item">
-      <a href="blackout-dates.html" class="md-nav__link">
+      <a href="background/blackout-dates.html" class="md-nav__link">
         
   
   
@@ -399,7 +395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="reference-dates.html" class="md-nav__link">
+      <a href="background/reference-dates.html" class="md-nav__link">
         
   
   
@@ -424,37 +420,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Processing modes
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="processing-modes.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="background/processing-modes.html" class="md-nav__link">
         
   
   
@@ -470,81 +439,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#the-three-labels" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The three labels
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-nisar-reconciliation-question" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The NISAR reconciliation question
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-this-lives-in-the-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Where this lives in the code
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#producing-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Producing it
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-json-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The JSON shape
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -616,7 +510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/consistent-mode-database.html" class="md-nav__link">
+      <a href="tutorials/consistent-mode-database.html" class="md-nav__link">
         
   
   
@@ -644,7 +538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/snow-analysis.html" class="md-nav__link">
+      <a href="tutorials/snow-analysis.html" class="md-nav__link">
         
   
   
@@ -731,7 +625,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../frame-viewer.html" class="md-nav__link">
+      <a href="frame-viewer.html" class="md-nav__link">
         
   
   
@@ -759,7 +653,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data-sources.html" class="md-nav__link">
+      <a href="data-sources.html" class="md-nav__link">
         
   
   
@@ -794,7 +688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html" class="md-nav__link">
+      <a href="api.html" class="md-nav__link">
         
   
   
@@ -818,10 +712,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../mcp.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="mcp.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -837,6 +758,109 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-ways-to-connect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two ways to connect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two ways to connect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claude-code-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude Code, local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claude-desktop-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude Desktop, local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#over-http-local-or-shared" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over HTTP, local or shared
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tools
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-assistant-may-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the assistant may do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -895,10 +919,60 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-three-labels" class="md-nav__link">
+  <a href="#two-ways-to-connect" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The three labels
+        Two ways to connect
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Two ways to connect">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#claude-code-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude Code, local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#claude-desktop-local" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Claude Desktop, local
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#over-http-local-or-shared" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Over HTTP, local or shared
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The tools
       
     </span>
   </a>
@@ -906,10 +980,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-nisar-reconciliation-question" class="md-nav__link">
+  <a href="#what-the-assistant-may-do" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The NISAR reconciliation question
+        What the assistant may do
       
     </span>
   </a>
@@ -917,32 +991,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-this-lives-in-the-code" class="md-nav__link">
+  <a href="#options" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where this lives in the code
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#producing-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Producing it
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-json-shape" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The JSON shape
+        Options
       
     </span>
   </a>
@@ -969,112 +1021,227 @@
   
 
 
-<h1 id="background-processing-modes-historical-forward">Background: processing modes (historical / forward)<a class="headerlink" href="#background-processing-modes-historical-forward" title="Permanent link">&para;</a></h1>
-<p>The <a href="consistent-mode.html">consistent-mode</a> database says <em>which</em> acquisitions
-belong to a frame's stack. It does not say which of them the processor can run
-<strong>now</strong>, as a complete batch, versus which are still accumulating. That is what
-the processing-mode labels add.</p>
-<p>This mirrors <code>burst_db</code>'s
-<code>opera-disp-s1-consistent-burst-ids-with-processing-mode-*.json</code> and its
-<code>reconcile_and_label_db.py</code> step.</p>
-<h2 id="the-three-labels">The three labels<a class="headerlink" href="#the-three-labels" title="Permanent link">&para;</a></h2>
-<p>DISP processing runs in batches of a fixed size (15 acquisitions, matching
-DISP-S1). Walking a frame's sorted sensing times from the beginning:</p>
+<h1 id="mcp-server-for-ai-assistants">MCP server for AI assistants<a class="headerlink" href="#mcp-server-for-ai-assistants" title="Permanent link">&para;</a></h1>
+<p>nisar_db includes a <a href="https://modelcontextprotocol.io">Model Context Protocol</a>
+(MCP) server. An AI assistant connected to it, such as Claude Code or Claude
+Desktop, can answer questions about the NISAR frames by calling it:</p>
+<ul>
+<li>"Which frames got a 4005 acquisition in cycle 23?"</li>
+<li>"List the GUNW pairs over frame 34_19 since June."</li>
+<li>"When is frame 28533 blacked out?"</li>
+<li>"Search CMR for all GSLC granules on track 163 and give me the CSV."</li>
+</ul>
+<p>It can also give you a link that opens the viewer on what it found.</p>
+<p>The tools answer from the same frames as the <a href="api.html">REST API</a> and the
+<a href="frame-viewer.html">frame viewer</a>, and they run jobs through the same job runner,
+so all three always agree.</p>
+<h2 id="two-ways-to-connect">Two ways to connect<a class="headerlink" href="#two-ways-to-connect" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Label</th>
+<th></th>
+<th><code>nisar-db mcp</code> (stdio)</th>
+<th><code>/mcp</code> on <code>nisar-db serve</code> (HTTP)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Who starts it</td>
+<td>the AI client, on your machine</td>
+<td>you, once; clients connect by URL</td>
+</tr>
+<tr>
+<td>Good for</td>
+<td>Claude Code / Claude Desktop next to your checkout</td>
+<td>a team server, remote clients</td>
+</tr>
+<tr>
+<td>Keys</td>
+<td>none</td>
+<td>none locally; an API key in shared mode</td>
+</tr>
+<tr>
+<td>Jobs run</td>
+<td>on your machine</td>
+<td>on the server</td>
+</tr>
+</tbody>
+</table>
+<p>Both need the <code>api</code> extra: <code>pip install "nisar_db[api]"</code>. In a checkout,
+<code>pixi install</code> already includes it.</p>
+<h3 id="claude-code-local">Claude Code, local<a class="headerlink" href="#claude-code-local" title="Permanent link">&para;</a></h3>
+<p>Run this from your nisar_db checkout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>claude<span class="w"> </span>mcp<span class="w"> </span>add<span class="w"> </span>nisar-db<span class="w"> </span>--<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>pixi<span class="w"> </span>run<span class="w"> </span>which<span class="w"> </span>nisar-db<span class="k">)</span><span class="s2">"</span><span class="w"> </span>mcp<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span>--cache-dir<span class="w"> </span><span class="s2">"</span><span class="nv">$PWD</span><span class="s2">/.qa_helper_cache"</span>
+</code></pre></div>
+<p>Claude Code starts the server whenever it needs it. Check with <code>claude mcp
+list</code>, or <code>/mcp</code> inside a session. Add <code>-s user</code> to make it available in every
+project, not only this one.</p>
+<h3 id="claude-desktop-local">Claude Desktop, local<a class="headerlink" href="#claude-desktop-local" title="Permanent link">&para;</a></h3>
+<p>Add the server to <code>claude_desktop_config.json</code> (Settings → Developer → Edit
+Config), using absolute paths:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"mcpServers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"nisar-db"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">"command"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/path/to/nisar_db/.pixi/envs/default/bin/nisar-db"</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="nt">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"mcp"</span><span class="p">,</span><span class="w"> </span><span class="s2">"--cache-dir"</span><span class="p">,</span><span class="w"> </span><span class="s2">"/path/to/nisar_db/.qa_helper_cache"</span><span class="p">]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">}</span>
+</code></pre></div>
+<p>Then restart Claude Desktop.</p>
+<h3 id="over-http-local-or-shared">Over HTTP, local or shared<a class="headerlink" href="#over-http-local-or-shared" title="Permanent link">&para;</a></h3>
+<p>Every <code>nisar-db serve</code> also serves the tools at <code>/mcp</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nisar-db<span class="w"> </span>serve<span class="w">                                          </span><span class="c1"># http://127.0.0.1:8797/mcp</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>claude<span class="w"> </span>mcp<span class="w"> </span>add<span class="w"> </span>--transport<span class="w"> </span>http<span class="w"> </span>nisar-db<span class="w"> </span>http://127.0.0.1:8797/mcp
+</code></pre></div>
+<p>A shared service asks for an API key at <code>/mcp</code>, the same keys as the REST API
+(see <a href="api.html#running-a-shared-service">Running a shared service</a>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>claude<span class="w"> </span>mcp<span class="w"> </span>add<span class="w"> </span>--transport<span class="w"> </span>http<span class="w"> </span>nisar-db<span class="w"> </span>https://nisar-db.example.org/mcp<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span>--header<span class="w"> </span><span class="s2">"X-API-Key: </span><span class="nv">$NISAR_DB_KEY</span><span class="s2">"</span>
+</code></pre></div>
+<h2 id="the-tools">The tools<a class="headerlink" href="#the-tools" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>list_datasets</code></td>
+<td>The datasets: <code>published</code> (North America) and rebuilt views such as <code>globe-...</code>, with their counts</td>
+</tr>
+<tr>
+<td><code>find_frames</code></td>
+<td>Frames matching the viewer's filters (track, frame, direction, bbox, cycle, dates, modes, polarizations, CRIDs, CalVal, land, rollout, consistent mode), one page at a time</td>
+</tr>
+<tr>
+<td><code>get_frame</code></td>
+<td>One frame's summary, by <code>8109</code> or <code>34_19</code></td>
+</tr>
+<tr>
+<td><code>frame_granules</code></td>
+<td>A frame's GSLC granules, or its GUNW pairs</td>
+</tr>
+<tr>
+<td><code>frame_blackout</code></td>
+<td>A frame's blackout windows, the share of each month they cover, and its reference dates</td>
+</tr>
+<tr>
+<td><code>list_cycles</code></td>
+<td>Every cycle with its dates and frame count</td>
+</tr>
+<tr>
+<td><code>summarize</code></td>
+<td>Consistent-mode and rollout counts over filtered frames</td>
+</tr>
+<tr>
+<td><code>viewer_link</code></td>
+<td>A URL that opens the viewer in a given state</td>
+</tr>
+<tr>
+<td><code>list_job_kinds</code></td>
+<td>The <code>nisar-db</code> commands that run as jobs, with their parameters</td>
+</tr>
+<tr>
+<td><code>start_job</code></td>
+<td>Start one (CMR search, consistent-GSLC, blackout or reference dates, catalogs, ...)</td>
+</tr>
+<tr>
+<td><code>job_status</code></td>
+<td>A job's state, outputs and last log lines, or the recent jobs</td>
+</tr>
+<tr>
+<td><code>cancel_job</code></td>
+<td>Stop a job</td>
+</tr>
+<tr>
+<td><code>read_job_output</code></td>
+<td>Read a finished job's CSV / JSON output</td>
+</tr>
+</tbody>
+</table>
+<p>The server also gives the assistant short instructions: what a frame,
+granule, pair and dataset are, and which tool to start with. You can just ask in
+plain language.</p>
+<h2 id="what-the-assistant-may-do">What the assistant may do<a class="headerlink" href="#what-the-assistant-may-do" title="Permanent link">&para;</a></h2>
+<p>The tools can read the catalog and run <code>nisar-db</code> jobs. They cannot rebuild the
+viewer, which is a crawl of all of CMR, or read files outside a job's folder.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Local (stdio, or <code>serve</code> in local mode)</th>
+<th>Shared <code>serve</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Catalog tools</td>
+<td>yes</td>
+<td>any valid key</td>
+</tr>
+<tr>
+<td>Job tools</td>
+<td>yes</td>
+<td>a key with the <code>jobs</code> scope</td>
+</tr>
+<tr>
+<td>Whose jobs it sees</td>
+<td>all</td>
+<td>its key's own (<code>admin</code> sees all)</td>
+</tr>
+<tr>
+<td>Downloads, S3 catalogs</td>
+<td>yes</td>
+<td>only with <code>--allow-job</code></td>
+</tr>
+<tr>
+<td>Job input files</td>
+<td>any path</td>
+<td><code>catalog/</code>, rebuilt views, job outputs</td>
+</tr>
+</tbody>
+</table>
+<p>A refused call comes back to the assistant with the reason, for example "the
+key 'reader' lacks the 'jobs' scope", so it can tell you what is missing.</p>
+<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">&para;</a></h2>
+<p><code>nisar-db mcp</code> takes:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>historical_NN</code></td>
-<td>Part of a full batch. Processable now, and the result is final.</td>
+<td><code>--cache-dir</code></td>
+<td><code>.qa_helper_cache</code></td>
+<td>Where rebuilt views are read from and jobs run</td>
 </tr>
 <tr>
-<td><code>forward_NN</code></td>
-<td>The trailing partial batch. Reprocessed as new acquisitions arrive.</td>
+<td><code>--viewer-html</code></td>
+<td>the checkout's page</td>
+<td>The <code>published</code> dataset</td>
 </tr>
 <tr>
-<td><code>no_run</code></td>
-<td>The frame has never accumulated a full batch. Nothing to run yet.</td>
+<td><code>--viewer-url</code></td>
+<td><code>http://127.0.0.1:8797</code></td>
+<td>Where viewer links point (a running <code>nisar-db serve</code>)</td>
+</tr>
+<tr>
+<td><code>--max-jobs</code></td>
+<td>2</td>
+<td>Jobs running at once</td>
 </tr>
 </tbody>
 </table>
-<p><code>NN</code> is a group number. It increments after any gap longer than
-<code>--gap-threshold-years</code> (default 2.0), because a stack cannot span such a gap --
-the acquisitions on either side belong to separate time series, and batch
-counting restarts.</p>
-<p>For a young mission this distribution is lopsided by construction: most NISAR
-frames carry one partial batch, so <code>forward_01</code> and <code>no_run</code> dominate and the
-<code>historical</code> fraction grows with every release.</p>
-<h2 id="the-nisar-reconciliation-question">The NISAR reconciliation question<a class="headerlink" href="#the-nisar-reconciliation-question" title="Permanent link">&para;</a></h2>
-<p><code>burst_db</code> also diffs each release against the previous one, looking for frames
-whose <code>burst_id_list</code> changed -- a changed burst set invalidates the existing
-stack.</p>
-<p>NISAR frames have no burst list: the footprint is fixed by the mission. The
-equivalent invalidation is the winning <strong><code>(common_mode, common_coverage)</code></strong>
-flipping between releases, since that changes which acquisitions were selected
-as consistent. Passing <code>--previous-json</code> records those frames under
-<code>metadata.frames_with_changed_mode</code>.</p>
-<h2 id="where-this-lives-in-the-code">Where this lives in the code<a class="headerlink" href="#where-this-lives-in-the-code" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Piece</th>
-<th>Location</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Labeling + reconciliation</td>
-<td><a href="https://github.com/opera-adt/nisar_db/blob/main/src/nisar_db/processing_mode.py"><code>processing_mode.py</code></a></td>
-</tr>
-<tr>
-<td>Sentinel-1 reference (for parity)</td>
-<td><code>burst_db</code>'s <a href="https://github.com/opera-adt/burst_db/blob/main/src/burst_db/reconcile_and_label_db.py"><code>reconcile_and_label_db.py</code></a></td>
-</tr>
-</tbody>
-</table>
-<h2 id="producing-it">Producing it<a class="headerlink" href="#producing-it" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>nisar-db<span class="w"> </span>label-processing-mode<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--consistent-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-07-25.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--previous-json<span class="w"> </span>opera-nisar-disp-consistent-gslc-2026-04-25.json<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--output<span class="w"> </span>opera-nisar-disp-consistent-gslc-with-processing-mode-2026-07-25.json
-</code></pre></div>
-<pre class="mermaid"><code>flowchart LR
-    A["Consistent-GSLC JSON"] --&gt; B["split on gaps &gt;&lt;br/&gt;gap_threshold_years"]
-    B --&gt; C["batch in groups of&lt;br/&gt;batch_size"]
-    C --&gt; D["historical / forward / no_run"]
-    E["Previous release"] -.-&gt; F["frames_with_changed_mode"]
-    D --&gt; G["…-with-processing-mode-*.json"]
-    F -.-&gt; G</code></pre>
-<h2 id="the-json-shape">The JSON shape<a class="headerlink" href="#the-json-shape" title="Permanent link">&para;</a></h2>
-<p>Identical to the consistent-GSLC document, except that <code>sensing_time_list</code>
-becomes a mapping from sensing time to label. Every other per-frame field is
-carried through unchanged:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">"metadata"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">"processing_mode_params"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">"batch_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">      </span><span class="nt">"gap_threshold_years"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.0</span><span class="p">,</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">"labeling_time"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-07-25T12:00:00"</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p">},</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">"frames_with_changed_mode"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"5830"</span><span class="p">]</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="p">},</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">"data"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">"5827"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">"common_mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"4005"</span><span class="p">,</span>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">      </span><span class="nt">"common_coverage"</span><span class="p">:</span><span class="w"> </span><span class="s2">"F"</span><span class="p">,</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">"sensing_time_list"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">"2025-01-05T01:23:45"</span><span class="p">:</span><span class="w"> </span><span class="s2">"historical_01"</span><span class="p">,</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">"2026-01-12T01:23:45"</span><span class="p">:</span><span class="w"> </span><span class="s2">"forward_01"</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">      </span><span class="p">}</span>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p">}</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="p">}</span>
-</code></pre></div>
+<p>Over HTTP, links point to the server itself. Behind a proxy, give
+<code>nisar-db serve</code> the address clients use with <code>--public-url</code>.</p>
 
 
 
@@ -1155,10 +1322,10 @@ carried through unchanged:</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.sections", "navigation.top", "navigation.tracking", "content.code.copy", "content.code.annotate", "toc.follow"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

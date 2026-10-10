@@ -806,6 +806,33 @@
   
   
     <li class="md-nav__item">
+      <a href="mcp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="https://www.jpl.nasa.gov/go/opera/" class="md-nav__link">
         
   
@@ -998,6 +1025,13 @@ are no sub-frame burst IDs).</p>
 <li><strong><a href="tutorials/snow-analysis.html">Tutorials → Derive blackout dates from snow cover</a></strong>
   — the upstream analysis: NOAA GEFS snow and temperature into per-frame
   blackout windows, and what those windows cost the stack.</li>
+<li><strong><a href="frame-viewer.html">Frame viewer</a></strong> — every frame on a map, with its
+  granules, interferograms, consistent mode, blackouts, flags and QA, rebuilt
+  weekly from CMR.</li>
+<li><strong><a href="api.html">REST API</a></strong> — <code>nisar-db serve</code>: catalog queries, <code>nisar-db</code>
+  commands as jobs and viewer links, locally or as a shared service.</li>
+<li><strong><a href="mcp.html">MCP server</a></strong> — the same tools for AI assistants such as Claude
+  (<code>nisar-db mcp</code>).</li>
 </ul>
 <h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">pip</label><label for="__tabbed_1_2">conda</label></div>
@@ -1053,8 +1087,10 @@ are no sub-frame burst IDs).</p>
 <a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="go">  download                Download NISAR granules/URLs from CMR.</span>
 <a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="go">  download-frame-db       Download the global NISAR TrackFrame database.</span>
 <a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="go">  label-processing-mode   Add historical/forward processing-mode labels.</span>
-<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="go">  query-catalog           Query a catalog built by build-s3-catalog.</span>
-<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="go">  search                  Search for NISAR products.</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="go">  mcp                     Serve the nisar_db tools to an AI client over MCP.</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="go">  query-catalog           Query a catalog built by build-s3-catalog.</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="go">  search                  Search for NISAR products.</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="go">  serve                   Serve the REST API, the viewer and its helper.</span>
 </code></pre></div>
 <h2 id="release-assets">Release assets<a class="headerlink" href="#release-assets" title="Permanent link">&para;</a></h2>
 <p><code>make all</code> builds the full DISP-NISAR asset set, and pushing a <code>v*</code> tag attaches
