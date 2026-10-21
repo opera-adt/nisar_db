@@ -31,6 +31,7 @@ it can also be run by hand::
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import tempfile
 from collections.abc import Callable
@@ -136,14 +137,16 @@ def with_catalog_flags(
 
 
 def search_gslc(
-    bbox: tuple[float, ...] | None, workdir: Path
+    bbox: tuple[float, ...] | None, workdir: Path, report: object = None
 ) -> tuple[pd.DataFrame, dict[str, dict]]:
     """Search CMR for GSLC granules: the viewer's catalog and their CMR flags."""
     from nisar_db.gslc_catalog import parse_gslc_list, write_catalog_csv
     from nisar_db.search.cmr import search_nisar_products
     from nisar_db.search.frames import products_to_dataframe
 
-    products = search_nisar_products(bbox=bbox, product_type="GSLC", max_results=0)
+    products = search_nisar_products(
+        bbox=bbox, product_type="GSLC", max_results=0, report=report
+    )
     found = products_to_dataframe(products)
     listing = workdir / "gslc_search.csv"
     found[["name", "url"]].to_csv(listing, index=False)
@@ -190,13 +193,79 @@ def gunw_rows(names: list[str]) -> pd.DataFrame:
 
 
 def search_gunw(
-    bbox: tuple[float, ...] | None,
+    bbox: tuple[float, ...] | None, report: object = None
 ) -> tuple[pd.DataFrame, dict[str, dict]]:
     """Search CMR for GUNW granules: the viewer's catalog and their CMR flags."""
     from nisar_db.search.cmr import search_nisar_products
 
-    products = search_nisar_products(bbox=bbox, product_type="GUNW", max_results=0)
+    products = search_nisar_products(
+        bbox=bbox, product_type="GUNW", max_results=0, report=report
+    )
     return gunw_rows([p.name for p in products]), catalog_flags(products)
+
+
+#: Files of a saved catalog; ``catalog.json`` says when and over what it was searched.
+SAVED_GSLC = "gslc_catalog.csv.gz"
+SAVED_GUNW = "gunw_catalog.csv.gz"
+SAVED_FLAGS = "cmr_flags.json.gz"
+SAVED_INFO = "catalog.json"
+
+
+def save_catalog(
+    directory: Path,
+    gslc: pd.DataFrame,
+    gunw: pd.DataFrame,
+    cmr_flags: dict[str, dict],
+    info: dict,
+) -> None:
+    """Save a build's CMR search results, so later builds can skip CMR.
+
+    ``info`` records when the search ran and the box it covered (``None`` for
+    the whole archive), plus anything else worth keeping, such as the CMR
+    reports.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    gslc[gen._CATALOG_COLUMNS].to_csv(directory / SAVED_GSLC, index=False)
+    gunw[gen._GUNW_COLUMNS].to_csv(directory / SAVED_GUNW, index=False)
+    with gzip.open(directory / SAVED_FLAGS, "wt") as fh:
+        json.dump(cmr_flags, fh, separators=(",", ":"))
+    info = {
+        **info,
+        "n_gslc": int(len(gslc)),
+        "n_gunw": int(len(gunw)),
+    }
+    (directory / SAVED_INFO).write_text(json.dumps(info, indent=1) + "\n")
+
+
+def load_catalog(
+    directory: Path, bbox: tuple[float, ...] | None
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, dict], dict]:
+    """Load a catalog :func:`save_catalog` wrote, for a page covering ``bbox``.
+
+    Raises
+    ------
+    ValueError
+        When the catalog was searched over a box that does not contain
+        ``bbox`` (``None`` meaning the whole archive).
+
+    """
+    info = json.loads((directory / SAVED_INFO).read_text())
+    saved = info.get("bbox")
+    if saved is not None and (
+        bbox is None or not box(*saved).buffer(1e-9).contains(box(*bbox))
+    ):
+        raise ValueError(
+            f"the saved catalog in {directory} covers only the box {saved}, "
+            f"not {'the whole archive' if bbox is None else list(bbox)}"
+        )
+    gslc = gen.load_gslc_catalog_csv(directory / SAVED_GSLC)
+    gunw = pd.read_csv(
+        directory / SAVED_GUNW,
+        dtype={c: str for c in gen._GUNW_COLUMNS if c not in ("track", "frame")},
+    )
+    with gzip.open(directory / SAVED_FLAGS, "rt") as fh:
+        cmr_flags = json.load(fh)
+    return gslc, gunw, cmr_flags, info
 
 
 def on_frames(rows: pd.DataFrame, frames: gpd.GeoDataFrame) -> pd.DataFrame:
@@ -259,6 +328,8 @@ def build_view(
     collect_qa: bool = False,
     cache_dir: Path | None = None,
     land_only: bool = False,
+    catalog_dir: Path | None = None,
+    save_catalog_dir: Path | None = None,
 ) -> dict:
     """Search CMR, build the frame data for ``scope`` and write the page.
 
@@ -281,6 +352,10 @@ def build_view(
         Where the local flag and QA caches live.
     land_only : bool
         Leave out the frames with no land.
+    catalog_dir : Path, optional
+        Build from a catalog saved earlier instead of searching CMR.
+    save_catalog_dir : Path, optional
+        Save this build's CMR search results here for later builds.
 
     Returns
     -------
@@ -299,12 +374,36 @@ def build_view(
     )
     search_box = tuple(bbox) if scope == "bbox" and bbox is not None else None
 
-    with tempfile.TemporaryDirectory() as tmp:
-        progress(f"Searching CMR for GSLC granules ({len(gdf)} frames)")
-        catalog, cmr_flags = search_gslc(search_box, Path(tmp))
-    progress(f"Searching CMR for GUNW granules ({len(catalog)} GSLC found)")
-    gunw, gunw_flags = search_gunw(search_box)
-    cmr_flags.update(gunw_flags)
+    if catalog_dir is not None:
+        progress(f"Reading the saved catalog in {catalog_dir}")
+        catalog, gunw, cmr_flags, saved_info = load_catalog(catalog_dir, search_box)
+        queried_at = saved_info["queried_at"]
+        source = f"CMR (saved catalog, searched {queried_at[:10]})"
+    else:
+        from nisar_db.search.cmr import CMRSearchReport
+
+        queried_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        source = "CMR (local search)"
+        reports = {"GSLC": CMRSearchReport(), "GUNW": CMRSearchReport()}
+        with tempfile.TemporaryDirectory() as tmp:
+            progress(f"Searching CMR for GSLC granules ({len(gdf)} frames)")
+            catalog, cmr_flags = search_gslc(search_box, Path(tmp), reports["GSLC"])
+        progress(f"Searching CMR for GUNW granules ({len(catalog)} GSLC found)")
+        gunw, gunw_flags = search_gunw(search_box, reports["GUNW"])
+        cmr_flags.update(gunw_flags)
+        if save_catalog_dir is not None:
+            progress(f"Saving the catalog to {save_catalog_dir}")
+            save_catalog(
+                save_catalog_dir,
+                catalog,
+                gunw,
+                cmr_flags,
+                {
+                    "queried_at": queried_at,
+                    "bbox": list(search_box) if search_box else None,
+                    "cmr_reports": {k: r.to_dict() for k, r in reports.items()},
+                },
+            )
 
     # The globe and North America searches cover the whole archive; only the
     # granules of this page's frames are worth collecting.
@@ -354,8 +453,8 @@ def build_view(
     meta = {
         "title": "OPERA NISAR-DB Viewer",
         "generated_at": now,
-        "catalog_queried_at": now,
-        "catalog_source": "CMR (local search)",
+        "catalog_queried_at": queried_at,
+        "catalog_source": source,
         "catalog_kind": "cmr",
         "n_frames": len(frame_data["features"]),
         "n_frames_with_gslc": n_with,
@@ -427,7 +526,21 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help="Local flag / QA caches, merged with the repository's.",
     )
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=None,
+        help="Build from a catalog saved with --save-catalog instead of CMR.",
+    )
+    parser.add_argument(
+        "--save-catalog",
+        type=Path,
+        default=None,
+        help="Save this build's CMR search results to this directory.",
+    )
     args = parser.parse_args(argv)
+    if args.catalog is not None and args.save_catalog is not None:
+        parser.error("--catalog and --save-catalog cannot be used together")
     bbox = tuple(float(v) for v in args.bbox.split(",")) if args.bbox else None
 
     def say(msg: str) -> None:
@@ -447,6 +560,8 @@ def main(argv: list[str] | None = None) -> None:
         collect_qa=args.collect_qa,
         cache_dir=args.cache_dir,
         land_only=args.land_only,
+        catalog_dir=args.catalog,
+        save_catalog_dir=args.save_catalog,
     )
     say(META_LINE + json.dumps({"n_frames": meta["n_frames"]}))
 

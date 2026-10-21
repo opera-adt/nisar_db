@@ -497,9 +497,17 @@ class ViewBuilds:
     viewer polls :meth:`status` and opens the page when it is done.
     """
 
-    def __init__(self, root: Path, trackframe_gpkg: Path | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        trackframe_gpkg: Path | None = None,
+        catalog_dir: Path | None = None,
+    ) -> None:
         self.root = root / "views"
         self.trackframe_gpkg = trackframe_gpkg
+        # A saved catalog (build_local_view.py --save-catalog) to build from
+        # instead of searching CMR, e.g. for an offline demo.
+        self.catalog_dir = catalog_dir
         self._job: dict | None = None
         self._lock = threading.Lock()
 
@@ -584,6 +592,8 @@ class ViewBuilds:
             cmd += ["--bbox=" + ",".join(str(v) for v in job["bbox"])]
         if self.trackframe_gpkg is not None:
             cmd += ["--trackframe-gpkg", str(self.trackframe_gpkg)]
+        if self.catalog_dir is not None:
+            cmd += ["--catalog", str(self.catalog_dir)]
         if job["collect_flags"]:
             cmd.append("--collect-flags")
         if job["collect_qa"]:
@@ -828,6 +838,13 @@ def main(argv: list[str] | None = None) -> None:
         help="NISAR TrackFrame GeoPackage for the viewer's search; downloaded into "
         "--cache-dir on the first search when omitted.",
     )
+    parser.add_argument(
+        "--catalog-dir",
+        type=Path,
+        default=None,
+        help="Build the viewer's searches from this saved catalog "
+        "(build_local_view.py --save-catalog) instead of CMR.",
+    )
     args = parser.parse_args(argv)
     args.cache_dir.mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer(
@@ -835,7 +852,7 @@ def main(argv: list[str] | None = None) -> None:
         make_handler(
             QaCache(args.cache_dir, EarthdataAuth()),
             ViewerPage(args.viewer_html),
-            ViewBuilds(args.cache_dir, args.trackframe_gpkg),
+            ViewBuilds(args.cache_dir, args.trackframe_gpkg, args.catalog_dir),
         ),
     )
     print(
