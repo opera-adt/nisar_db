@@ -446,6 +446,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="background/cmr-umm-json-drops.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CMR UMM-JSON drops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -990,7 +1018,7 @@ it is derived. Values are listed by where they live: per frame, per granule
 </tr>
 <tr>
 <td><strong>CMR</strong></td>
-<td>NASA's Common Metadata Repository, <code>https://cmr.earthdata.nasa.gov/search/granules.umm_json</code>, collections <code>NISAR_L2_GSLC_PROVISIONAL_V1</code> and <code>NISAR_L2_GUNW_PROVISIONAL_V1</code></td>
+<td>NASA's Common Metadata Repository, <code>https://cmr.earthdata.nasa.gov/search/granules.umm_json</code>, collections <code>NISAR_L2_GSLC_PROVISIONAL_V1</code> and <code>NISAR_L2_GUNW_PROVISIONAL_V1</code>. UMM-JSON leaves some granules out of its results while counting them in <code>CMR-Hits</code> (seen October 2026), so every search is checked against the atom-JSON <code>granules.json</code> listing and the missing records are fetched from <code>search/concepts/&lt;id&gt;</code> (<a href="background/cmr-umm-json-drops.html">details</a>)</td>
 <td>public</td>
 </tr>
 <tr>
