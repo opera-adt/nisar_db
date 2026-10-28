@@ -218,3 +218,81 @@ def test_a_killed_build_is_reported(
     status = builds.status()
     assert status["state"] == "error"
     assert "killed (signal 9)" in status["step"]
+
+
+def _saved_catalog(tmp_path: Path, bbox: list[float] | None) -> tuple[ModuleType, Path]:
+    import pandas as pd
+
+    builder = _load("build_local_view")
+    gslc = pd.DataFrame(
+        {
+            "track": [1],
+            "frame": [10],
+            "direction": ["A"],
+            "mode": ["4005"],
+            "coverage": ["F"],
+            "polarization": ["DHDH"],
+            "cycle": ["031"],
+            "granule_id": ["NISAR_L2_PR_GSLC_X"],
+            "start_datetime": ["2026-09-28T23:11:25"],
+        }
+    )
+    gunw = builder.gunw_rows([GUNW])
+    directory = tmp_path / "saved"
+    builder.save_catalog(
+        directory,
+        gslc,
+        gunw,
+        {GUNW: {"o": "MOE"}},
+        {"queried_at": "2026-10-21T18:24:08+00:00", "bbox": bbox},
+    )
+    return builder, directory
+
+
+def test_saved_catalog_round_trips(tmp_path: Path) -> None:
+    builder, directory = _saved_catalog(tmp_path, None)
+
+    gslc, gunw, flags, info = builder.load_catalog(directory, None)
+
+    assert gslc["granule_id"].tolist() == ["NISAR_L2_PR_GSLC_X"]
+    assert gslc["mode"].tolist() == ["4005"]  # a code, not a number
+    assert gslc["date"].tolist() == ["2026-09-28"]
+    assert gunw.to_dict("records") == builder.gunw_rows([GUNW]).to_dict("records")
+    assert flags == {GUNW: {"o": "MOE"}}
+    assert (info["n_gslc"], info["n_gunw"]) == (1, 1)
+
+
+def test_box_catalog_only_serves_pages_inside_its_box(tmp_path: Path) -> None:
+    builder, directory = _saved_catalog(tmp_path, [-125.0, 32.0, -114.0, 42.0])
+
+    assert builder.load_catalog(directory, (-123.0, 35.0, -120.0, 38.0))[3]["bbox"]
+    with pytest.raises(ValueError, match="covers only the box"):
+        builder.load_catalog(directory, None)
+    with pytest.raises(ValueError, match="covers only the box"):
+        builder.load_catalog(directory, (0.0, 0.0, 1.0, 1.0))
+
+
+def test_builds_use_the_servers_saved_catalog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    helper = _load("qa_browse_server")
+    builds = helper.ViewBuilds(tmp_path, catalog_dir=tmp_path / "saved")
+    seen: list[list[str]] = []
+
+    def popen(cmd: list[str], **_kwargs: object) -> contextlib.nullcontext:
+        seen.append(cmd)
+        return _fake_build([helper.META_LINE + '{"n_frames": 1}'], 0)
+
+    monkeypatch.setattr(helper.subprocess, "Popen", popen)
+    job = {
+        "id": "globe-1",
+        "scope": "globe",
+        "bbox": None,
+        "collect_flags": False,
+        "collect_qa": False,
+    }
+    builds._job = dict(job, state="running")
+    builds._run(job)
+
+    i = seen[0].index("--catalog")
+    assert seen[0][i + 1] == str(tmp_path / "saved")
