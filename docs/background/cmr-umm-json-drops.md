@@ -94,6 +94,9 @@ Write it from the command line with `--cmr-report`:
 nisar-db search --product-type GUNW --max-results 0 --cmr-report gunw_cmr_report.json
 ```
 
+A local viewer build that saves its catalog (see below) stores the GSLC and
+GUNW reports in the catalog's `catalog.json`.
+
 ## Runtime cost
 
 The extra cost is the atom-JSON listing, which every search pays, plus one
@@ -114,6 +117,29 @@ concepts endpoint. A local search-and-rebuild over one box stays small. If the
 cost matters, the atom-JSON listing could run at the same time as the
 UMM-JSON walk, and the concepts endpoint could take more workers, which CMR
 may rate-limit.
+
+## Building the viewer without CMR
+
+A global search now takes half an hour, so a local build can save what it
+found and later builds can reuse it:
+
+```bash
+# Search CMR once and save the catalog next to the page
+python scripts/build_local_view.py --scope globe \
+    --output .qa_helper_cache/views/globe-20261021T190000.html \
+    --save-catalog .qa_helper_cache/catalogs/globe-20261021T190000
+
+# Rebuild any scope from it, with no CMR search
+python scripts/build_local_view.py --scope na --output na.html \
+    --catalog .qa_helper_cache/catalogs/globe-20261021T190000
+
+# Or have the viewer's own search button build from it
+python scripts/qa_browse_server.py --cache-dir .qa_helper_cache \
+    --catalog-dir .qa_helper_cache/catalogs/globe-20261021T190000
+```
+
+The page shows when its catalog was searched. A catalog saved from a box
+only serves pages inside that box.
 
 ## How to check one granule
 
