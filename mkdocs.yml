@@ -45,6 +45,13 @@ nav:
       - Reference (reset) dates: background/reference-dates.md
       - Processing modes: background/processing-modes.md
       - CMR UMM-JSON drops: background/cmr-umm-json-drops.md
+      - NISAR product metadata: background/nisar-product-metadata.md
+      - Metadata for the viewer: background/viewer-metadata-candidates.md
+  - Product layouts:
+      - RSLC: products/rslc.md
+      - GSLC: products/gslc.md
+      - GUNW: products/gunw.md
+      - GOFF: products/goff.md
   - Tutorials:
       - Build a consistent-mode database: tutorials/consistent-mode-database.md
       - Derive blackout dates from snow cover: tutorials/snow-analysis.md

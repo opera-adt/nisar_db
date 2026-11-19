@@ -126,6 +126,10 @@ Histogram statistics weight each bin centre by `density * bin width`; the
 median interpolates inside the bin where the cumulative weight crosses one
 half (`hist_stats` in `scripts/collect_granule_qa.py`).
 
+Values the products carry that the viewer does not show yet, with what each
+costs to collect, are listed in
+[Metadata for the viewer](background/viewer-metadata-candidates.md).
+
 ## Browse and QA images
 
 | Image | Source | Access |
